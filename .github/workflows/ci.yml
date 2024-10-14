@@ -1,6 +1,7 @@
 name: CI
 
 on:
+workflow_dispatch:
   push:
     branches: [ main, hd, dev ]
   pull_request:
@@ -643,4 +644,3 @@ jobs:
           path: |
             ./cpymo-backends/text/cpymo-text
             ./cpymo-backends/text/cpymo-text.exe
-
