@@ -157,7 +157,7 @@ jobs:
         submodules: true
 
     - name: Setup Ninja
-      uses: ashutoshvarma/setup-ninja@v4.1
+      uses: ashutoshvarma/setup-ninja@v1.1
 
     - name: Install PSPDEV
       run: |
@@ -269,7 +269,7 @@ jobs:
         distribution: 'microsoft'
 
     - name: Setup NDK
-      uses: nttld/setup-ndk@v4
+      uses: nttld/setup-ndk@v1
       id: setup-ndk
       with:
         ndk-version: r21e
@@ -322,10 +322,10 @@ jobs:
         submodules: true
 
     - name: Find Visual Studio
-      uses: ilammy/msvc-dev-cmd@v4
+      uses: ilammy/msvc-dev-cmd@v1
 
     - name: Set up NASM
-      uses: ilammy/setup-nasm@v4.3.1
+      uses: ilammy/setup-nasm@v1.3.1
 
     - name: Donwload vcpkg
       run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
@@ -484,17 +484,17 @@ jobs:
             vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
-    - uses: ilammy/msvc-dev-cmd@v4
+    - uses: ilammy/msvc-dev-cmd@v1
       if: ${{ runner.os == 'Windows' }}
       with:
         arch: ${{ matrix.arch }}
 
     - name: Set up NASM
-      uses: ilammy/setup-nasm@v4.3.1
+      uses: ilammy/setup-nasm@v1.3.1
       if: ${{ runner.os != 'Windows' }}
 
     - name: Setup pkg-config
@@ -565,7 +565,7 @@ jobs:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
@@ -610,7 +610,7 @@ jobs:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
