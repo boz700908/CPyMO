@@ -1,7 +1,6 @@
 name: CI
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main, hd, dev ]
   pull_request:
@@ -18,7 +17,7 @@ jobs:
     container: devkitpro/devkita64:20230507
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -28,7 +27,7 @@ jobs:
         make -j -f Makefile.Switch
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Nintendo Switch
         path: ./cpymo-backends/sdl2/cpymo.nro
@@ -39,7 +38,7 @@ jobs:
     container: devkitpro/devkitarm:latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -64,13 +63,13 @@ jobs:
         ./makerom -f cia -o cpymo.cia -elf ./build/cpymo.elf -rsf cpymo.rsf -exefslogo -target t -icon icon -banner banner
 
     - name: Upload cia
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Nintendo 3DS (cia)
         path: ./cpymo-backends/3ds/cpymo.cia
 
     - name: Upload 3dsx
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Nintendo 3DS (3dsx)
         path: ./cpymo-backends/3ds/cpymo.3dsx
@@ -81,7 +80,7 @@ jobs:
     container: devkitpro/devkitppc:20230110
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
         with:
           submodules: true
 
@@ -93,7 +92,7 @@ jobs:
           mv wii-icon.png icon.png
 
       - name: 'Upload'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2.3.0
         with:
           name: CPyMO for Nintendo Wii
           path: |
@@ -106,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -141,7 +140,7 @@ jobs:
         make -f Makefile.PSV -j
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Sony PSV
         path: |
@@ -152,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -188,7 +187,7 @@ jobs:
         make -f Makefile.PSP -j
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Sony PSP
         path: ./cpymo-backends/sdl2/EBOOT.PBP
@@ -199,7 +198,7 @@ jobs:
     container: emscripten/emsdk:latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -220,7 +219,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
         with:
           submodules: true
 
@@ -248,7 +247,7 @@ jobs:
           mv ./cpymo.ipa ../../../cpymo.ipa
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2.3.0
         with:
           name: CPyMO for iOS
           path: ./cpymo.ipa
@@ -258,24 +257,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
     - name: Setup JDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v3
       with:
         java-version: '17'
         distribution: 'microsoft'
-        cache: 'gradle'
 
     - name: Setup NDK
       uses: nttld/setup-ndk@v1
       id: setup-ndk
       with:
-        ndk-version: r23c
-        link-to-sdk: true
-        add-to-path: true
+        ndk-version: r21e
 
     - name: Build FFmpeg
       env:
@@ -302,14 +298,14 @@ jobs:
         ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY: 1
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Android
         path: |
           ./cpymo-signed.apk
 
     - name: Upload (Accessibility)
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Android (Accessibility)
         path: |
@@ -320,7 +316,7 @@ jobs:
     runs-on: 'windows-latest'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -349,7 +345,7 @@ jobs:
         popd
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Universal Windows Platform
         path: ./cpymo-backends/uwp/AppPackages/CPyMO/
@@ -362,7 +358,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -396,7 +392,7 @@ jobs:
         mv COPYING COPYING.SDL.txt
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Windows (SDL 1.2)
         path: |
@@ -409,7 +405,7 @@ jobs:
     runs-on: 'ubuntu-latest'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v1
       with:
         submodules: true
 
@@ -426,7 +422,7 @@ jobs:
         strip ./cpymo
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       with:
         name: CPyMO for Linux (SDL 1.2)
         path: ./cpymo-backends/sdl1/cpymo
@@ -487,7 +483,7 @@ jobs:
             vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v2
       with:
         submodules: 'recursive'
 
@@ -540,7 +536,7 @@ jobs:
         strip ./build/build/cpymo-tool
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       if: ${{ runner.os != 'Windows' }}
       with:
         name: CPyMO for ${{ matrix.package-name }}
@@ -551,7 +547,7 @@ jobs:
             ./build/build/MinSizeRel/cpymo-tool.exe
 
     - name: Upload
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v2.3.0
       if: ${{ runner.os == 'Windows' }}
       with:
         name: CPyMO for ${{ matrix.package-name }}
@@ -568,7 +564,7 @@ jobs:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v2
         with:
           submodules: 'recursive'
 
@@ -595,7 +591,7 @@ jobs:
           strip ./cpymo-ascii-art.exe
 
       - name: 'Upload'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2.3.0
         with:
           name: CPyMO ASCII Art for ${{ runner.os }}
           path: |
@@ -613,7 +609,7 @@ jobs:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v2
         with:
           submodules: 'recursive'
 
@@ -641,7 +637,7 @@ jobs:
           strip cpymo-text.exe
 
       - name: 'Upload'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2.3.0
         with:
           name: CPyMO Text for ${{ runner.os }}
           path: |
