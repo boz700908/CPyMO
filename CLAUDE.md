@@ -190,6 +190,7 @@ make
 - Android: `ENABLE_TEXT_EXTRACT` and `ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY` enable text-to-speech and accessibility gestures.
 - iOS: `ENABLE_IOS_ACCESSIBILITY=ON` enables the Android-equivalent accessibility interaction model while retaining iOS 9 support.
 - Windows SDL2 accessibility builds send short interaction feedback to every connected controller that supports SDL rumble; unsupported controllers are ignored.
+- macOS desktop builds use `NSSpeechSynthesizer` for extracted text without external runtime dependencies. Linux desktop builds invoke Speech Dispatcher's `spd-say`; install and enable `speech-dispatcher` plus a voice engine for narration.
 - `ENABLE_EXIT_CONFIRM=1` - Prompt confirmation on exit
 
 ### Performance Tuning

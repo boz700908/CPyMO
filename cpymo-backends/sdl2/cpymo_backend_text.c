@@ -15,6 +15,12 @@
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 #include <windows.h>
 #include <Tolk.h>
+#elif defined(__APPLE__) && !defined(__IOS__)
+extern void cpymo_macos_accessibility_announce(const char *text);
+#elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
+#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
 #elif defined(__IOS__)
 extern void cpymo_ios_accessibility_announce(const char *text);
 extern void cpymo_ios_accessibility_play_sound(int sound_type);
@@ -194,6 +200,33 @@ void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
     cpymo_ios_accessibility_announce(text);
+}
+#elif defined(__APPLE__)
+void cpymo_backend_text_extract_init(void) {}
+void cpymo_backend_text_extract_free(void) {}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    cpymo_macos_accessibility_announce(text);
+}
+#elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
+void cpymo_backend_text_extract_init(void)
+{
+    signal(SIGCHLD, SIG_IGN);
+}
+
+void cpymo_backend_text_extract_free(void) {}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+
+    pid_t child = fork();
+    if (child == 0) {
+        execlp("spd-say", "spd-say", "--", text, (char *)NULL);
+        _exit(127);
+    }
 }
 #else
 void cpymo_backend_text_extract_init(void) {}

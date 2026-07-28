@@ -2,6 +2,10 @@
 
 project ("cpymo")
 
+if (APPLE)
+	enable_language(OBJC)
+endif ()
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
@@ -10,6 +14,8 @@ add_definitions (-D_CRT_SECURE_NO_WARNINGS)
 add_definitions (-DENABLE_TEXT_EXTRACT)
 if (WIN32)
 	add_definitions (-DENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
+elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
+	add_definitions (-DENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
 endif ()
 add_definitions (-DENABLE_EXIT_CONFIRM)
 add_definitions (-DLEAKCHECK)

@@ -9,6 +9,11 @@ file (GLOB CPYMO_BACKEND_SRC "*.h" "*.c")
 
 add_executable (cpymo ${CPYMO_BACKEND_SRC})
 
+if (APPLE AND NOT IOS)
+	target_sources(cpymo PRIVATE "cpymo_backend_text_macos.m")
+	target_link_libraries(cpymo PRIVATE "-framework AppKit")
+endif ()
+
 target_link_libraries(cpymo PRIVATE 
 	SDL2::SDL2 
 	SDL2::SDL2main 
