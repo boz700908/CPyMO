@@ -172,23 +172,23 @@ jobs:
           mv wii-meta.xml meta.xml
           mv wii-icon.png icon.png
 
-    - name: 'Upload (Standard)'
-      uses: actions/upload-artifact@v4
-      with:
-        name: CPyMO for Nintendo Wii
-        path: |
-          ./cpymo-backends/sdl1/boot.dol
-          ./cpymo-backends/sdl1/icon.png
-          ./cpymo-backends/sdl1/meta.xml
+      - name: 'Upload (Standard)'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPyMO for Nintendo Wii
+          path: |
+            ./cpymo-backends/sdl1/boot.dol
+            ./cpymo-backends/sdl1/icon.png
+            ./cpymo-backends/sdl1/meta.xml
 
-    - name: 'Upload (Accessibility)'
-      uses: actions/upload-artifact@v4
-      with:
-        name: CPyMO for Nintendo Wii (Accessibility)
-        path: |
-          ./cpymo-backends/sdl1/boot-accessibility.dol
-          ./cpymo-backends/sdl1/icon.png
-          ./cpymo-backends/sdl1/meta.xml
+      - name: 'Upload (Accessibility)'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPyMO for Nintendo Wii (Accessibility)
+          path: |
+            ./cpymo-backends/sdl1/boot-accessibility.dol
+            ./cpymo-backends/sdl1/icon.png
+            ./cpymo-backends/sdl1/meta.xml
 
   build-psv:
     name: 'Sony PSV'
