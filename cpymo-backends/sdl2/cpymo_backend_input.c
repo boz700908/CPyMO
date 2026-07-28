@@ -13,6 +13,10 @@ float mouse_wheel;
 SDL_GameController **gamecontrollers = NULL;
 size_t gamecontrollers_count = 0;
 
+#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
+static bool ios_accessibility_skip_held;
+#endif
+
 void cpymo_sdl2_accessibility_vibrate(int milliseconds)
 {
     for (size_t i = 0; i < gamecontrollers_count; ++i) {
@@ -73,7 +77,10 @@ cpymo_input cpymo_input_snapshot()
 	case 5: out.ok = true; break;
 	case 6: out.cancel = true; break;
 	case 7: out.skip = true; break;
+	case 8: ios_accessibility_skip_held = true; break;
+	case 9: ios_accessibility_skip_held = false; break;
 	}
+	out.skip = out.skip || ios_accessibility_skip_held;
 #endif
 
 #ifdef DISABLE_MOUSE

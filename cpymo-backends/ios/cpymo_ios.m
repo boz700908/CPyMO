@@ -5,6 +5,8 @@
 #import <objc/runtime.h>
 #include <SDL_atomic.h>
 
+extern SDL_Window *window;
+
 #ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
 static NSString *last_announcement;
 static AVSpeechSynthesizer *speech_synthesizer;
@@ -21,8 +23,50 @@ enum {
     CPYMO_IOS_ACCESSIBILITY_RIGHT,
     CPYMO_IOS_ACCESSIBILITY_OK,
     CPYMO_IOS_ACCESSIBILITY_CANCEL,
-    CPYMO_IOS_ACCESSIBILITY_SKIP
+    CPYMO_IOS_ACCESSIBILITY_SKIP,
+    CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_START,
+    CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_END
 };
+
+@interface CPyMOAccessibilityTwoDoublePressRecognizer : UIGestureRecognizer
+@property(nonatomic) NSUInteger phase;
+@property(nonatomic) CFTimeInterval firstTapTime;
+@end
+
+@implementation CPyMOAccessibilityTwoDoublePressRecognizer
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (event.allTouches.count != 2) { self.state = UIGestureRecognizerStateFailed; return; }
+    CFTimeInterval now = CACurrentMediaTime();
+    if (self.phase == 0) {
+        self.phase = 1;
+        self.firstTapTime = now;
+    } else if (self.phase == 2 && now - self.firstTapTime <= 0.4) {
+        self.phase = 3;
+        self.state = UIGestureRecognizerStateBegan;
+    } else {
+        self.state = UIGestureRecognizerStateFailed;
+    }
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (self.phase == 1) self.phase = 2;
+    else if (self.phase == 3) self.state = UIGestureRecognizerStateEnded;
+    else self.state = UIGestureRecognizerStateFailed;
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    self.state = self.phase == 3 ? UIGestureRecognizerStateCancelled : UIGestureRecognizerStateFailed;
+}
+
+- (void)reset
+{
+    self.phase = 0;
+    self.firstTapTime = 0;
+}
+@end
 
 @interface CPyMOAccessibilityGestureDelegate : NSObject <UIGestureRecognizerDelegate>
 @end
@@ -68,6 +112,12 @@ static void cpymo_ios_send_input(int action)
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_OK);
 }
 
+- (void)scan:(UITapGestureRecognizer *)recognizer
+{
+    CGPoint point = [recognizer locationInView:recognizer.view];
+    SDL_WarpMouseInWindow(window, (int)point.x, (int)point.y);
+}
+
 - (void)cancel:(UILongPressGestureRecognizer *)recognizer
 {
     if (recognizer.state == UIGestureRecognizerStateBegan) {
@@ -89,6 +139,17 @@ static void cpymo_ios_send_input(int action)
     cpymo_ios_accessibility_play_sound(2);
     cpymo_ios_accessibility_vibrate(50);
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
+}
+
+- (void)twoDoublePress:(CPyMOAccessibilityTwoDoublePressRecognizer *)recognizer
+{
+    if (recognizer.state == UIGestureRecognizerStateBegan) {
+        cpymo_ios_accessibility_vibrate(20);
+        cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_START);
+    } else {
+        cpymo_ios_accessibility_vibrate(20);
+        cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_END);
+    }
 }
 
 - (void)copy:(UISwipeGestureRecognizer *)recognizer
@@ -134,11 +195,23 @@ static void cpymo_ios_install_accessibility_gestures(void)
     activate.cancelsTouchesInView = YES;
     [view addGestureRecognizer:activate];
 
+    UITapGestureRecognizer *scan = [[UITapGestureRecognizer alloc] initWithTarget:target action:@selector(scan:)];
+    scan.delegate = gesture_delegate;
+    scan.cancelsTouchesInView = YES;
+    [scan requireGestureRecognizerToFail:activate];
+    [view addGestureRecognizer:scan];
+
     UITapGestureRecognizer *skip = [[UITapGestureRecognizer alloc] initWithTarget:target action:@selector(skip:)];
     skip.numberOfTouchesRequired = 2;
     skip.numberOfTapsRequired = 2;
     skip.delegate = gesture_delegate;
     skip.cancelsTouchesInView = YES;
+
+    CPyMOAccessibilityTwoDoublePressRecognizer *two_double_press = [[CPyMOAccessibilityTwoDoublePressRecognizer alloc] initWithTarget:target action:@selector(twoDoublePress:)];
+    two_double_press.delegate = gesture_delegate;
+    two_double_press.cancelsTouchesInView = YES;
+    [skip requireGestureRecognizerToFail:two_double_press];
+    [view addGestureRecognizer:two_double_press];
     [view addGestureRecognizer:skip];
 
     UILongPressGestureRecognizer *cancel = [[UILongPressGestureRecognizer alloc] initWithTarget:target action:@selector(cancel:)];

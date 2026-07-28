@@ -80,7 +80,9 @@ VoiceOver receives announcements when enabled; otherwise AVSpeechSynthesizer spe
 the same text. It provides Android-equivalent navigation, clipboard actions, and
 enter/menu/select sounds and haptic feedback without changing the iOS 9 app
 deployment target. Short haptics indicate navigation, confirmation, skipping, and
-copying; cancellation uses the system vibration feedback.
+copying; cancellation uses the system vibration feedback. Keep iOS gesture parity
+with Android: scan tap, directional swipe, double tap, long press, two-finger
+double tap, two-finger swipe, and two-finger double-press hold/release.
 
 ### Nintendo Platforms
 
