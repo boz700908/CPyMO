@@ -373,30 +373,16 @@ jobs:
       with:
         msystem: MINGW32
         update: true
-        install: mingw-w64-i686-toolchain unzip
+        install: mingw-w64-i686-toolchain mingw-w64-i686-SDL mingw-w64-i686-SDL_mixer
 
     - name: 'Build'
       run: |
-        wget https://www.libsdl.org/release/SDL-devel-1.2.15-mingw32.tar.gz
-        wget https://www.libsdl.org/projects/SDL_mixer/release/SDL_mixer-devel-1.2.12-VC.zip
-        tar -xf SDL-devel-1.2.15-mingw32.tar.gz
-        unzip SDL_mixer-devel-1.2.12-VC.zip
-        cp SDL_mixer-1.2.12/include/SDL_mixer.h SDL-1.2.15/include/SDL/SDL_mixer.h
-        cp SDL_mixer-1.2.12/lib/x86/SDL_mixer.lib SDL-1.2.15/lib/SDL_mixer.lib
-        cp SDL-1.2.15/bin/SDL.dll cpymo-backends/sdl1/SDL.dll
-        cp SDL_mixer-1.2.12/lib/x86/*.dll cpymo-backends/sdl1
-        cp SDL_mixer-1.2.12/lib/x86/*.txt cpymo-backends/sdl1
-
         cd ./cpymo-backends/sdl1
-        export SDL=../../SDL-1.2.15
         export USE_SDL_MIXER=1
         mingw32-make -j
         strip cpymo.exe
-
-        wget https://raw.githubusercontent.com/libsdl-org/SDL_mixer/SDL-1.2/COPYING
-        mv COPYING COPYING.SDL_mixer.txt
-        wget https://raw.githubusercontent.com/libsdl-org/SDL-1.2/main/COPYING
-        mv COPYING COPYING.SDL.txt
+        cp /mingw32/bin/SDL.dll .
+        cp /mingw32/bin/SDL_mixer.dll .
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0

@@ -40,7 +40,7 @@ LDFLAGS += -L$(SDL_MIXER)/lib
 endif
 
 ifneq ($(strip $(FFMPEG)), "")
-CFLAGS += -I$(SDL_FFMPEG)/include
+CFLAGS += -I$(FFMPEG)/include
 LDFLAGS += -L$(FFMPEG)/lib
 endif
 
