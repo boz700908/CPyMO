@@ -12,6 +12,7 @@ static SDL_atomic_t pending_input_action;
 
 void cpymo_ios_accessibility_announce(const char *text);
 void cpymo_ios_accessibility_play_sound(int sound_type);
+void cpymo_ios_accessibility_vibrate(int milliseconds);
 
 enum {
     CPYMO_IOS_ACCESSIBILITY_UP = 1,
@@ -56,12 +57,14 @@ static void cpymo_ios_send_input(int action)
     default: return;
     }
     cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_vibrate(10);
     cpymo_ios_send_input(action);
 }
 
 - (void)activate:(UITapGestureRecognizer *)recognizer
 {
     cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_vibrate(10);
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_OK);
 }
 
@@ -69,6 +72,7 @@ static void cpymo_ios_send_input(int action)
 {
     if (recognizer.state == UIGestureRecognizerStateBegan) {
         cpymo_ios_accessibility_play_sound(2);
+        cpymo_ios_accessibility_vibrate(50);
         cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
     }
 }
@@ -76,7 +80,15 @@ static void cpymo_ios_send_input(int action)
 - (void)skip:(UITapGestureRecognizer *)recognizer
 {
     cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_vibrate(10);
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP);
+}
+
+- (void)twoFingerCancel:(UISwipeGestureRecognizer *)recognizer
+{
+    cpymo_ios_accessibility_play_sound(2);
+    cpymo_ios_accessibility_vibrate(50);
+    cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
 }
 
 - (void)copy:(UISwipeGestureRecognizer *)recognizer
@@ -92,6 +104,7 @@ static void cpymo_ios_send_input(int action)
         cpymo_ios_accessibility_announce("已追加复制");
     }
     cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_vibrate(10);
 }
 @end
 
@@ -142,6 +155,13 @@ static void cpymo_ios_install_accessibility_gestures(void)
         copy.cancelsTouchesInView = YES;
         [view addGestureRecognizer:copy];
     }
+
+    UISwipeGestureRecognizer *two_finger_cancel = [[UISwipeGestureRecognizer alloc] initWithTarget:target action:@selector(twoFingerCancel:)];
+    two_finger_cancel.numberOfTouchesRequired = 2;
+    two_finger_cancel.direction = UISwipeGestureRecognizerDirectionDown;
+    two_finger_cancel.delegate = gesture_delegate;
+    two_finger_cancel.cancelsTouchesInView = YES;
+    [view addGestureRecognizer:two_finger_cancel];
 }
 #endif
 
@@ -186,5 +206,10 @@ int cpymo_ios_accessibility_take_input_action(void)
 void cpymo_ios_accessibility_play_sound(int sound_type) {
     SystemSoundID sound = sound_type == 1 ? 1104 : (sound_type == 2 ? 1155 : 1103);
     AudioServicesPlaySystemSound(sound);
+}
+
+void cpymo_ios_accessibility_vibrate(int milliseconds) {
+    (void)milliseconds;
+    AudioServicesPlaySystemSound(kSystemSoundID_Vibrate);
 }
 #endif

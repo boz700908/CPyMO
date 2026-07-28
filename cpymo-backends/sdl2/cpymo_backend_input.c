@@ -13,6 +13,14 @@ float mouse_wheel;
 SDL_GameController **gamecontrollers = NULL;
 size_t gamecontrollers_count = 0;
 
+void cpymo_sdl2_accessibility_vibrate(int milliseconds)
+{
+    for (size_t i = 0; i < gamecontrollers_count; ++i) {
+        if (gamecontrollers[i] != NULL)
+            SDL_GameControllerRumble(gamecontrollers[i], SDL_MAX_UINT16, SDL_MAX_UINT16, (Uint32)milliseconds);
+    }
+}
+
 cpymo_input cpymo_input_snapshot()
 {
 	cpymo_input out;

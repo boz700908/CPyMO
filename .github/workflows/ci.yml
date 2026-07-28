@@ -232,20 +232,14 @@ jobs:
 
       - name: Build FFmpeg
         shell: bash
-        working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
-        run: |
-          chmod +x ./build-ffmpeg.sh
-          ./build-ffmpeg.sh arm64
-
-      - name: Configure CMake
-        shell: bash
         working-directory: ./cpymo-backends/ios
-        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+        run: bash ./build-ffmpeg.sh arm64
 
       - name: Build IPA
         shell: bash
         working-directory: ./cpymo-backends/ios
         run: |
+          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64
           cmake --build build -j $(sysctl -n hw.physicalcpu) --config Release
           cd ./build
           mkdir Payload
@@ -253,11 +247,29 @@ jobs:
           zip -r cpymo.ipa Payload
           mv ./cpymo.ipa ../../../cpymo.ipa
 
+      - name: Build IPA (Accessibility)
+        shell: bash
+        working-directory: ./cpymo-backends/ios
+        run: |
+          cmake -S. -Bbuild-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+          cmake --build build-accessibility -j $(sysctl -n hw.physicalcpu) --config Release
+          cd ./build-accessibility
+          mkdir Payload
+          mv cpymo.app Payload/
+          zip -r cpymo-accessibility.ipa Payload
+          mv ./cpymo-accessibility.ipa ../../../cpymo-accessibility.ipa
+
       - name: Upload
         uses: actions/upload-artifact@v6.0.0
         with:
           name: CPyMO for iOS
           path: ./cpymo.ipa
+
+      - name: Upload (Accessibility)
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: CPyMO for iOS (Accessibility)
+          path: ./cpymo-accessibility.ipa
 
   build-android:
     name: 'Android'
@@ -373,7 +385,10 @@ jobs:
       with:
         msystem: MINGW32
         update: true
-        install: mingw-w64-i686-toolchain mingw-w64-i686-SDL mingw-w64-i686-SDL_mixer
+        install: mingw-w64-i686-toolchain mingw-w64-i686-SDL
+
+    - name: Install SDL_mixer 1.2
+      run: pacman -U --noconfirm https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL_mixer-1.2.12-9-any.pkg.tar.zst
 
     - name: 'Build'
       run: |

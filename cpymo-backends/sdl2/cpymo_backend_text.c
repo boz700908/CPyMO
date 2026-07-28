@@ -165,6 +165,12 @@ void cpymo_backend_text_extract_free(void)
     Tolk_Unload();
 }
 
+void cpymo_windows_accessibility_play_sound(int sound_type)
+{
+    UINT sound = sound_type == 1 ? MB_OK : (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
+    MessageBeep(sound);
+}
+
 void cpymo_backend_text_extract(const char *text)
 {
 	if (text == NULL || text[0] == '\0') return;

@@ -58,7 +58,7 @@ Sony PSP          | SDL2 | 无       | FFmpeg             | 外置字体        
 --------------- | ---- | -------- | ------------------ | ----------- | ---------------
 Linux           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     | 视障帮助
 macOS           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 加载系统字体  | 视障帮助
-iOS             | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器
+iOS             | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器,视障帮助
 Nintendo Switch | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器
 UWP             | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器
 Emscripten      | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     |
@@ -164,7 +164,7 @@ brew install libxcb
 
 * 使用`RC_FILE`环境变量可以自定义RC文件。（仅Windows）
 * 使`NO_CONSOLE`环境变量为`1`可以禁止CPyMO创建控制台窗口。（仅Windows）
-* 使`ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD`环境变量为`1`可将游戏文本复制到控制台上。（用于视障玩家）
+* 使`ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD`环境变量为`1`可通过 Tolk 将游戏文本输出到读屏软件。（仅 Windows）
 * 若`ENABLE_EXIT_CONFIRM`环境变量为1或通过-a传入1，则会在退出游戏时询问是否要退出。
 * 若`LEAKCHECK`环境变量为1或通过-a传入1，则会启动stb_leakcheck进行内存泄漏检查。
 * 若`DISABLE_VSYNC`环境变量为1或通过-a传入1，则禁用垂直同步并以最高可能帧率运行。
@@ -281,6 +281,30 @@ cd到`cpymo-backends/sdl2`，执行`make -j -f Makefile.Switch`即可编译到�
 ## 启动
 
 使用iTunes打开CPyMO文档目录，将default.ttf和游戏放入之后点击CPyMO图标即可启动。
+
+## 编译
+
+先在`cpymo-backends/ios`中执行`bash ./build-ffmpeg.sh arm64`，再使用 iOS CMake 工具链构建。普通包与 Android 的普通 APK 对应，不启用视障帮助：
+
+```bash
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64
+cmake --build build --config Release
+```
+
+视障帮助包与 Android 的“Accessibility”APK 对应，额外传入`-DENABLE_IOS_ACCESSIBILITY=ON`。它保持 iOS 9 的应用部署目标和 FFmpeg iOS 8.0 的兼容目标，不要求打开系统旁白。
+
+```bash
+cmake -S . -B build-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+cmake --build build-accessibility --config Release
+```
+
+启用视障帮助时，旁白开启会使用 VoiceOver 公告；旁白关闭会回退到系统语音合成。手势、复制及三类提示音与 Android 无障碍包一致：
+
+* 单指滑动：上下左右移动；单指双击：确认；单指长按或双指下滑：取消；双指双击：跳过。
+* 双指左滑复制最近朗读，双指右滑将最近朗读追加到剪贴板。
+* 进入、菜单、选择会播放对应的系统提示音；导航、确认、跳过和复制使用短触觉反馈，取消使用较长反馈，语义与 Android 无障碍包一致。
+
+Windows、Linux 和 macOS 的 SDL2 无障碍构建也会把上述短反馈发送到所有支持震动的已连接手柄；没有震动硬件时自动忽略，不影响游戏输入或普通构建。
 
 # Sony Playstation Portable 平台
 
