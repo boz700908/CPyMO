@@ -564,6 +564,8 @@ START:
 		return -1;
 	}
 
+	cpymo_backend_text_extract_init();
+
 	Uint32 prev_ticks = SDL_GetTicks();
 	SDL_Event event;
 
@@ -725,6 +727,7 @@ START:
 
 EXIT:
 	cpymo_engine_free(&engine);
+	cpymo_backend_text_extract_free();
 
 	extern void cpymo_input_free_joysticks();
 	cpymo_input_free_joysticks();

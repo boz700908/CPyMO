@@ -12,6 +12,11 @@
 #include <math.h>
 #include <assert.h>
 
+#if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
+#include <windows.h>
+#include <Tolk.h>
+#endif
+
 extern stbtt_fontinfo font;
 
 typedef struct {
@@ -146,6 +151,34 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
 #endif
 
 #ifdef ENABLE_TEXT_EXTRACT
+#if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
+void cpymo_backend_text_extract_init(void)
+{
+    Tolk_Load();
+}
+
+void cpymo_backend_text_extract_free(void)
+{
+    Tolk_Unload();
+}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
+    if (wide_len == 0) return;
+
+    wchar_t *wide_text = (wchar_t *)malloc((size_t)wide_len * sizeof(*wide_text));
+    if (wide_text == NULL) return;
+
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide_text, wide_len) != 0)
+        Tolk_Output(wide_text, true);
+
+    free(wide_text);
+}
+#else
+void cpymo_backend_text_extract_init(void) {}
+void cpymo_backend_text_extract_free(void) {}
+
 void cpymo_backend_text_extract(const char *text)
 {
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
@@ -158,6 +191,7 @@ void cpymo_backend_text_extract(const char *text)
     SDL_SetClipboardText(text);
 #endif
 }
+#endif
 #endif
 
 

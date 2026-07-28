@@ -16,9 +16,9 @@ jobs:
     container: devkitpro/devkita64:20230507
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Build
       run: |
@@ -37,9 +37,9 @@ jobs:
     container: devkitpro/devkitarm:latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Install Makerom
       run: |
@@ -79,9 +79,9 @@ jobs:
     container: devkitpro/devkitppc:20230110
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
       - name: 'Build'
         run: |
@@ -104,9 +104,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Install Dependents
       run: |
@@ -150,9 +150,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Setup Ninja
       uses: ashutoshvarma/setup-ninja@v1.1
@@ -167,7 +167,7 @@ jobs:
         sudo chown -R $USER: $PSPDEV
         export PATH=$PATH:$PSPDEV/bin
         ./build-all.sh
-        psp-pacman -Syu
+        psp-pacman -Syu --noconfirm
 
     - name: Build FFmpeg
       run: |
@@ -197,9 +197,9 @@ jobs:
     container: emscripten/emsdk:latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Build FFmpeg
       run: |
@@ -213,14 +213,22 @@ jobs:
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten -j
 
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO for Emscripten
+        path: |
+          ./cpymo-backends/sdl2/cpymo.js
+          ./cpymo-backends/sdl2/cpymo.wasm
+
   build-ios:
     name: 'iOS'
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Build FFmpeg
         shell: bash
@@ -256,9 +264,9 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Setup JDK
       uses: actions/setup-java@v3
@@ -315,9 +323,9 @@ jobs:
     runs-on: 'windows-latest'
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Find Visual Studio
       uses: ilammy/msvc-dev-cmd@v1
@@ -357,9 +365,9 @@ jobs:
         shell: msys2 {0}
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - uses: msys2/setup-msys2@v2
       with:
@@ -404,9 +412,9 @@ jobs:
     runs-on: 'ubuntu-latest'
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Install dependents
       run: |
@@ -482,7 +490,7 @@ jobs:
             vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
@@ -541,7 +549,7 @@ jobs:
       run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
 
     - name: Configure CMake
-      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} ${{ matrix.cmake-flags }}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
@@ -569,8 +577,9 @@ jobs:
       with:
         name: CPyMO for ${{ matrix.package-name }}
         path: |
-            ./build/build/Release/cpymo.exe
-            ./build/build/Release/cpymo-tool.exe
+          ./build/build/Release/cpymo.exe
+          ./build/build/Release/cpymo-tool.exe
+          ./build/build/Release/*.dll
 
   build-ascii-art:
     name: 'CPyMO ASCII Art'
@@ -581,7 +590,7 @@ jobs:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
@@ -626,7 +635,7 @@ jobs:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
