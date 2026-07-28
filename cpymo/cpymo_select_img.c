@@ -10,6 +10,12 @@
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
 #include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
+#define CALL_VISUALLY_PLAY_SOUND(X) cpymo_android_play_sound(X)
+#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+extern void cpymo_ios_accessibility_play_sound(int sound_type);
+#define CALL_VISUALLY_PLAY_SOUND(X) cpymo_ios_accessibility_play_sound(X)
+#else
+#define CALL_VISUALLY_PLAY_SOUND(X)
 #endif
 
 typedef struct cpymo_select_img_selection{
@@ -322,12 +328,6 @@ static error_t cpymo_select_img_ok(cpymo_engine *e, int sel, uint64_t hash, cpym
 	cpymo_engine_request_redraw(e);
 	return err;
 }
-
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-#define CALL_VISUALLY_PLAY_SOUND(X) cpymo_android_play_sound(X)
-#else
-#define CALL_VISUALLY_PLAY_SOUND(X)
-#endif
 
 error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 {

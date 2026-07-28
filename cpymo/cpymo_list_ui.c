@@ -7,6 +7,12 @@
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
 #include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
+#define CPYMO_VISUAL_HELP_PLAY_SOUND(X) cpymo_android_play_sound(X)
+#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+extern void cpymo_ios_accessibility_play_sound(int sound_type);
+#define CPYMO_VISUAL_HELP_PLAY_SOUND(X) cpymo_ios_accessibility_play_sound(X)
+#else
+#define CPYMO_VISUAL_HELP_PLAY_SOUND(X)
 #endif
 
 #ifdef __3DS__
@@ -368,9 +374,7 @@ static error_t cpymo_list_ui_update(cpymo_engine *e, void *ui_data, float d)
 		}
 
 		if (ui->selection_changed) {
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-			cpymo_android_play_sound(SOUND_SELECT);
-#endif
+			CPYMO_VISUAL_HELP_PLAY_SOUND(3);
 			error_t err = ui->selection_changed(e,
 				cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
 			CPYMO_THROW(err);
@@ -396,9 +400,7 @@ static error_t cpymo_list_ui_update(cpymo_engine *e, void *ui_data, float d)
 		}
 
 		if (ui->selection_changed) {
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-			cpymo_android_play_sound(SOUND_SELECT);
-#endif
+			CPYMO_VISUAL_HELP_PLAY_SOUND(3);
 			error_t err = ui->selection_changed(e,
 				cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
 			CPYMO_THROW(err);
@@ -412,9 +414,7 @@ static error_t cpymo_list_ui_update(cpymo_engine *e, void *ui_data, float d)
 			cpymo_engine_request_redraw(e);
 
 			if (ui->selection_changed) {
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-				cpymo_android_play_sound(SOUND_SELECT);
-#endif
+				CPYMO_VISUAL_HELP_PLAY_SOUND(3);
 				error_t err = ui->selection_changed(e, 
 					cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
 				CPYMO_THROW(err);

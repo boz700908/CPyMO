@@ -6,6 +6,12 @@
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
 #include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
+#define CPYMO_VISUAL_HELP_ENTER_SOUND() cpymo_android_play_sound(SOUND_ENTER)
+#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+extern void cpymo_ios_accessibility_play_sound(int sound_type);
+#define CPYMO_VISUAL_HELP_ENTER_SOUND() cpymo_ios_accessibility_play_sound(1)
+#else
+#define CPYMO_VISUAL_HELP_ENTER_SOUND()
 #endif
 
 typedef struct cpymo_textbox_line {
@@ -78,9 +84,7 @@ error_t cpymo_textbox_init(
     o->timer = 0;
     o->draw_cursor = false;
 
-    #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-    cpymo_android_play_sound(SOUND_ENTER);
-    #endif
+    CPYMO_VISUAL_HELP_ENTER_SOUND();
 
     return CPYMO_ERR_SUCC;
 }

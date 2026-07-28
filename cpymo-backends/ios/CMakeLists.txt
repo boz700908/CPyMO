@@ -15,6 +15,7 @@ find_library(COREMEDIA_LIBRARY CoreMedia)
 find_library(COREVIDEO_LIBRARY CoreVideo)
 find_library(FOUNDATION_LIBRARY Foundation)
 find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
+find_library(AVFOUNDATION_LIBRARY AVFoundation)
 find_library(VIDEOTOOLBOX_LIBRARY VideoToolbox)
 find_library(COREFOUNDATION_LIBRARY CoreFoundation)
 
@@ -22,11 +23,12 @@ set(BUILD_SHARED_LIBS OFF)
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
 
+option(ENABLE_IOS_ACCESSIBILITY "Enable VoiceOver announcements and accessibility gestures" OFF)
+
 add_subdirectory(../sdl2/SDL SDL)
 
 add_definitions(
         -D__IOS__
-        -DENABLE_TEXT_EXTRACT
         -DUSE_GAME_SELECTOR
         -DADAPT_SCREEN_SIZE
         -DSCREEN_WIDTH=800
@@ -36,6 +38,10 @@ add_definitions(
         -DGAME_SELECTOR_COUNT_PER_SCREEN=4
         -DEXIT_TO_GAME_SELECTOR
 )
+
+if (ENABLE_IOS_ACCESSIBILITY)
+    add_definitions(-DENABLE_TEXT_EXTRACT -DENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+endif ()
 
 include_directories(
         "../include"
@@ -117,6 +123,7 @@ target_link_libraries(cpymo PUBLIC
         ${COREVIDEO_LIBRARY}
         ${FOUNDATION_LIBRARY}
         ${AUDIOTOOLBOX_LIBRARY}
+        ${AVFOUNDATION_LIBRARY}
         ${VIDEOTOOLBOX_LIBRARY}
         ${COREFOUNDATION_LIBRARY}
         )

@@ -240,7 +240,7 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ./cpymo-backends/ios
-        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake  -DENABLE_BITCODE=0 -DPLATFORM=OS64
+        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
 
       - name: Build IPA
         shell: bash

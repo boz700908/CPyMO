@@ -2,6 +2,7 @@
 #include "../../cpymo/cpymo_engine.h"
 #include "../include/cpymo_backend_input.h"
 #include "cpymo_import_sdl2.h"
+#include <string.h>
 
 extern SDL_Renderer *renderer;
 extern SDL_Window *window;
@@ -15,6 +16,7 @@ size_t gamecontrollers_count = 0;
 cpymo_input cpymo_input_snapshot()
 {
 	cpymo_input out;
+	memset(&out, 0, sizeof(out));
 
 	const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
 
@@ -52,6 +54,19 @@ cpymo_input cpymo_input_snapshot()
 		out.skip = 0;
 		out.hide_window = 0;
 	}
+
+#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
+	extern int cpymo_ios_accessibility_take_input_action(void);
+	switch (cpymo_ios_accessibility_take_input_action()) {
+	case 1: out.up = true; break;
+	case 2: out.down = true; break;
+	case 3: out.left = true; break;
+	case 4: out.right = true; break;
+	case 5: out.ok = true; break;
+	case 6: out.cancel = true; break;
+	case 7: out.skip = true; break;
+	}
+#endif
 
 #ifdef DISABLE_MOUSE
 	out.mouse_position_useable = false;

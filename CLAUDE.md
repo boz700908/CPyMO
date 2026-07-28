@@ -61,6 +61,17 @@ cd cpymo-backends/sdl2
 nmake -f Makefile.Win32
 ```
 
+#### iOS Accessibility Build
+```bash
+cd cpymo-backends/ios
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+cmake --build build --config Release
+```
+
+`ENABLE_IOS_ACCESSIBILITY=ON` enables the same text-extraction flow as Android,
+including VoiceOver announcements, system speech fallback when VoiceOver is off,
+gesture navigation, clipboard actions, and enter/menu/select feedback sounds.
+
 ### Nintendo Platforms
 
 #### 3DS
@@ -165,7 +176,9 @@ make
 - `CPYMO_LANG` - Default language
 
 ### Accessibility Features
-- `ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1` - Export game text to clipboard for visually impaired players
+- Windows: `ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1` sends extracted text to Tolk. The required x86/x64/ARM64 release libraries and driver configuration files are in `third_party/tolk`.
+- Android: `ENABLE_TEXT_EXTRACT` and `ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY` enable text-to-speech and accessibility gestures.
+- iOS: `ENABLE_IOS_ACCESSIBILITY=ON` enables the Android-equivalent accessibility interaction model while retaining iOS 9 support.
 - `ENABLE_EXIT_CONFIRM=1` - Prompt confirmation on exit
 
 ### Performance Tuning

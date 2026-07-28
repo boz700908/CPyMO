@@ -17,6 +17,7 @@
 #include <Tolk.h>
 #elif defined(__IOS__)
 extern void cpymo_ios_accessibility_announce(const char *text);
+extern void cpymo_ios_accessibility_play_sound(int sound_type);
 #endif
 
 extern stbtt_fontinfo font;

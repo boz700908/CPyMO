@@ -18,6 +18,12 @@ const extern bool enhanced_3ds_display_mode;
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
 #include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
+#define CPYMO_VISUAL_HELP_MENU_SOUND() cpymo_android_play_sound(SOUND_MENU)
+#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+extern void cpymo_ios_accessibility_play_sound(int sound_type);
+#define CPYMO_VISUAL_HELP_MENU_SOUND() cpymo_ios_accessibility_play_sound(2)
+#else
+#define CPYMO_VISUAL_HELP_MENU_SOUND()
 #endif
 
 typedef struct {
@@ -204,9 +210,7 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 		&cpymo_rmenu_delete);
 	CPYMO_THROW(err);
 
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-	cpymo_android_play_sound(SOUND_MENU);
-#endif
+	CPYMO_VISUAL_HELP_MENU_SOUND();
 
 	rmenu->alive = true;
 
