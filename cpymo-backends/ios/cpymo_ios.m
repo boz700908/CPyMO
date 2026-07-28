@@ -3,7 +3,7 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
-#include <SDL_atomic.h>
+#include <SDL.h>
 
 extern SDL_Window *window;
 

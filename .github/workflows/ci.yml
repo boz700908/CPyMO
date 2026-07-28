@@ -4,9 +4,18 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [ main, hd, dev ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
 jobs:
@@ -26,7 +35,7 @@ jobs:
         make -j -f Makefile.Switch
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Nintendo Switch
         path: ./cpymo-backends/sdl2/cpymo.nro
@@ -41,14 +50,32 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Cache Makerom
+      id: cache-makerom
+      uses: actions/cache@v4
+      with:
+        path: ./cpymo-backends/3ds/makerom
+        key: makerom-v0.17
+
     - name: Install Makerom
+      if: steps.cache-makerom.outputs.cache-hit != 'true'
       run: |
         cd ./cpymo-backends/3ds
         wget https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.17/makerom-v0.17-ubuntu_x86_64.zip
         unzip makerom-v0.17-ubuntu_x86_64.zip -d .
         chmod +x makerom
 
+    - name: Cache FFmpeg (3DS)
+      id: cache-ffmpeg-3ds
+      uses: actions/cache@v4
+      with:
+        path: |
+          ./cpymo-backends/3ds/ffmpeg
+          ./cpymo-backends/3ds/ffmpeg-build
+        key: ffmpeg-3ds-${{ hashFiles('cpymo-backends/3ds/build-3ds-ffmpeg.sh') }}
+
     - name: Build FFmpeg
+      if: steps.cache-ffmpeg-3ds.outputs.cache-hit != 'true'
       run: |
         cd ./cpymo-backends/3ds
         chmod +x ./build-3ds-ffmpeg.sh
@@ -62,13 +89,13 @@ jobs:
         ./makerom -f cia -o cpymo.cia -elf ./build/cpymo.elf -rsf cpymo.rsf -exefslogo -target t -icon icon -banner banner
 
     - name: Upload cia
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Nintendo 3DS (cia)
         path: ./cpymo-backends/3ds/cpymo.cia
 
     - name: Upload 3dsx
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Nintendo 3DS (3dsx)
         path: ./cpymo-backends/3ds/cpymo.3dsx
@@ -91,7 +118,7 @@ jobs:
           mv wii-icon.png icon.png
 
       - name: 'Upload'
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v4
         with:
           name: CPyMO for Nintendo Wii
           path: |
@@ -108,7 +135,15 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Cache Vita SDK
+      id: cache-vitasdk
+      uses: actions/cache@v4
+      with:
+        path: ~/vitasdk
+        key: vitasdk-${{ hashFiles('.github/workflows/ci.yml') }}
+
     - name: Install Dependents
+      if: steps.cache-vitasdk.outputs.cache-hit != 'true'
       run: |
         git clone https://github.com/vitasdk/vdpm.git --depth 1
         cd vdpm
@@ -126,10 +161,6 @@ jobs:
         ./vdpm opus
         ./vdpm opusfile
         ./vdpm libxmp
-        # cd ../cpymo-backends/sdl2
-        # chmod +x ./build-psv-ffmpeg.sh
-        # ./build-psv-ffmpeg.sh
-        # cd ../../
 
     - name: Build
       run: |
@@ -139,7 +170,7 @@ jobs:
         make -f Makefile.PSV -j
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Sony PSV
         path: |
@@ -157,7 +188,15 @@ jobs:
     - name: Setup Ninja
       uses: ashutoshvarma/setup-ninja@v1.1
 
+    - name: Cache PSPDEV
+      id: cache-pspdev
+      uses: actions/cache@v4
+      with:
+        path: /usr/local/pspdev
+        key: pspdev-${{ hashFiles('.github/workflows/ci.yml') }}
+
     - name: Install PSPDEV
+      if: steps.cache-pspdev.outputs.cache-hit != 'true'
       run: |
         git clone https://github.com/pspdev/pspdev.git --depth 1
         cd pspdev
@@ -169,7 +208,15 @@ jobs:
         ./build-all.sh
         psp-pacman -Syu --noconfirm
 
+    - name: Cache FFmpeg (PSP)
+      id: cache-ffmpeg-psp
+      uses: actions/cache@v4
+      with:
+        path: ./cpymo-backends/sdl2/ffmpeg
+        key: ffmpeg-psp-${{ hashFiles('cpymo-backends/sdl2/build-psp-ffmpeg.sh') }}
+
     - name: Build FFmpeg
+      if: steps.cache-ffmpeg-psp.outputs.cache-hit != 'true'
       run: |
         export PSPDEV=/usr/local/pspdev
         export PATH=$PATH:$PSPDEV/bin
@@ -186,7 +233,7 @@ jobs:
         make -f Makefile.PSP -j
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Sony PSP
         path: ./cpymo-backends/sdl2/EBOOT.PBP
@@ -201,7 +248,15 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Cache FFmpeg (Emscripten)
+      id: cache-ffmpeg-em
+      uses: actions/cache@v4
+      with:
+        path: ./cpymo-backends/sdl2/ffmpeg
+        key: ffmpeg-emscripten-${{ hashFiles('cpymo-backends/sdl2/build-emscripten-ffmpeg.sh') }}
+
     - name: Build FFmpeg
+      if: steps.cache-ffmpeg-em.outputs.cache-hit != 'true'
       run: |
         cd cpymo-backends/sdl2
         chmod +x ./build-emscripten-ffmpeg.sh
@@ -214,7 +269,7 @@ jobs:
         make -f Makefile.Emscripten -j
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Emscripten
         path: |
@@ -230,7 +285,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache FFmpeg (iOS)
+        id: cache-ffmpeg-ios
+        uses: actions/cache@v4
+        with:
+          path: ./cpymo-backends/ios/FFmpeg-iOS-build-script/thin
+          key: ffmpeg-ios-${{ hashFiles('cpymo-backends/ios/build-ffmpeg.sh') }}
+
       - name: Build FFmpeg
+        if: steps.cache-ffmpeg-ios.outputs.cache-hit != 'true'
         shell: bash
         working-directory: ./cpymo-backends/ios
         run: bash ./build-ffmpeg.sh arm64
@@ -260,13 +323,13 @@ jobs:
           mv ./cpymo-accessibility.ipa ../../../cpymo-accessibility.ipa
 
       - name: Upload
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v4
         with:
           name: CPyMO for iOS
           path: ./cpymo.ipa
 
       - name: Upload (Accessibility)
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v4
         with:
           name: CPyMO for iOS (Accessibility)
           path: ./cpymo-accessibility.ipa
@@ -281,7 +344,7 @@ jobs:
         submodules: recursive
 
     - name: Setup JDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'microsoft'
@@ -292,7 +355,15 @@ jobs:
       with:
         ndk-version: r21e
 
+    - name: Cache FFmpeg (Android)
+      id: cache-ffmpeg-android
+      uses: actions/cache@v4
+      with:
+        path: ./cpymo-backends/android/ffmpeg-android-maker/build
+        key: ffmpeg-android-${{ hashFiles('cpymo-backends/android/build-android-ffmpeg.sh') }}
+
     - name: Build FFmpeg
+      if: steps.cache-ffmpeg-android.outputs.cache-hit != 'true'
       env:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
       run: |
@@ -300,12 +371,6 @@ jobs:
         cd cpymo-backends/android/
         chmod +x ./build-android-ffmpeg.sh
         ./build-android-ffmpeg.sh
-
-    - name: Build APK
-      run: |
-        cd ./cpymo-backends/android
-        ./gradlew assembleRelease --stacktrace
-        cp ./app/build/outputs/apk/release/app-release.apk ../../cpymo-signed.apk
 
     - name: Build APK (Accessibility)
       run: |
@@ -316,19 +381,28 @@ jobs:
         ENABLE_TEXT_EXTRACT: 1
         ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY: 1
 
-    - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+    - name: Clean
+      run: |
+        cd ./cpymo-backends/android
+        ./gradlew clean
+
+    - name: Build APK (Standard)
+      run: |
+        cd ./cpymo-backends/android
+        ./gradlew assembleRelease --stacktrace
+        cp ./app/build/outputs/apk/release/app-release.apk ../../cpymo-signed.apk
+
+    - name: Upload (Standard)
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Android
-        path: |
-          ./cpymo-signed.apk
+        path: ./cpymo-signed.apk
 
     - name: Upload (Accessibility)
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Android (Accessibility)
-        path: |
-          ./cpymo-accessibility-signed.apk
+        path: ./cpymo-accessibility-signed.apk
 
   build-uwp:
     name: 'Universal Windows Platform'
@@ -364,7 +438,7 @@ jobs:
         popd
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Universal Windows Platform
         path: ./cpymo-backends/uwp/AppPackages/CPyMO/
@@ -404,7 +478,7 @@ jobs:
         cp /mingw32/bin/libSDL_mixer-*.dll .
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Windows (SDL 1.2)
         path: |
@@ -424,7 +498,7 @@ jobs:
     - name: Install dependents
       run: |
         sudo apt-get update
-        sudo apt-get install libsdl1.2-dev libsdl-mixer1.2-dev # libavcodec-dev libswscale-dev libavformat-dev libswresample-dev libavutil-dev
+        sudo apt-get install libsdl1.2-dev libsdl-mixer1.2-dev
 
     - name: Build
       run: |
@@ -434,18 +508,19 @@ jobs:
         strip ./cpymo
 
     - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Linux (SDL 1.2)
         path: ./cpymo-backends/sdl1/cpymo
 
   build-desktop:
-    name: 'Desktop'
+    name: 'Desktop ${{ matrix.package-name }}'
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
-        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64 ] #, win-arm ]
+        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64 ]
 
         include:
           - tuple: win-x64
@@ -454,45 +529,32 @@ jobs:
             arch: x64
             package-name: "Windows x64"
             cmake-flags: "-A x64 -DCMAKE_GENERATOR_PLATFORM=x64"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: win-x86
             os: windows-latest
             triplet: x86-windows-static
             arch: x86
             package-name: "Windows x86"
             cmake-flags: "-A Win32 -DCMAKE_GENERATOR_PLATFORM=Win32"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          # - tuple: win-arm
-          #   os: windows-latest
-          #   triplet: arm-windows-static
-          #   arch: amd64_arm
-          #   package-name: "Windows ARM"
-          #   cmake-flags: "-A arm -DCMAKE_GENERATOR_PLATFORM=arm"
-          #   vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: win-arm64
             os: windows-latest
             triplet: arm64-windows-static
             arch: amd64_arm64
             package-name: "Windows ARM64"
             cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: linux-x64
             os: ubuntu-latest
             triplet: x64-linux
             package-name: "Linux x64"
-            vcpkg-path: "/home/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: mac-x64
             os: macos-latest
             triplet: x64-osx
             package-name: "macOS x64"
             cmake-flags: "-DCMAKE_OSX_ARCHITECTURES=x86_64"
-            vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: mac-arm64
             os: macos-latest
             triplet: arm64-osx
             package-name: "macOS Apple Silicon"
             cmake-flags: "-DCMAKE_OSX_ARCHITECTURES=arm64"
-            vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
     steps:
     - uses: actions/checkout@v4
@@ -547,6 +609,15 @@ jobs:
         ./vcpkg/vcpkg integrate install
       if: ${{ runner.os == 'Windows' }}
 
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ./vcpkg/packages
+          ./vcpkg/buildtrees
+          ./vcpkg/downloads
+        key: vcpkg-${{ matrix.triplet }}-${{ hashFiles('.github/workflows/ci.yml') }}
+
     - name: Install SDL2
       run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
 
@@ -570,33 +641,44 @@ jobs:
       run: |
         strip ./build/build/cpymo
         strip ./build/build/cpymo-tool
+        strip ./build-accessibility/build/cpymo
+        strip ./build-accessibility/build/cpymo-tool
 
-    - name: Upload
-      uses: actions/upload-artifact@v6.0.0
-      if: ${{ runner.os != 'Windows' }}
+    - name: Upload (Standard)
+      uses: actions/upload-artifact@v4
       with:
         name: CPyMO for ${{ matrix.package-name }}
         path: |
-            ./build/build/cpymo
-            ./build/build/cpymo-tool
-            ./build/build/MinSizeRel/cpymo.exe
-            ./build/build/MinSizeRel/cpymo-tool.exe
-
-    - name: Upload
-      uses: actions/upload-artifact@v6.0.0
-      if: ${{ runner.os == 'Windows' }}
-      with:
-        name: CPyMO for ${{ matrix.package-name }}
-        path: |
+          ./build/build/cpymo
+          ./build/build/cpymo-tool
+          ./build/build/cpymo.exe
+          ./build/build/cpymo-tool.exe
           ./build/build/Release/cpymo.exe
           ./build/build/Release/cpymo-tool.exe
           ./build/build/Release/*.dll
+          ./build/build/MinSizeRel/cpymo.exe
+          ./build/build/MinSizeRel/cpymo-tool.exe
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for ${{ matrix.package-name }} (Accessibility)
+        path: |
+          ./build-accessibility/build/cpymo
+          ./build-accessibility/build/cpymo-tool
+          ./build-accessibility/build/cpymo.exe
+          ./build-accessibility/build/cpymo-tool.exe
+          ./build-accessibility/build/Release/cpymo.exe
+          ./build-accessibility/build/Release/cpymo-tool.exe
+          ./build-accessibility/build/Release/*.dll
+          ./build-accessibility/build/MinSizeRel/cpymo.exe
+          ./build-accessibility/build/MinSizeRel/cpymo-tool.exe
 
   build-ascii-art:
     name: 'CPyMO ASCII Art'
     runs-on: ${{ matrix.os }}
-
     strategy:
+      fail-fast: false
       matrix:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
@@ -628,20 +710,18 @@ jobs:
           strip ./cpymo-ascii-art.exe
 
       - name: 'Upload'
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v4
         with:
           name: CPyMO ASCII Art for ${{ runner.os }}
           path: |
             ./cpymo-backends/ascii-art/cpymo-ascii-art
             ./cpymo-backends/ascii-art/cpymo-ascii-art.exe
 
-
-
   build-text:
     name: 'CPyMO Text'
     runs-on: ${{ matrix.os }}
-
     strategy:
+      fail-fast: false
       matrix:
         os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
 
@@ -656,7 +736,6 @@ jobs:
           msystem: MINGW32
           update: true
           install: mingw-w64-i686-toolchain make
-
 
       - name: 'Build'
         if: ${{ runner.os != 'Windows' }}
@@ -674,7 +753,7 @@ jobs:
           strip cpymo-text.exe
 
       - name: 'Upload'
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v4
         with:
           name: CPyMO Text for ${{ runner.os }}
           path: |
