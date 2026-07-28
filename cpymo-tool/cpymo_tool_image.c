@@ -96,7 +96,7 @@ error_t cpymo_tool_image_detach_mask(const cpymo_tool_image *img, cpymo_tool_ima
     size_t pixels_count = img->width * img->height;
 
     if (img->channels == 3) {
-        memset(out_mask, 255, pixels_count);
+        memset(out_mask->pixels, 255, pixels_count);
         return CPYMO_ERR_SUCC;
     }
 

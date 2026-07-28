@@ -8,8 +8,8 @@
 
 #ifdef __3DS__
 extern bool fill_screen_enabled;
-const extern bool fill_screen;
-const extern bool enhanced_3ds_display_mode;
+extern bool fill_screen;
+extern bool enhanced_3ds_display_mode;
 #endif
 
 typedef struct {

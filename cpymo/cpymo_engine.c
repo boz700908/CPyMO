@@ -328,13 +328,13 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 			delta_time_sec);
 		CPYMO_THROW(err);
 
-		if (!cpymo_wait_is_wating(&engine->wait)) {
+		if (!cpymo_wait_is_waiting(&engine->wait)) {
 			if (engine->interpreter)
 				err = cpymo_interpreter_execute_step(
 					engine->interpreter, engine);
 			else return CPYMO_ERR_NO_MORE_CONTENT;
 
-			if (cpymo_wait_is_wating(&engine->wait)) {
+			if (cpymo_wait_is_waiting(&engine->wait)) {
 				if (err == CPYMO_ERR_NO_MORE_CONTENT) 
 					err = CPYMO_ERR_SUCC;
 			}
@@ -376,10 +376,8 @@ void cpymo_engine_draw(const cpymo_engine *engine)
 
 void cpymo_engine_trim_memory(cpymo_engine *e)
 {
-	extern void cpymo_bg_transfer_operate(cpymo_engine *e);
 	cpymo_bg_transfer_operate(e);
 
-	extern void cpymo_charas_gc(cpymo_charas *p, bool trim_memory);
 	cpymo_charas_gc(&e->charas, true);
 
 	cpymo_anime_off(&e->anime);

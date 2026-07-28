@@ -95,3 +95,8 @@ $(TARGET): $(SRC) dirs $(BUILD_DIR)/cpymo.res
 		Version.lib Mfplat.lib OleAut32.lib Bcrypt.lib strmiids.lib Mfuuid.lib \
 		$(LD_FLAGS) /RELEASE
 	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG)\*.dll" . >nul
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG)\*.ini" . >nul 2>&1
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG)\*.conf" . >nul 2>&1
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist enter.wav copy /Y enter.wav . >nul
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist menu.wav copy /Y menu.wav . >nul
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist select.wav copy /Y select.wav . >nul

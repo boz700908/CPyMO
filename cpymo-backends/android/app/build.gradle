@@ -16,13 +16,13 @@ if (System.getenv("ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY") == null) {
 }
 
 android {
-    compileSdk 32
+    compileSdk 34
     ndkVersion "21.4.7075529"
 
     defaultConfig {
         applicationId "xyz.xydm.cpymo"
         minSdk 18
-        targetSdk 32
+        targetSdk 34
         versionCode 3
         versionName "1.1.4"
 
@@ -44,13 +44,9 @@ android {
 
     signingConfigs {
         release {
-            //签名文件路径，我是放到项目中了
             storeFile file { "keystore.jks" }
-            //签名密码
             storePassword "123456"
-            //别名
             keyAlias "key0"
-            //别名密码
             keyPassword "123456"
         }
     }

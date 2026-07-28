@@ -165,6 +165,8 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 
 #ifdef ENABLE_TEXT_EXTRACT
 	box->music_title_text = (char **)malloc(sizeof(char *) * box->music_count);
+	if (box->music_title_text)
+		memset(box->music_title_text, 0, sizeof(char *) * box->music_count);
 	cpymo_list_ui_set_selection_changed_callback(
 		e, &cpymo_musicbox_visual_help_selection_change);
 #endif

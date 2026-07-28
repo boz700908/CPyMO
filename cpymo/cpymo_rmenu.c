@@ -12,8 +12,8 @@
 
 #ifdef __3DS__
 extern bool fill_screen_enabled;
-const extern bool fill_screen;
-const extern bool enhanced_3ds_display_mode;
+extern bool fill_screen;
+extern bool enhanced_3ds_display_mode;
 #endif
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
@@ -21,11 +21,12 @@ const extern bool enhanced_3ds_display_mode;
 #define CPYMO_VISUAL_HELP_MENU_SOUND() cpymo_android_play_sound(SOUND_MENU)
 #elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
 extern void cpymo_ios_accessibility_play_sound(int sound_type);
-#define CPYMO_VISUAL_HELP_MENU_SOUND() cpymo_ios_accessibility_play_sound(2)
-#elif defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
-extern void cpymo_windows_accessibility_play_sound(int sound_type);
+extern void cpymo_ios_accessibility_vibrate(int milliseconds);
+#define CPYMO_VISUAL_HELP_MENU_SOUND() do { cpymo_ios_accessibility_play_sound(2); cpymo_ios_accessibility_vibrate(10); } while (0)
+#elif defined(ENABLE_TEXT_EXTRACT)
+extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
 extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
-#define CPYMO_VISUAL_HELP_MENU_SOUND() do { cpymo_windows_accessibility_play_sound(2); cpymo_sdl2_accessibility_vibrate(10); } while (0)
+#define CPYMO_VISUAL_HELP_MENU_SOUND() do { cpymo_sdl2_accessibility_play_sound(2); cpymo_sdl2_accessibility_vibrate(10); } while (0)
 #else
 #define CPYMO_VISUAL_HELP_MENU_SOUND()
 #endif

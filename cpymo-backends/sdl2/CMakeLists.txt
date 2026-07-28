@@ -41,13 +41,32 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 		endif ()
 		find_library(TOLK_LIBRARY NAMES Tolk PATHS "${TOLK_ROOT}/${TOLK_ARCH}/Release" NO_DEFAULT_PATH REQUIRED)
 		file(GLOB TOLK_RUNTIME_DLLS "${TOLK_ROOT}/${TOLK_ARCH}/Release/*.dll")
+		file(GLOB TOLK_RUNTIME_INIS "${TOLK_ROOT}/${TOLK_ARCH}/Release/*.ini")
+		file(GLOB TOLK_RUNTIME_CONFS "${TOLK_ROOT}/${TOLK_ARCH}/Release/*.conf")
 		target_include_directories(cpymo PRIVATE "${TOLK_INCLUDE_DIR}")
 		target_link_libraries(cpymo PRIVATE "${TOLK_LIBRARY}")
 		add_custom_command(TARGET cpymo POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_DLLS} $<TARGET_FILE_DIR:cpymo>)
+		add_custom_command(TARGET cpymo POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_INIS} $<TARGET_FILE_DIR:cpymo>)
+		add_custom_command(TARGET cpymo POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_CONFS} $<TARGET_FILE_DIR:cpymo>)
+		file(GLOB ACCESSIBILITY_WAVS "${CMAKE_CURRENT_SOURCE_DIR}/enter.wav" "${CMAKE_CURRENT_SOURCE_DIR}/menu.wav" "${CMAKE_CURRENT_SOURCE_DIR}/select.wav")
+		add_custom_command(TARGET cpymo POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
 	endif ()
 elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
 	set(CMAKE_C_FLAGS "-D__LINUX__")
     target_link_libraries(cpymo PRIVATE X11)
-endif ()
+	if (ENABLE_ACCESSIBILITY)
+		file(GLOB ACCESSIBILITY_WAVS "${CMAKE_CURRENT_SOURCE_DIR}/enter.wav" "${CMAKE_CURRENT_SOURCE_DIR}/menu.wav" "${CMAKE_CURRENT_SOURCE_DIR}/select.wav")
+		add_custom_command(TARGET cpymo POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
+	endif ()
+elseif (APPLE AND NOT IOS)
+	if (ENABLE_ACCESSIBILITY)
+		file(GLOB ACCESSIBILITY_WAVS "${CMAKE_CURRENT_SOURCE_DIR}/enter.wav" "${CMAKE_CURRENT_SOURCE_DIR}/menu.wav" "${CMAKE_CURRENT_SOURCE_DIR}/select.wav")
+		add_custom_command(TARGET cpymo POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
+	endif ()
 

@@ -11,7 +11,7 @@
 #endif
 
 #ifndef mkdir
-#define mkdir(A, B) _mkdir(A);
+#define mkdir(A, B) _mkdir(A)
 #endif
 
 #endif

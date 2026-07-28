@@ -1,30 +1,17 @@
 ﻿#include "../../cpymo/cpymo_prelude.h"
+#include "../include/cpymo_backend_text.h"
+#include "cpymo_import_sdl2.h"
+
 #ifndef DISABLE_STB_TRUETYPE
 
 #include "../../cpymo/cpymo_utils.h"
 #include "../../cpymo/cpymo_parser.h"
 #include "../../stb/stb_truetype.h"
-#include "../include/cpymo_backend_text.h"
 #include "../include/cpymo_backend_image.h"
-#include "cpymo_import_sdl2.h"
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
 #include <assert.h>
-
-#if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
-#include <windows.h>
-#include <Tolk.h>
-#elif defined(__APPLE__) && !defined(__IOS__)
-extern void cpymo_macos_accessibility_announce(const char *text);
-#elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
-#include <signal.h>
-#include <sys/types.h>
-#include <unistd.h>
-#elif defined(__IOS__)
-extern void cpymo_ios_accessibility_announce(const char *text);
-extern void cpymo_ios_accessibility_play_sound(int sound_type);
-#endif
 
 extern stbtt_fontinfo font;
 
@@ -159,27 +146,106 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
 
 #endif
 
+#if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
+#include <windows.h>
+#include <Tolk.h>
+#elif defined(__APPLE__) && !defined(__IOS__)
+extern void cpymo_macos_accessibility_announce(const char *text);
+#elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
+#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
+#elif defined(__IOS__)
+extern void cpymo_ios_accessibility_announce(const char *text);
+extern void cpymo_ios_accessibility_play_sound(int sound_type);
+#endif
+
 #ifdef ENABLE_TEXT_EXTRACT
+
+/* === Shared SDL2 Accessibility Sound System (Windows, macOS, Linux) === */
+#if !defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) && !defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+
+static SDL_AudioDeviceID accessibility_audio_dev = 0;
+static Uint8 *accessibility_wav_bufs[4] = {NULL, NULL, NULL, NULL};
+static Uint32 accessibility_wav_lens[4] = {0, 0, 0, 0};
+
+static void cpymo_sdl2_accessibility_sound_init(void)
+{
+    SDL_AudioSpec want, have;
+    SDL_memset(&want, 0, sizeof(want));
+    want.freq = 22050;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;
+    want.samples = 512;
+
+    accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
+        SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+
+    const char *sound_files[] = { NULL, "enter.wav", "menu.wav", "select.wav" };
+    for (int i = 1; i <= 3; i++) {
+        SDL_AudioSpec wav_spec;
+        if (SDL_LoadWAV(sound_files[i], &wav_spec,
+                &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) == NULL) {
+            accessibility_wav_bufs[i] = NULL;
+            accessibility_wav_lens[i] = 0;
+        }
+    }
+}
+
+static void cpymo_sdl2_accessibility_sound_free(void)
+{
+    for (int i = 1; i <= 3; i++) {
+        if (accessibility_wav_bufs[i]) {
+            SDL_FreeWAV(accessibility_wav_bufs[i]);
+            accessibility_wav_bufs[i] = NULL;
+        }
+    }
+    if (accessibility_audio_dev) {
+        SDL_CloseAudioDevice(accessibility_audio_dev);
+        accessibility_audio_dev = 0;
+    }
+}
+
+void cpymo_sdl2_accessibility_play_sound(int sound_type)
+{
+    if (sound_type >= 1 && sound_type <= 3
+        && accessibility_audio_dev
+        && accessibility_wav_bufs[sound_type]) {
+        SDL_ClearQueuedAudio(accessibility_audio_dev);
+        if (SDL_QueueAudio(accessibility_audio_dev,
+                accessibility_wav_bufs[sound_type],
+                accessibility_wav_lens[sound_type]) == 0) {
+            SDL_PauseAudioDevice(accessibility_audio_dev, 0);
+            return;
+        }
+    }
+
+#if defined(_WIN32)
+    UINT sound = sound_type == 1 ? MB_OK : (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
+    MessageBeep(sound);
+#endif
+}
+
+#endif /* !Android && !iOS */
+
+/* === Platform-specific TTS backends === */
+
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 void cpymo_backend_text_extract_init(void)
 {
     Tolk_Load();
+    cpymo_sdl2_accessibility_sound_init();
 }
 
 void cpymo_backend_text_extract_free(void)
 {
     Tolk_Unload();
-}
-
-void cpymo_windows_accessibility_play_sound(int sound_type)
-{
-    UINT sound = sound_type == 1 ? MB_OK : (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
-    MessageBeep(sound);
+    cpymo_sdl2_accessibility_sound_free();
 }
 
 void cpymo_backend_text_extract(const char *text)
 {
-	if (text == NULL || text[0] == '\0') return;
+    if (text == NULL || text[0] == '\0') return;
 
     int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
     if (wide_len == 0) return;
@@ -202,8 +268,15 @@ void cpymo_backend_text_extract(const char *text)
     cpymo_ios_accessibility_announce(text);
 }
 #elif defined(__APPLE__)
-void cpymo_backend_text_extract_init(void) {}
-void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_init(void)
+{
+    cpymo_sdl2_accessibility_sound_init();
+}
+
+void cpymo_backend_text_extract_free(void)
+{
+    cpymo_sdl2_accessibility_sound_free();
+}
 
 void cpymo_backend_text_extract(const char *text)
 {
@@ -214,9 +287,13 @@ void cpymo_backend_text_extract(const char *text)
 void cpymo_backend_text_extract_init(void)
 {
     signal(SIGCHLD, SIG_IGN);
+    cpymo_sdl2_accessibility_sound_init();
 }
 
-void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_free(void)
+{
+    cpymo_sdl2_accessibility_sound_free();
+}
 
 void cpymo_backend_text_extract(const char *text)
 {
@@ -234,7 +311,7 @@ void cpymo_backend_text_extract_free(void) {}
 
 void cpymo_backend_text_extract(const char *text)
 {
-	if (text == NULL || text[0] == '\0') return;
+    if (text == NULL || text[0] == '\0') return;
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
     extern void cpymo_android_text_to_speech(const char *text);

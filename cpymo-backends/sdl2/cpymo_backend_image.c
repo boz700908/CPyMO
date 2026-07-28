@@ -325,10 +325,6 @@ static void cpymo_assetloader_sdl2_attach_mask(
 				+ ((size_t)y * mask->pitch)
 				+ ((size_t)x * mask->format->BytesPerPixel);
 
-			Uint8 dummy;
-			SDL_GetRGBA(*(Uint32 *)mask_px, mask->format,
-				&img_rgba_px[0], &dummy, &dummy, &dummy);
-
 			img_rgba_px[0] = mask_px[2];
 		}
 	}

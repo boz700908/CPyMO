@@ -102,7 +102,7 @@ error_t cpymo_backend_font_init(const char *gamedir)
 		"msmincho.ttc",
 		"simhei.ttf",
 		"simkai.ttf",
-		"simsun.ttc"
+		"simsun.ttc",
 		"simsunb.ttf",
 		"simfang.ttf",
 		"SIMLI.ttf"

@@ -626,7 +626,7 @@ START:
 #ifndef __ANDROID__
 			else if (event.type == SDL_QUIT) {
 				#ifdef ENABLE_EXIT_CONFIRM
-				#ifndef DISALBE_MOVIE
+				#ifndef DISABLE_MOVIE
 				extern bool playing_movie;
 				if (playing_movie) goto EXIT;
 				#endif

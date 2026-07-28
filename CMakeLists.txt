@@ -22,15 +22,13 @@ if (ENABLE_ACCESSIBILITY)
 	endif ()
 endif ()
 add_definitions (-DENABLE_EXIT_CONFIRM)
-add_definitions (-DLEAKCHECK)
 add_definitions (-DLIMIT_WINDOW_SIZE_TO_SCREEN)
 
-find_package (FFMPEG REQUIRED)
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+	add_definitions (-DLEAKCHECK)
+endif ()
 
-if (FFMPEG_FOUND)
-else ()
-	MESSAGE ("Can not find FFMPEG!")
-endif (FFMPEG_FOUND)
+find_package (FFMPEG REQUIRED)
 
 include_directories (${FFMPEG_INCLUDE_DIRS})
 

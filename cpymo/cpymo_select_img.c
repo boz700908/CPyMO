@@ -13,11 +13,12 @@
 #define CALL_VISUALLY_PLAY_SOUND(X) cpymo_android_play_sound(X)
 #elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
 extern void cpymo_ios_accessibility_play_sound(int sound_type);
-#define CALL_VISUALLY_PLAY_SOUND(X) cpymo_ios_accessibility_play_sound(X)
-#elif defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
-extern void cpymo_windows_accessibility_play_sound(int sound_type);
+extern void cpymo_ios_accessibility_vibrate(int milliseconds);
+#define CALL_VISUALLY_PLAY_SOUND(X) do { cpymo_ios_accessibility_play_sound(X); cpymo_ios_accessibility_vibrate(10); } while (0)
+#elif defined(ENABLE_TEXT_EXTRACT)
+extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
 extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
-#define CALL_VISUALLY_PLAY_SOUND(X) do { cpymo_windows_accessibility_play_sound(X); cpymo_sdl2_accessibility_vibrate(10); } while (0)
+#define CALL_VISUALLY_PLAY_SOUND(X) do { cpymo_sdl2_accessibility_play_sound(X); cpymo_sdl2_accessibility_vibrate(10); } while (0)
 #else
 #define CALL_VISUALLY_PLAY_SOUND(X)
 #endif

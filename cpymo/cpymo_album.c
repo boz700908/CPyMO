@@ -169,8 +169,9 @@ error_t cpymo_album_generate_album_ui_image_pixels(
 			strcat(path, ".png");
 
 			#ifdef CPYMO_TOOL
-			if (fopen(path, "rb"))
-			{
+			FILE *fp = fopen(path, "rb");
+			if (fp) {
+				fclose(fp);
 				free(path);
 				*out_image = pixels;
 				return CPYMO_ERR_SUCC;

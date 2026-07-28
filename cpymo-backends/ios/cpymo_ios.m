@@ -277,12 +277,46 @@ int cpymo_ios_accessibility_take_input_action(void)
 }
 
 void cpymo_ios_accessibility_play_sound(int sound_type) {
+    static AVAudioPlayer *players[4] = {nil, nil, nil, nil};
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSString *sound_names[] = {nil, @"enter", @"menu", @"select"};
+        for (int i = 1; i <= 3; i++) {
+            NSURL *url = [[NSBundle mainBundle] URLForResource:sound_names[i] withExtension:@"wav"];
+            if (url) {
+                players[i] = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:nil];
+                [players[i] prepareToPlay];
+            }
+        }
+    });
+
+    if (sound_type >= 1 && sound_type <= 3 && players[sound_type]) {
+        players[sound_type].currentTime = 0;
+        [players[sound_type] play];
+        return;
+    }
+
     SystemSoundID sound = sound_type == 1 ? 1104 : (sound_type == 2 ? 1155 : 1103);
     AudioServicesPlaySystemSound(sound);
 }
 
 void cpymo_ios_accessibility_vibrate(int milliseconds) {
-    (void)milliseconds;
-    AudioServicesPlaySystemSound(kSystemSoundID_Vibrate);
+    if (milliseconds <= 0) return;
+
+    if (@available(iOS 10.0, *)) {
+        UIImpactFeedbackStyle style;
+        if (milliseconds <= 20) {
+            style = UIImpactFeedbackStyleLight;
+        } else if (milliseconds <= 60) {
+            style = UIImpactFeedbackStyleMedium;
+        } else {
+            style = UIImpactFeedbackStyleHeavy;
+        }
+        UIImpactFeedbackGenerator *generator = [[UIImpactFeedbackGenerator alloc] initWithStyle:style];
+        [generator prepare];
+        [generator impactOccurred];
+    } else {
+        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate);
+    }
 }
 #endif

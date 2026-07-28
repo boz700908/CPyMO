@@ -33,10 +33,6 @@ endif
 
 LDFLAGS += -lSDL2main -lSDL2 -lm
 
-ifeq ($(DISABLE_AUDIO), 1)
-CFLAGS += -DDISABLE_AUDIO -DDISABLE_MOVIE
-endif
-
 ifeq ($(DISABLE_VSYNC), 1)
 CFLAGS += -DDISABLE_VSYNC
 endif
@@ -91,7 +87,7 @@ ifeq ($(NO_CONSOLE), 1)
 LDFLAGS += -mwindows
 endif
 
-ifneq ($(strip $(RC_FILE)), "")
+ifeq ($(strip $(RC_FILE)), "")
 RC_FILE := ../sdl2/pymo-icon-windows.rc
 endif
 

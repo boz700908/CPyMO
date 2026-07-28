@@ -362,6 +362,14 @@ jobs:
         path: ./cpymo-backends/android/ffmpeg-android-maker/build
         key: ffmpeg-android-${{ hashFiles('cpymo-backends/android/build-android-ffmpeg.sh') }}
 
+    - name: Cache Gradle
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ hashFiles('cpymo-backends/android/**/*.gradle*', 'cpymo-backends/android/**/gradle-wrapper.properties') }}
+
     - name: Build FFmpeg
       if: steps.cache-ffmpeg-android.outputs.cache-hit != 'true'
       env:
@@ -406,7 +414,7 @@ jobs:
 
   build-uwp:
     name: 'Universal Windows Platform'
-    runs-on: 'windows-latest'
+    runs-on: 'windows-2022'
 
     steps:
     - uses: actions/checkout@v4
@@ -415,17 +423,36 @@ jobs:
 
     - name: Find Visual Studio
       uses: ilammy/msvc-dev-cmd@v1
+      with:
+        uwp: true
 
     - name: Set up NASM
       uses: ilammy/setup-nasm@v1.3.1
 
-    - name: Donwload vcpkg
+    - name: Cache vcpkg clone
+      id: cache-vcpkg-clone
+      uses: actions/cache@v4
+      with:
+        path: ./vcpkg
+        key: vcpkg-clone-v1
+
+    - name: Download vcpkg
+      if: steps.cache-vcpkg-clone.outputs.cache-hit != 'true'
       run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
       run: |
         ./vcpkg/bootstrap-vcpkg.bat
         ./vcpkg/vcpkg integrate install
+
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ./vcpkg/packages
+          ./vcpkg/buildtrees
+          ./vcpkg/downloads
+        key: vcpkg-uwp-v1
 
     - name: Install FFmpeg
       run: |
@@ -592,7 +619,15 @@ jobs:
           libxkbcommon-dev \
           libegl1-mesa-dev
 
-    - name: Donwload vcpkg
+    - name: Cache vcpkg clone
+      id: cache-vcpkg-clone-desktop
+      uses: actions/cache@v4
+      with:
+        path: ./vcpkg
+        key: vcpkg-clone-v1
+
+    - name: Download vcpkg
+      if: steps.cache-vcpkg-clone-desktop.outputs.cache-hit != 'true'
       run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
@@ -616,7 +651,7 @@ jobs:
           ./vcpkg/packages
           ./vcpkg/buildtrees
           ./vcpkg/downloads
-        key: vcpkg-${{ matrix.triplet }}-${{ hashFiles('.github/workflows/ci.yml') }}
+        key: vcpkg-${{ matrix.triplet }}-v1
 
     - name: Install SDL2
       run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
@@ -666,11 +701,13 @@ jobs:
         path: |
           ./build-accessibility/build/cpymo
           ./build-accessibility/build/cpymo-tool
+          ./build-accessibility/build/*.wav
           ./build-accessibility/build/cpymo.exe
           ./build-accessibility/build/cpymo-tool.exe
           ./build-accessibility/build/Release/cpymo.exe
           ./build-accessibility/build/Release/cpymo-tool.exe
           ./build-accessibility/build/Release/*.dll
+          ./build-accessibility/build/Release/*.wav
           ./build-accessibility/build/MinSizeRel/cpymo.exe
           ./build-accessibility/build/MinSizeRel/cpymo-tool.exe
 

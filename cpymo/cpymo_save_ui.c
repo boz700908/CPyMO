@@ -287,6 +287,10 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 #ifdef ENABLE_TEXT_EXTRACT
 		ui->items[i].orginal_text = 
 			cpymo_str_copy_malloc(cpymo_str_pure(text_buf));
+		if (ui->items[i].orginal_text == NULL) {
+			cpymo_ui_exit(e);
+			return CPYMO_ERR_OUT_OF_MEM;
+		}
 #endif
 
 		if (err != CPYMO_ERR_SUCC) {

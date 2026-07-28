@@ -58,8 +58,7 @@ else
 
 # Use SDL2_Mixer by default
 CFLAGS += -DENABLE_SDL2_MIXER_AUDIO_BACKEND
-LDFLAGS += -lSDL2_mixer
-EM_FLAGS += -s SDL2_MIXER_FORMATS=[ogg,mp3,flac,mid,mod,wav] -s USE_SDL_MIXER=2
+LDFLAGS += -lSDL2_mixer -s SDL2_MIXER_FORMATS=[ogg,mp3,flac,mid,mod,wav] -s USE_SDL_MIXER=2
 
 endif
 endif

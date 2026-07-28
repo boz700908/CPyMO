@@ -533,7 +533,7 @@ int cpymo_tool_invoke_convert(int argc, const char **argv)
         return -1;
     }
 
-    bool use_pack_flag, pack_flag;
+    bool use_pack_flag = false, pack_flag = false;
     for (int i = 5; i < argc; ++i) {
         if (!strcmp(argv[i], "--pack")) {
             use_pack_flag = true;
