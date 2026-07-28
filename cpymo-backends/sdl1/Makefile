@@ -29,6 +29,10 @@ ifeq ($(LEAKCHECK), 1)
 CFLAGS += -DLEAKCHECK
 endif
 
+ifeq ($(ENABLE_TEXT_EXTRACT), 1)
+CFLAGS += -DENABLE_TEXT_EXTRACT
+endif
+
 ifneq ($(strip $(SDL)), "")
 CFLAGS += -I$(SDL)/include
 LDFLAGS += -L$(SDL)/lib

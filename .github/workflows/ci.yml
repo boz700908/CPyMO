@@ -359,7 +359,9 @@ jobs:
       id: cache-ffmpeg-android
       uses: actions/cache@v4
       with:
-        path: ./cpymo-backends/android/ffmpeg-android-maker/build
+        path: |
+          ./cpymo-backends/android/ffmpeg-android-maker/build
+          ./cpymo-backends/android/ffmpeg-android-maker/output
         key: ffmpeg-android-${{ hashFiles('cpymo-backends/android/build-android-ffmpeg.sh') }}
 
     - name: Cache Gradle
@@ -499,7 +501,7 @@ jobs:
       run: |
         cd ./cpymo-backends/sdl1
         export USE_SDL_MIXER=1
-        mingw32-make -j
+        mingw32-make -j ENABLE_TEXT_EXTRACT=1
         strip cpymo.exe
         cp /mingw32/bin/SDL.dll .
         cp /mingw32/bin/libSDL_mixer-*.dll .
@@ -531,7 +533,7 @@ jobs:
       run: |
         cd cpymo-backends/sdl1
         export USE_SDL_MIXER=1
-        make -j
+        make -j ENABLE_TEXT_EXTRACT=1
         strip ./cpymo
 
     - name: Upload
@@ -735,7 +737,7 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
         run: |
           cd cpymo-backends/ascii-art/
-          make -j
+          make -j ENABLE_TEXT_EXTRACT=1
           strip ./cpymo-ascii-art
 
       - name: 'Build (Windows)'
@@ -743,7 +745,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           cd cpymo-backends/ascii-art/
-          make -j
+          make -j ENABLE_TEXT_EXTRACT=1
           strip ./cpymo-ascii-art.exe
 
       - name: 'Upload'

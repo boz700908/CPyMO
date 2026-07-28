@@ -149,6 +149,10 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 #include <windows.h>
 #include <Tolk.h>
+#elif defined(__UWP__)
+/* UWP TTS implemented in cpymo_backend_uwp.cpp */
+#elif defined(__EMSCRIPTEN__)
+#include <emscripten.h>
 #elif defined(__APPLE__) && !defined(__IOS__)
 extern void cpymo_macos_accessibility_announce(const char *text);
 #elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
@@ -258,6 +262,11 @@ void cpymo_backend_text_extract(const char *text)
 
     free(wide_text);
 }
+#elif defined(__UWP__)
+/* UWP TTS implemented in cpymo_backend_uwp.cpp */
+void cpymo_backend_text_extract_init(void);
+void cpymo_backend_text_extract_free(void);
+void cpymo_backend_text_extract(const char *text);
 #elif defined(__IOS__)
 void cpymo_backend_text_extract_init(void) {}
 void cpymo_backend_text_extract_free(void) {}
@@ -266,6 +275,22 @@ void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
     cpymo_ios_accessibility_announce(text);
+}
+#elif defined(__EMSCRIPTEN__)
+void cpymo_backend_text_extract_init(void) {}
+
+void cpymo_backend_text_extract_free(void) {}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+
+    EM_ASM({
+        var msg = new SpeechSynthesisUtterance(UTF8ToString($0));
+        msg.lang = 'zh-CN';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(msg);
+    }, text);
 }
 #elif defined(__APPLE__)
 void cpymo_backend_text_extract_init(void)
@@ -321,6 +346,11 @@ void cpymo_backend_text_extract(const char *text)
 
 #ifdef ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD
     SDL_SetClipboardText(text);
+#endif
+
+#if !defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) && !defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
+    /* Console / embedded platform: output to stderr for accessibility debugging */
+    fprintf(stderr, "[Accessibility] %s\n", text);
 #endif
 }
 #endif

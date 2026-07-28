@@ -152,3 +152,6 @@ float cpymo_backend_text_width(
 
 
 #endif
+
+/* --- Accessibility (TTS + Sound) --- */
+#include "../include/cpymo_backend_text_extract.h"

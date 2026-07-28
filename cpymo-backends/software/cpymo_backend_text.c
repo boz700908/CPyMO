@@ -193,3 +193,6 @@ float cpymo_backend_text_width(
 
     return TEXT_CHARACTER_W_SCALE * (float)w / win_w * game_w;
 }
+
+/* --- Accessibility (TTS + Sound) --- */
+#include "../include/cpymo_backend_text_extract.h"

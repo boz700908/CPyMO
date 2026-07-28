@@ -34,7 +34,7 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	}
 
-	if (out_package->file_count > SIZE_MAX / sizeof(cpymo_package_index)) {
+	if ((size_t)out_package->file_count > SIZE_MAX / sizeof(cpymo_package_index)) {
 		fclose(out_package->stream);
 		out_package->stream = NULL;
 		return CPYMO_ERR_BAD_FILE_FORMAT;

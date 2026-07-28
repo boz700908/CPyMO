@@ -325,6 +325,10 @@ int main(int argc, char **argv)
 
     cpymo_backend_audio_init();
 
+#ifdef ENABLE_TEXT_EXTRACT
+    cpymo_backend_text_extract_init();
+#endif
+
     extern error_t cpymo_backend_image_init(void);
     extern void cpymo_backend_image_quit(void);
     error_t err = cpymo_backend_image_init();
@@ -525,6 +529,9 @@ EXIT:
     cpymo_backend_image_quit();
     cpymo_backend_audio_free();
     cpymo_backend_font_free();
+#ifdef ENABLE_TEXT_EXTRACT
+    cpymo_backend_text_extract_free();
+#endif
     SDL_Quit();
 
     #ifdef LEAKCHECK

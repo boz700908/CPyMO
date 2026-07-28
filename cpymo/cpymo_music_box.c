@@ -6,6 +6,7 @@
 #include "../cpymo-backends/include/cpymo_backend_text.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
 	char *music_list;

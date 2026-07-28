@@ -1,0 +1,179 @@
+#pragma once
+
+#include "../../cpymo/cpymo_prelude.h"
+
+#ifdef ENABLE_TEXT_EXTRACT
+
+/* ================================================================
+ * Shared Accessibility Implementation for Desktop Platforms
+ *
+ * Used by: SDL1, Software, ASCII-Art backends
+ * (SDL2 has its own implementation with SDL2 audio)
+ *
+ * Provides:
+ *   - cpymo_backend_text_extract_init()   : init TTS & sound
+ *   - cpymo_backend_text_extract_free()   : cleanup
+ *   - cpymo_backend_text_extract(text)    : speak text
+ *   - cpymo_accessibility_play_sound(type): play sound (1=enter, 2=menu, 3=select)
+ *   - cpymo_accessibility_vibrate(ms)     : haptic feedback (stub on desktop)
+ * ================================================================ */
+
+/* --- Platform-specific includes --- */
+#if defined(_WIN32)
+#include <windows.h>
+#include <sapi.h>
+#include <sphelper.h>
+#pragma comment(lib, "sapi.lib")
+#pragma comment(lib, "ole32.lib")
+#elif defined(__APPLE__) && !defined(__IOS__)
+#include <TargetConditionals.h>
+#if TARGET_OS_OSX
+#import <AppKit/AppKit.h>
+#import <AudioToolbox/AudioToolbox.h>
+#endif
+#elif defined(__linux__)
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+#endif
+
+/* --- Sound effects --- */
+
+#if defined(_WIN32)
+static void cpymo_accessibility_play_sound(int sound_type)
+{
+	UINT sound = sound_type == 1 ? MB_OK :
+	             (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
+	MessageBeep(sound);
+}
+#elif defined(__APPLE__) && !defined(__IOS__)
+static void cpymo_accessibility_play_sound(int sound_type)
+{
+	/* macOS: use system alert sound */
+	AudioServicesPlaySystemSound(kSystemSoundID_UserPreferredAlert);
+	(void)sound_type;
+}
+#elif defined(__linux__)
+static void cpymo_accessibility_play_sound(int sound_type)
+{
+	/* Linux: try beep, fallback to aplay */
+	(void)sound_type;
+	const char *sound_files[] = { NULL, "enter.wav", "menu.wav", "select.wav" };
+	if (sound_type >= 1 && sound_type <= 3) {
+		pid_t child = fork();
+		if (child == 0) {
+			execlp("aplay", "aplay", "-q", sound_files[sound_type], (char *)NULL);
+			_exit(127);
+		}
+	}
+}
+#else
+static void cpymo_accessibility_play_sound(int sound_type) { (void)sound_type; }
+#endif
+
+/* --- Haptic / vibration --- */
+
+static void cpymo_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
+
+/* --- TTS backends --- */
+
+#if defined(_WIN32)
+/* Windows SAPI (Speech API) - no Tolk dependency, uses built-in voices */
+static ISpVoice *cpymo_sapi_voice = NULL;
+
+static void cpymo_backend_text_extract_init(void)
+{
+	if (SUCCEEDED(CoInitializeEx(NULL, COINIT_MULTITHREADED))) {
+		/* CoInitialize may have been called already; ignore error */
+	}
+	if (FAILED(CoCreateInstance(&CLSID_SpVoice, NULL, CLSCTX_ALL,
+	                            &IID_ISpVoice, (void **)&cpymo_sapi_voice))) {
+		cpymo_sapi_voice = NULL;
+	}
+}
+
+static void cpymo_backend_text_extract_free(void)
+{
+	if (cpymo_sapi_voice) {
+		ISpVoice_Release(cpymo_sapi_voice);
+		cpymo_sapi_voice = NULL;
+	}
+	CoUninitialize();
+}
+
+static void cpymo_backend_text_extract(const char *text)
+{
+	if (text == NULL || text[0] == '\0') return;
+	if (cpymo_sapi_voice == NULL) return;
+
+	int wide_len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
+	if (wide_len <= 0) return;
+
+	wchar_t *wide_text = (wchar_t *)malloc((size_t)wide_len * sizeof(wchar_t));
+	if (wide_text == NULL) return;
+
+	if (MultiByteToWideChar(CP_UTF8, 0, text, -1, wide_text, wide_len) > 0) {
+		ISpVoice_Speak(cpymo_sapi_voice, wide_text, SPF_ASYNC, NULL);
+	}
+	free(wide_text);
+}
+
+#elif defined(__APPLE__) && !defined(__IOS__)
+/* macOS NSSpeechSynthesizer */
+static void cpymo_backend_text_extract_init(void) {}
+
+static void cpymo_backend_text_extract_free(void) {}
+
+static void cpymo_backend_text_extract(const char *text)
+{
+	if (text == NULL || text[0] == '\0') return;
+
+	NSString *announcement = [NSString stringWithUTF8String:text];
+	if (announcement.length == 0) return;
+
+	dispatch_async(dispatch_get_main_queue(), ^{
+		static NSSpeechSynthesizer *speaker;
+		if (speaker == nil) speaker = [[NSSpeechSynthesizer alloc] init];
+		[speaker stopSpeaking];
+		[speaker startSpeakingString:announcement];
+	});
+}
+
+#elif defined(__linux__)
+/* Linux speech-dispatcher (spd-say) */
+static void cpymo_backend_text_extract_init(void)
+{
+	signal(SIGCHLD, SIG_IGN);
+}
+
+static void cpymo_backend_text_extract_free(void) {}
+
+static void cpymo_backend_text_extract(const char *text)
+{
+	if (text == NULL || text[0] == '\0') return;
+
+	pid_t child = fork();
+	if (child == 0) {
+		execlp("spd-say", "spd-say", "--", text, (char *)NULL);
+		/* fallback to espeak if spd-say not found */
+		execlp("espeak", "espeak", text, (char *)NULL);
+		_exit(127);
+	}
+}
+
+#else
+/* Fallback: output to stdout */
+static void cpymo_backend_text_extract_init(void) {}
+
+static void cpymo_backend_text_extract_free(void) {}
+
+static void cpymo_backend_text_extract(const char *text)
+{
+	if (text == NULL || text[0] == '\0') return;
+	fprintf(stderr, "[TTS] %s\n", text);
+}
+#endif
+
+#endif /* ENABLE_TEXT_EXTRACT */

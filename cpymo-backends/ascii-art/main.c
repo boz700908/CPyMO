@@ -122,6 +122,10 @@ int main(int argc, char **argv)
 
     ensure_save_dir(gamedir);
 
+#ifdef ENABLE_TEXT_EXTRACT
+    cpymo_backend_text_extract_init();
+#endif
+
     printf("\033]0;%s\007", engine.gameconfig.gametitle);
 
     err = init_context();
@@ -180,6 +184,10 @@ int main(int argc, char **argv)
     cpymo_engine_free(&engine);
     free_context();
     cpymo_backend_font_free();
+
+#ifdef ENABLE_TEXT_EXTRACT
+    cpymo_backend_text_extract_free();
+#endif
 
     extern void cpymo_backend_ascii_clean(void);
     cpymo_backend_ascii_clean();

@@ -15,6 +15,7 @@
 #include "../software/cpymo_backend_software.h"
 #include "../include/cpymo_backend_audio.h"
 #include "../include/cpymo_backend_movie.h"
+#include "../include/cpymo_backend_text.h"
 
 #include <libswscale/swscale.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -471,3 +472,15 @@ size_t retro_get_memory_size(unsigned id)
 {
     return 0;
 }
+
+#ifdef ENABLE_TEXT_EXTRACT
+void cpymo_backend_text_extract_init(void) {}
+
+void cpymo_backend_text_extract_free(void) {}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    log_cb(RETRO_LOG_INFO, "[Accessibility] %s\n", text);
+}
+#endif

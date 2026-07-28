@@ -17,6 +17,7 @@ endif ()
 
 target_compile_definitions(cpymo_libretro PRIVATE
   -DTEXT_CHARACTER_W_SCALE=1
+  -DENABLE_TEXT_EXTRACT
 )
 target_link_options(cpymo_libretro PRIVATE
   -Wl,--version-script=${CMAKE_SOURCE_DIR}/link.T

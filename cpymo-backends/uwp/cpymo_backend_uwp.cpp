@@ -83,3 +83,48 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 
 	return head;
 }
+
+#ifdef ENABLE_TEXT_EXTRACT
+#include <ppltasks.h>
+#include <string>
+
+using namespace Windows::Media::SpeechSynthesis;
+using namespace Windows::Media::Playback;
+
+extern "C" {
+
+static SpeechSynthesizer^ g_speech_synthesizer = nullptr;
+static MediaPlayer^ g_speech_player = nullptr;
+
+void cpymo_backend_text_extract_init(void)
+{
+    g_speech_synthesizer = ref new SpeechSynthesizer();
+    g_speech_player = ref new MediaPlayer();
+}
+
+void cpymo_backend_text_extract_free(void)
+{
+    g_speech_synthesizer = nullptr;
+    g_speech_player = nullptr;
+}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    if (g_speech_synthesizer == nullptr) return;
+
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
+    std::wstring wide = convert.from_bytes(text);
+    auto str = ref new Platform::String(wide.c_str());
+
+    concurrency::create_task(g_speech_synthesizer->SynthesizeTextToStreamAsync(str))
+        .then([](SpeechSynthesisStream^ stream) {
+            if (stream && g_speech_player) {
+                g_speech_player->Source = MediaSource::CreateFromStream(stream, stream->ContentType);
+                g_speech_player->Play();
+            }
+        });
+}
+
+} // extern "C"
+#endif
