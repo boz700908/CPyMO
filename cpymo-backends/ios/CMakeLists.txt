@@ -26,6 +26,7 @@ add_subdirectory(../sdl2/SDL SDL)
 
 add_definitions(
         -D__IOS__
+        -DENABLE_TEXT_EXTRACT
         -DUSE_GAME_SELECTOR
         -DADAPT_SCREEN_SIZE
         -DSCREEN_WIDTH=800

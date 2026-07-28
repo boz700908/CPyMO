@@ -15,6 +15,8 @@
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 #include <windows.h>
 #include <Tolk.h>
+#elif defined(__IOS__)
+extern void cpymo_ios_accessibility_announce(const char *text);
 #endif
 
 extern stbtt_fontinfo font;
@@ -176,6 +178,15 @@ void cpymo_backend_text_extract(const char *text)
         Tolk_Output(wide_text, true);
 
     free(wide_text);
+}
+#elif defined(__IOS__)
+void cpymo_backend_text_extract_init(void) {}
+void cpymo_backend_text_extract_free(void) {}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    cpymo_ios_accessibility_announce(text);
 }
 #else
 void cpymo_backend_text_extract_init(void) {}

@@ -18,6 +18,7 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 
 	out_package->stream = fopen(path, "rb");
 	if (out_package->stream == NULL) return CPYMO_ERR_CAN_NOT_OPEN_FILE;
+	out_package->files = NULL;
 
 	size_t count = 
 		fread(
@@ -33,9 +34,19 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	}
 
+	if (out_package->file_count > SIZE_MAX / sizeof(cpymo_package_index)) {
+		fclose(out_package->stream);
+		out_package->stream = NULL;
+		return CPYMO_ERR_BAD_FILE_FORMAT;
+	}
+
 	out_package->files = (cpymo_package_index *)malloc(sizeof(cpymo_package_index) * out_package->file_count);
 
-	if (out_package->files == NULL) return CPYMO_ERR_OUT_OF_MEM;
+	if (out_package->files == NULL) {
+		fclose(out_package->stream);
+		out_package->stream = NULL;
+		return CPYMO_ERR_OUT_OF_MEM;
+	}
 	
 	count =
 		fread(
@@ -61,7 +72,7 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 void cpymo_package_close(cpymo_package * package)
 {
 	free(package->files);
-	fclose(package->stream);
+	if (package->stream) fclose(package->stream);
 }
 
 error_t cpymo_package_find(cpymo_package_index * out_index, const cpymo_package * package, cpymo_str filename)

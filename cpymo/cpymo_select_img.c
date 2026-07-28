@@ -84,7 +84,7 @@ error_t cpymo_select_img_configuare_begin(
 {
 	sel->selections =
 		(cpymo_select_img_selection *)malloc(sizeof(cpymo_select_img_selection) * selections);
-	if (sel->selections == NULL) return CPYMO_ERR_SUCC;
+	if (sel->selections == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
 	memset(sel->selections, 0, sizeof(cpymo_select_img_selection) * selections);
 
