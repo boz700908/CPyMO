@@ -304,7 +304,7 @@ cmake --build build-accessibility --config Release
 * 双指左滑复制最近朗读，双指右滑将最近朗读追加到剪贴板。
 * 进入、菜单、选择会播放对应的系统提示音；导航、确认、跳过和复制使用短触觉反馈，取消使用较长反馈，语义与 Android 无障碍包一致。
 
-Windows SDL2 无障碍构建会把上述短反馈发送到所有支持震动的已连接手柄；没有震动硬件时自动忽略，不影响游戏输入或普通构建。
+Windows SDL2 无障碍构建会把上述短反馈发送到所有支持震动的已连接手柄；没有震动硬件时自动忽略，不影响游戏输入或普通构建。桌面版只有在 CMake 传入`-DENABLE_ACCESSIBILITY=ON`时才启用朗读，默认构建不会朗读。
 
 macOS 桌面版会将提取的游戏文本交给系统语音合成朗读，无需额外安装。Linux 桌面版会通过 Speech Dispatcher 的`spd-say`朗读提取文本；组件不可用时游戏会继续运行但不朗读。
 
@@ -320,6 +320,13 @@ sudo pacman -S speech-dispatcher espeak-ng
 ```
 
 Windows 无障碍版随程序提供匹配架构的 Tolk、读屏驱动 DLL 及配置文件。请把发行包内的全部 DLL 和配置文件与`cpymo.exe`放在同一目录；不需要单独安装 Tolk。
+
+桌面无障碍构建示例：
+
+```bash
+cmake -S . -B build-accessibility -DENABLE_ACCESSIBILITY=ON
+cmake --build build-accessibility --config Release
+```
 
 # Sony Playstation Portable 平台
 

@@ -553,11 +553,17 @@ jobs:
     - name: Install FFMPEG
       run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
 
-    - name: Configure CMake
+    - name: Configure CMake (Standard)
       run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{ github.workspace }}/build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} ${{ matrix.cmake-flags }}
 
-    - name: Build
+    - name: Build (Standard)
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Configure CMake (Accessibility)
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{ github.workspace }}/build-accessibility -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DENABLE_ACCESSIBILITY=ON ${{ matrix.cmake-flags }}
+
+    - name: Build (Accessibility)
+      run: cmake --build ${{github.workspace}}/build-accessibility --config ${{env.BUILD_TYPE}}
 
     - name: Strip
       if: ${{ runner.os != 'Windows' }}

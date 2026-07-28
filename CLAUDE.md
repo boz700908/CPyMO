@@ -186,7 +186,8 @@ make
 - `CPYMO_LANG` - Default language
 
 ### Accessibility Features
-- Windows: `ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1` sends extracted text to Tolk and plays Windows enter/menu/select feedback sounds. The required x86/x64/ARM64 release libraries and driver configuration files are in `third_party/tolk`; copy the matching DLL set beside the executable.
+- Desktop CMake: `ENABLE_ACCESSIBILITY=ON` is the explicit opt-in for Windows Tolk, Linux Speech Dispatcher, or macOS speech. It defaults to `OFF`, so ordinary desktop packages never narrate.
+- Windows: the accessibility configuration sends extracted text to Tolk and plays Windows enter/menu/select feedback sounds. The required x86/x64/ARM64 release libraries and driver configuration files are in `third_party/tolk`; copy the matching DLL set beside the executable.
 - Android: `ENABLE_TEXT_EXTRACT` and `ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY` enable text-to-speech and accessibility gestures.
 - iOS: `ENABLE_IOS_ACCESSIBILITY=ON` enables the Android-equivalent accessibility interaction model while retaining iOS 9 support.
 - Windows SDL2 accessibility builds send short interaction feedback to every connected controller that supports SDL rumble; unsupported controllers are ignored.
