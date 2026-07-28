@@ -67,11 +67,11 @@ cd cpymo-backends/ios
 ./build-ffmpeg.sh arm64
 
 # Standard package (same role as the regular Android APK)
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build build --config Release
 
 # Accessibility package (same role as Android Accessibility APK)
-cmake -S . -B build-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+cmake -S . -B build-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_IOS_ACCESSIBILITY=ON
 cmake --build build-accessibility --config Release
 ```
 

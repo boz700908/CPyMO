@@ -287,14 +287,14 @@ cd到`cpymo-backends/sdl2`，执行`make -j -f Makefile.Switch`即可编译到�
 先在`cpymo-backends/ios`中执行`bash ./build-ffmpeg.sh arm64`，再使用 iOS CMake 工具链构建。普通包与 Android 的普通 APK 对应，不启用视障帮助：
 
 ```bash
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build build --config Release
 ```
 
 视障帮助包与 Android 的“Accessibility”APK 对应，额外传入`-DENABLE_IOS_ACCESSIBILITY=ON`。它保持 iOS 9 的应用部署目标和 FFmpeg iOS 8.0 的兼容目标，不要求打开系统旁白。
 
 ```bash
-cmake -S . -B build-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+cmake -S . -B build-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_IOS_ACCESSIBILITY=ON
 cmake --build build-accessibility --config Release
 ```
 

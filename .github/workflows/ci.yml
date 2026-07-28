@@ -239,7 +239,7 @@ jobs:
         shell: bash
         working-directory: ./cpymo-backends/ios
         run: |
-          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64
+          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           cmake --build build -j $(sysctl -n hw.physicalcpu) --config Release
           cd ./build
           mkdir Payload
@@ -251,7 +251,7 @@ jobs:
         shell: bash
         working-directory: ./cpymo-backends/ios
         run: |
-          cmake -S. -Bbuild-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_IOS_ACCESSIBILITY=ON
+          cmake -S. -Bbuild-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_IOS_ACCESSIBILITY=ON
           cmake --build build-accessibility -j $(sysctl -n hw.physicalcpu) --config Release
           cd ./build-accessibility
           mkdir Payload
@@ -401,7 +401,7 @@ jobs:
         mingw32-make -j
         strip cpymo.exe
         cp /mingw32/bin/SDL.dll .
-        cp /mingw32/bin/SDL_mixer.dll .
+        cp /mingw32/bin/libSDL_mixer-*.dll .
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
