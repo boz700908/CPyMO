@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 project(cpymo-libretro C)
 
 option(LIBRETRO_STATIC "Statically link the libretro core" OFF)
+option(ENABLE_TEXT_EXTRACT "Enable accessibility features (TTS, sounds, vibration)" ON)
 
 set(SOURCES
   libretro.c
@@ -17,8 +18,10 @@ endif ()
 
 target_compile_definitions(cpymo_libretro PRIVATE
   -DTEXT_CHARACTER_W_SCALE=1
-  -DENABLE_TEXT_EXTRACT
 )
+if (ENABLE_TEXT_EXTRACT)
+  target_compile_definitions(cpymo_libretro PRIVATE -DENABLE_TEXT_EXTRACT)
+endif ()
 target_link_options(cpymo_libretro PRIVATE
   -Wl,--version-script=${CMAKE_SOURCE_DIR}/link.T
   -Wl,--no-undefined -lm

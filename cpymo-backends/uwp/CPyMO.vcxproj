@@ -127,7 +127,15 @@
     <AppxBundle>Always</AppxBundle>
     <AppxBundlePlatforms>x86|x64|arm</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    <!-- Set ENABLE_TEXT_EXTRACT=1 via MSBuild property to enable accessibility:
+         msbuild /p:ENABLE_TEXT_EXTRACT=1 -->
+    <ENABLE_TEXT_EXTRACT>0</ENABLE_TEXT_EXTRACT>
   </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions Condition="'$(ENABLE_TEXT_EXTRACT)'=='1'">ENABLE_TEXT_EXTRACT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <IncludePath>../sdl2/SDL/include;../../cpymo;../sdl2;../include;../../endianness.h;../../stb;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -159,7 +167,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;ENABLE_TEXT_EXTRACT;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -170,7 +178,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -181,7 +189,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -192,7 +200,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -203,7 +211,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -214,7 +222,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -225,7 +233,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -236,7 +244,7 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";ENABLE_TEXT_EXTRACT;__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SCREEN_WIDTH=800;SCREEN_HEIGHT=600;USE_GAME_SELECTOR;ADAPT_SCREEN_SIZE;__UWP__;GAME_SELECTOR_FONTSIZE=46;GAME_SELECTOR_EMPTY_MSG_FONTSIZE=36;GAME_SELECTOR_COUNT_PER_SCREEN=4;GAME_SELECTOR_DIR="";__CXX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -253,6 +261,17 @@
     <Image Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="enter.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="menu.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="select.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\cpymo\cpymo_album.c" />

@@ -41,9 +41,15 @@ CFLAGS	= -O3 -Wall $(MACHDEP) $(INCLUDE) \
 			-DGAME_SELECTOR_DIR=" \"sd:/pymogames/\" " \
 			-D__WII__ \
 			-DFONT_RENDER_QUALITY=3 \
-			-DENABLE_TEXT_EXTRACT \
 			-DSCREEN_FLAGS="(SDL_DOUBLEBUF | SDL_SWSURFACE)" \
 			-DFAST_FILL_RECT -DDISABLE_MASKTRANS -DDISABLE_HIGHLIGHT_SQUARE
+
+ifeq ($(ENABLE_TEXT_EXTRACT), 0)
+# Standard build: no accessibility features
+else
+# Accessibility build (default): enable TTS, sounds, vibration
+CFLAGS += -DENABLE_TEXT_EXTRACT
+endif
 
 CXXFLAGS	=	$(CFLAGS)
 

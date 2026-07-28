@@ -51,7 +51,14 @@ CFLAGS	:=	-O3 -Wall -Wno-unknown-pragmas -Ofast -mword-relocations \
 			-ffunction-sections \
 			$(ARCH)
 
-CFLAGS	+=	$(INCLUDE) -D__3DS__ -DNDEBUG -DENABLE_TEXT_EXTRACT
+CFLAGS	+=	$(INCLUDE) -D__3DS__ -DNDEBUG
+
+ifeq ($(ENABLE_TEXT_EXTRACT), 0)
+# Standard build: no accessibility features
+else
+# Accessibility build (default): enable TTS, sounds, vibration
+CFLAGS += -DENABLE_TEXT_EXTRACT
+endif
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
 

@@ -173,7 +173,7 @@ static SDL_AudioDeviceID accessibility_audio_dev = 0;
 static Uint8 *accessibility_wav_bufs[4] = {NULL, NULL, NULL, NULL};
 static Uint32 accessibility_wav_lens[4] = {0, 0, 0, 0};
 
-static void cpymo_sdl2_accessibility_sound_init(void)
+void cpymo_sdl2_accessibility_sound_init(void)
 {
     SDL_AudioSpec want, have;
     SDL_memset(&want, 0, sizeof(want));
@@ -196,7 +196,7 @@ static void cpymo_sdl2_accessibility_sound_init(void)
     }
 }
 
-static void cpymo_sdl2_accessibility_sound_free(void)
+void cpymo_sdl2_accessibility_sound_free(void)
 {
     for (int i = 1; i <= 3; i++) {
         if (accessibility_wav_bufs[i]) {

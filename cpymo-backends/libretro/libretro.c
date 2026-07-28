@@ -483,4 +483,8 @@ void cpymo_backend_text_extract(const char *text)
     if (text == NULL || text[0] == '\0') return;
     log_cb(RETRO_LOG_INFO, "[Accessibility] %s\n", text);
 }
+
+/* Stub: sound & vibration not available in libretro backend */
+void cpymo_sdl2_accessibility_play_sound(int sound_type) { (void)sound_type; }
+void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
 #endif

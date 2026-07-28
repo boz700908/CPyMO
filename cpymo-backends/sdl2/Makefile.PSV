@@ -24,12 +24,18 @@ CFLAGS := \
 	-DSCREEN_HEIGHT=544 \
 	-DNDEBUG \
 	-DDISABLE_MOVIE -DDISABLE_FFMPEG_AUDIO \
-	-DENABLE_TEXT_EXTRACT \
 	-DENABLE_SDL2_MIXER_AUDIO_BACKEND \
 	-DSDL2_MIXER_AUDIO_BACKEND_CHUNK_SIZE="(1024 * 1024 * 4)" \
 	-DENABLE_SCREEN_FORCE_CENTERED -DDISABLE_AUTOSAVE \
 	-O2 \
 	-Wall
+
+ifeq ($(ENABLE_TEXT_EXTRACT), 0)
+# Standard build: no accessibility features
+else
+# Accessibility build (default): enable TTS, sounds, vibration
+CFLAGS += -DENABLE_TEXT_EXTRACT
+endif
 
 define compile
 	@echo "$(notdir $1)"

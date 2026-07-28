@@ -58,7 +58,6 @@ CFLAGS	:=	-g -Wall -O3 -ffunction-sections -DNDEBUG \
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__ \
 			-DSCREEN_WIDTH=1920 \
 			-DSCREEN_HEIGHT=1080 \
-			-DENABLE_TEXT_EXTRACT \
 			-DUSE_GAME_SELECTOR \
 			-DTEXT_LINE_Y_OFFSET=12 \
 			-DGAME_SELECTOR_FONTSIZE=80 \
@@ -66,6 +65,13 @@ CFLAGS	+=	$(INCLUDE) -D__SWITCH__ \
 			-DGAME_SELECTOR_COUNT_PER_SCREEN=4 \
 			-DGAME_SELECTOR_DIR=" \"sdmc:/pymogames/\" " \
 			-DDONT_PASS_PATH_TO_FFMPEG
+
+ifeq ($(ENABLE_TEXT_EXTRACT), 0)
+# Standard build: no accessibility features
+else
+# Accessibility build (default): enable TTS, sounds, vibration
+CFLAGS += -DENABLE_TEXT_EXTRACT
+endif
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 

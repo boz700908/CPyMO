@@ -130,8 +130,15 @@ float cpymo_backend_text_width(
     float single_character_size_in_logical_screen) 
 { return t.len * single_character_size_in_logical_screen; }
 
+void cpymo_backend_text_extract_init(void) {}
+void cpymo_backend_text_extract_free(void) {}
+
 void cpymo_backend_text_extract(const char *text)
 { puts(text); }
+
+/* Stub: sound & vibration not available in text backend */
+void cpymo_sdl2_accessibility_play_sound(int sound_type) { (void)sound_type; }
+void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
 
 #ifdef _WIN32
 #include <windows.h>

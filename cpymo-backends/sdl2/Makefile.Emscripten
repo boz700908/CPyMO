@@ -26,9 +26,15 @@ CFLAGS := \
 	-D__EMSCRIPTEN__ \
 	-DEMSCRIPTEN_GAMEDIR="\"$(BUILD_GAME_DIR)\"" \
 	-DNDEBUG \
-	-DENABLE_TEXT_EXTRACT \
 	$(EM_FLAGS) \
 	-O3
+
+ifeq ($(ENABLE_TEXT_EXTRACT), 0)
+# Standard build: no accessibility features
+else
+# Accessibility build: enable TTS, gestures, sound, vibration
+CFLAGS += -DENABLE_TEXT_EXTRACT
+endif
 
 LDFLAGS := \
 	$(EM_FLAGS) \

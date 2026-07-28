@@ -4,6 +4,10 @@
 #include "cpymo_import_sdl2.h"
 #include <string.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 extern SDL_Renderer *renderer;
 extern SDL_Window *window;
 extern cpymo_engine engine;
@@ -23,6 +27,15 @@ void cpymo_sdl2_accessibility_vibrate(int milliseconds)
         if (gamecontrollers[i] != NULL)
             SDL_GameControllerRumble(gamecontrollers[i], SDL_MAX_UINT16, SDL_MAX_UINT16, (Uint32)milliseconds);
     }
+
+#ifdef __EMSCRIPTEN__
+    /* Browser Vibration API for mobile web */
+    EM_ASM({
+        if (navigator.vibrate) {
+            navigator.vibrate($0);
+        }
+    }, milliseconds);
+#endif
 }
 
 cpymo_input cpymo_input_snapshot()

@@ -91,6 +91,12 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 using namespace Windows::Media::SpeechSynthesis;
 using namespace Windows::Media::Playback;
 
+/* SDL2 accessibility sound & vibration (shared with SDL2 backend) */
+extern "C" {
+    void cpymo_sdl2_accessibility_sound_init(void);
+    void cpymo_sdl2_accessibility_sound_free(void);
+}
+
 extern "C" {
 
 static SpeechSynthesizer^ g_speech_synthesizer = nullptr;
@@ -100,10 +106,16 @@ void cpymo_backend_text_extract_init(void)
 {
     g_speech_synthesizer = ref new SpeechSynthesizer();
     g_speech_player = ref new MediaPlayer();
+
+    /* Initialize SDL2 accessibility sound system (WAV playback, aligned with Android) */
+    cpymo_sdl2_accessibility_sound_init();
 }
 
 void cpymo_backend_text_extract_free(void)
 {
+    /* Clean up SDL2 accessibility sound system */
+    cpymo_sdl2_accessibility_sound_free();
+
     g_speech_synthesizer = nullptr;
     g_speech_player = nullptr;
 }

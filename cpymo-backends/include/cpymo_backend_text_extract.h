@@ -8,14 +8,19 @@
  * Shared Accessibility Implementation for Desktop Platforms
  *
  * Used by: SDL1, Software, ASCII-Art backends
- * (SDL2 has its own implementation with SDL2 audio)
+ * (SDL2/UWP have their own implementation with SDL2 audio)
  *
  * Provides:
  *   - cpymo_backend_text_extract_init()   : init TTS & sound
  *   - cpymo_backend_text_extract_free()   : cleanup
  *   - cpymo_backend_text_extract(text)    : speak text
- *   - cpymo_accessibility_play_sound(type): play sound (1=enter, 2=menu, 3=select)
- *   - cpymo_accessibility_vibrate(ms)     : haptic feedback (stub on desktop)
+ *   - cpymo_sdl2_accessibility_play_sound(type): play sound (1=enter, 2=menu, 3=select)
+ *   - cpymo_sdl2_accessibility_vibrate(ms)    : haptic feedback
+ *
+ * Sound scheme aligned with Android:
+ *   1 = SOUND_ENTER  (enter/confirm)
+ *   2 = SOUND_MENU   (menu/cancel)
+ *   3 = SOUND_SELECT (select/switch)
  * ================================================================ */
 
 /* --- Platform-specific includes --- */
@@ -39,43 +44,52 @@
 #include <stdlib.h>
 #endif
 
-/* --- Sound effects --- */
+/* --- Sound effects (aligned with Android's SoundPool WAV playback) --- */
 
 #if defined(_WIN32)
-static void cpymo_accessibility_play_sound(int sound_type)
+/* Windows: try MessageBeep as fallback (WAV loading via SDL not available in these backends) */
+void cpymo_sdl2_accessibility_play_sound(int sound_type)
 {
+	/* Map to system sounds: 1=enter(OK), 2=menu(warning), 3=select(info) */
 	UINT sound = sound_type == 1 ? MB_OK :
 	             (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
 	MessageBeep(sound);
 }
 #elif defined(__APPLE__) && !defined(__IOS__)
-static void cpymo_accessibility_play_sound(int sound_type)
+void cpymo_sdl2_accessibility_play_sound(int sound_type)
 {
-	/* macOS: use system alert sound */
+	/* macOS: use system alert sound for all types */
 	AudioServicesPlaySystemSound(kSystemSoundID_UserPreferredAlert);
 	(void)sound_type;
 }
 #elif defined(__linux__)
-static void cpymo_accessibility_play_sound(int sound_type)
+void cpymo_sdl2_accessibility_play_sound(int sound_type)
 {
-	/* Linux: try beep, fallback to aplay */
-	(void)sound_type;
+	/* Linux: try aplay with WAV files (same names as Android) */
 	const char *sound_files[] = { NULL, "enter.wav", "menu.wav", "select.wav" };
 	if (sound_type >= 1 && sound_type <= 3) {
 		pid_t child = fork();
 		if (child == 0) {
 			execlp("aplay", "aplay", "-q", sound_files[sound_type], (char *)NULL);
+			/* fallback to system beep */
+			execlp("beep", "beep", (char *)NULL);
 			_exit(127);
 		}
 	}
 }
 #else
-static void cpymo_accessibility_play_sound(int sound_type) { (void)sound_type; }
+void cpymo_sdl2_accessibility_play_sound(int sound_type) { (void)sound_type; }
 #endif
 
 /* --- Haptic / vibration --- */
 
-static void cpymo_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
+#if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+/* Desktop platforms: vibration via gamepad is not available in SDL1/Software/ASCII-Art backends.
+ * SDL2 and UWP backends have their own implementation in cpymo_backend_input.c */
+void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
+#else
+void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
+#endif
 
 /* --- TTS backends --- */
 
@@ -83,7 +97,7 @@ static void cpymo_accessibility_vibrate(int milliseconds) { (void)milliseconds; 
 /* Windows SAPI (Speech API) - no Tolk dependency, uses built-in voices */
 static ISpVoice *cpymo_sapi_voice = NULL;
 
-static void cpymo_backend_text_extract_init(void)
+void cpymo_backend_text_extract_init(void)
 {
 	if (SUCCEEDED(CoInitializeEx(NULL, COINIT_MULTITHREADED))) {
 		/* CoInitialize may have been called already; ignore error */
@@ -94,7 +108,7 @@ static void cpymo_backend_text_extract_init(void)
 	}
 }
 
-static void cpymo_backend_text_extract_free(void)
+void cpymo_backend_text_extract_free(void)
 {
 	if (cpymo_sapi_voice) {
 		ISpVoice_Release(cpymo_sapi_voice);
@@ -103,7 +117,7 @@ static void cpymo_backend_text_extract_free(void)
 	CoUninitialize();
 }
 
-static void cpymo_backend_text_extract(const char *text)
+void cpymo_backend_text_extract(const char *text)
 {
 	if (text == NULL || text[0] == '\0') return;
 	if (cpymo_sapi_voice == NULL) return;
@@ -122,11 +136,11 @@ static void cpymo_backend_text_extract(const char *text)
 
 #elif defined(__APPLE__) && !defined(__IOS__)
 /* macOS NSSpeechSynthesizer */
-static void cpymo_backend_text_extract_init(void) {}
+void cpymo_backend_text_extract_init(void) {}
 
-static void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_free(void) {}
 
-static void cpymo_backend_text_extract(const char *text)
+void cpymo_backend_text_extract(const char *text)
 {
 	if (text == NULL || text[0] == '\0') return;
 
@@ -143,14 +157,14 @@ static void cpymo_backend_text_extract(const char *text)
 
 #elif defined(__linux__)
 /* Linux speech-dispatcher (spd-say) */
-static void cpymo_backend_text_extract_init(void)
+void cpymo_backend_text_extract_init(void)
 {
 	signal(SIGCHLD, SIG_IGN);
 }
 
-static void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_free(void) {}
 
-static void cpymo_backend_text_extract(const char *text)
+void cpymo_backend_text_extract(const char *text)
 {
 	if (text == NULL || text[0] == '\0') return;
 
@@ -165,11 +179,11 @@ static void cpymo_backend_text_extract(const char *text)
 
 #else
 /* Fallback: output to stdout */
-static void cpymo_backend_text_extract_init(void) {}
+void cpymo_backend_text_extract_init(void) {}
 
-static void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_free(void) {}
 
-static void cpymo_backend_text_extract(const char *text)
+void cpymo_backend_text_extract(const char *text)
 {
 	if (text == NULL || text[0] == '\0') return;
 	fprintf(stderr, "[TTS] %s\n", text);

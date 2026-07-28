@@ -564,7 +564,13 @@ START:
 		return -1;
 	}
 
+	#ifdef ENABLE_TEXT_EXTRACT
 	cpymo_backend_text_extract_init();
+	#ifdef __EMSCRIPTEN__
+		extern void cpymo_emscripten_gesture_init(void);
+		cpymo_emscripten_gesture_init();
+	#endif
+	#endif
 
 	Uint32 prev_ticks = SDL_GetTicks();
 	SDL_Event event;
@@ -727,7 +733,9 @@ START:
 
 EXIT:
 	cpymo_engine_free(&engine);
+	#ifdef ENABLE_TEXT_EXTRACT
 	cpymo_backend_text_extract_free();
+#endif
 
 	extern void cpymo_input_free_joysticks();
 	cpymo_input_free_joysticks();

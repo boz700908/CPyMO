@@ -29,16 +29,33 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Build
+    - name: Build (Accessibility)
       run: |
         cd ./cpymo-backends/sdl2
         make -j -f Makefile.Switch
+        cp cpymo.nro cpymo-accessibility.nro
 
-    - name: Upload
+    - name: Clean
+      run: |
+        cd ./cpymo-backends/sdl2
+        make -f Makefile.Switch clean
+
+    - name: Build (Standard)
+      run: |
+        cd ./cpymo-backends/sdl2
+        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=0
+
+    - name: Upload (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Nintendo Switch
         path: ./cpymo-backends/sdl2/cpymo.nro
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Nintendo Switch (Accessibility)
+        path: ./cpymo-backends/sdl2/cpymo-accessibility.nro
 
   build-3ds:
     name: 'Nintendo 3DS'
@@ -81,24 +98,49 @@ jobs:
         chmod +x ./build-3ds-ffmpeg.sh
         ./build-3ds-ffmpeg.sh
 
-    - name: Build
+    - name: Build (Accessibility)
       run: |
         cd ./cpymo-backends/3ds
         make -j
         $DEVKITARM/bin/arm-none-eabi-strip ./build/cpymo.elf
+        ./makerom -f cia -o cpymo-accessibility.cia -elf ./build/cpymo.elf -rsf cpymo.rsf -exefslogo -target t -icon icon -banner banner
+        cp cpymo.3dsx cpymo-accessibility.3dsx
+
+    - name: Clean
+      run: |
+        cd ./cpymo-backends/3ds
+        make clean
+
+    - name: Build (Standard)
+      run: |
+        cd ./cpymo-backends/3ds
+        make -j ENABLE_TEXT_EXTRACT=0
+        $DEVKITARM/bin/arm-none-eabi-strip ./build/cpymo.elf
         ./makerom -f cia -o cpymo.cia -elf ./build/cpymo.elf -rsf cpymo.rsf -exefslogo -target t -icon icon -banner banner
 
-    - name: Upload cia
+    - name: Upload cia (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Nintendo 3DS (cia)
         path: ./cpymo-backends/3ds/cpymo.cia
 
-    - name: Upload 3dsx
+    - name: Upload 3dsx (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Nintendo 3DS (3dsx)
         path: ./cpymo-backends/3ds/cpymo.3dsx
+
+    - name: Upload cia (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Nintendo 3DS (cia) (Accessibility)
+        path: ./cpymo-backends/3ds/cpymo-accessibility.cia
+
+    - name: Upload 3dsx (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Nintendo 3DS (3dsx) (Accessibility)
+        path: ./cpymo-backends/3ds/cpymo-accessibility.3dsx
 
   build-wii:
     name: 'Nintendo Wii'
@@ -110,21 +152,43 @@ jobs:
         with:
           submodules: recursive
 
-      - name: 'Build'
+      - name: 'Build (Accessibility)'
         run: |
           cd cpymo-backends/sdl1
           make -f Makefile.Wii -j
+          cp boot.dol boot-accessibility.dol
           mv wii-meta.xml meta.xml
           mv wii-icon.png icon.png
 
-      - name: 'Upload'
-        uses: actions/upload-artifact@v4
-        with:
-          name: CPyMO for Nintendo Wii
-          path: |
-            ./cpymo-backends/sdl1/boot.dol
-            ./cpymo-backends/sdl1/icon.png
-            ./cpymo-backends/sdl1/meta.xml
+      - name: 'Clean'
+        run: |
+          cd cpymo-backends/sdl1
+          make -f Makefile.Wii clean
+
+      - name: 'Build (Standard)'
+        run: |
+          cd cpymo-backends/sdl1
+          make -f Makefile.Wii -j ENABLE_TEXT_EXTRACT=0
+          mv wii-meta.xml meta.xml
+          mv wii-icon.png icon.png
+
+    - name: 'Upload (Standard)'
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Nintendo Wii
+        path: |
+          ./cpymo-backends/sdl1/boot.dol
+          ./cpymo-backends/sdl1/icon.png
+          ./cpymo-backends/sdl1/meta.xml
+
+    - name: 'Upload (Accessibility)'
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Nintendo Wii (Accessibility)
+        path: |
+          ./cpymo-backends/sdl1/boot-accessibility.dol
+          ./cpymo-backends/sdl1/icon.png
+          ./cpymo-backends/sdl1/meta.xml
 
   build-psv:
     name: 'Sony PSV'
@@ -162,19 +226,41 @@ jobs:
         ./vdpm opusfile
         ./vdpm libxmp
 
-    - name: Build
+    - name: Build (Accessibility)
       run: |
         export VITASDK=~/vitasdk
         export PATH=$VITASDK/bin:$PATH
         cd cpymo-backends/sdl2
         make -f Makefile.PSV -j
+        cp cpymo.vpk cpymo-accessibility.vpk
 
-    - name: Upload
+    - name: Clean
+      run: |
+        export VITASDK=~/vitasdk
+        export PATH=$VITASDK/bin:$PATH
+        cd cpymo-backends/sdl2
+        make -f Makefile.PSV clean
+
+    - name: Build (Standard)
+      run: |
+        export VITASDK=~/vitasdk
+        export PATH=$VITASDK/bin:$PATH
+        cd cpymo-backends/sdl2
+        make -f Makefile.PSV -j ENABLE_TEXT_EXTRACT=0
+
+    - name: Upload (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Sony PSV
         path: |
           ./cpymo-backends/sdl2/cpymo.vpk
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Sony PSV (Accessibility)
+        path: |
+          ./cpymo-backends/sdl2/cpymo-accessibility.vpk
 
   build-psp:
     name: 'Sony PSP'
@@ -224,19 +310,40 @@ jobs:
         chmod +x ./build-psp-ffmpeg.sh
         ./build-psp-ffmpeg.sh
 
-    - name: Build
+    - name: Build (Accessibility)
       run: |
         export PSPDEV=/usr/local/pspdev
         export PATH=$PATH:$PSPDEV/bin
         psp-pacman -S sdl2 sdl2-image freetype2 sdl2-ttf --noconfirm
         cd ./cpymo-backends/sdl2
         make -f Makefile.PSP -j
+        cp EBOOT.PBP EBOOT-accessibility.PBP
 
-    - name: Upload
+    - name: Clean
+      run: |
+        export PSPDEV=/usr/local/pspdev
+        export PATH=$PATH:$PSPDEV/bin
+        cd ./cpymo-backends/sdl2
+        make -f Makefile.PSP clean
+
+    - name: Build (Standard)
+      run: |
+        export PSPDEV=/usr/local/pspdev
+        export PATH=$PATH:$PSPDEV/bin
+        cd ./cpymo-backends/sdl2
+        make -f Makefile.PSP -j ENABLE_TEXT_EXTRACT=0
+
+    - name: Upload (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Sony PSP
         path: ./cpymo-backends/sdl2/EBOOT.PBP
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Sony PSP (Accessibility)
+        path: ./cpymo-backends/sdl2/EBOOT-accessibility.PBP
 
   build-wasm:
     name: 'Emscripten'
@@ -262,19 +369,36 @@ jobs:
         chmod +x ./build-emscripten-ffmpeg.sh
         ./build-emscripten-ffmpeg.sh
 
-    - name: Build
+    - name: Build (Accessibility)
       run: |
         cd cpymo-backends/sdl2
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten -j
+        cp cpymo.js cpymo-accessibility.js
+        cp cpymo.wasm cpymo-accessibility.wasm
+        make -f Makefile.Emscripten clean
 
-    - name: Upload
+    - name: Build (Standard)
+      run: |
+        cd cpymo-backends/sdl2
+        export AUDIO_BACKEND=ffmpeg
+        make -f Makefile.Emscripten -j ENABLE_TEXT_EXTRACT=0
+
+    - name: Upload (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Emscripten
         path: |
           ./cpymo-backends/sdl2/cpymo.js
           ./cpymo-backends/sdl2/cpymo.wasm
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Emscripten (Accessibility)
+        path: |
+          ./cpymo-backends/sdl2/cpymo-accessibility.js
+          ./cpymo-backends/sdl2/cpymo-accessibility.wasm
 
   build-ios:
     name: 'iOS'
@@ -460,16 +584,29 @@ jobs:
       run: |
         ./vcpkg/vcpkg install ffmpeg:x86-uwp ffmpeg:x64-uwp ffmpeg:arm64-uwp
 
-    - name: Build
+    - name: Build (Standard)
       run: |
         pushd cpymo-backends/uwp
         msbuild -m -p:UapAppxPackageBuildMode=SideLoadOnly -p:AppxBundlePlatforms="x86|x64|arm64" -p:AppxPackageSigningEnabled=true -p:Configuration=Release -p:PackageCertificateKeyFile=cert.pfx -p:PackageCertificatePassword="12345" CPyMO.vcxproj
         popd
+        mv cpymo-backends/uwp/AppPackages/CPyMO cpymo-backends/uwp/AppPackages/CPyMO-Standard
 
-    - name: Upload
+    - name: Build (Accessibility)
+      run: |
+        pushd cpymo-backends/uwp
+        msbuild -m -p:UapAppxPackageBuildMode=SideLoadOnly -p:AppxBundlePlatforms="x86|x64|arm64" -p:AppxPackageSigningEnabled=true -p:Configuration=Release -p:PackageCertificateKeyFile=cert.pfx -p:PackageCertificatePassword="12345" -p:ENABLE_TEXT_EXTRACT=1 CPyMO.vcxproj
+        popd
+
+    - name: Upload (Standard)
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Universal Windows Platform
+        path: ./cpymo-backends/uwp/AppPackages/CPyMO-Standard/
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Universal Windows Platform (Accessibility)
         path: ./cpymo-backends/uwp/AppPackages/CPyMO/
 
   build-SDL1-windows:
@@ -497,21 +634,45 @@ jobs:
           https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-libmikmod-3.3.13-1-any.pkg.tar.zst \
           https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL_mixer-1.2.12-9-any.pkg.tar.zst
 
-    - name: 'Build'
+    - name: 'Build (Accessibility)'
       run: |
         cd ./cpymo-backends/sdl1
         export USE_SDL_MIXER=1
         mingw32-make -j ENABLE_TEXT_EXTRACT=1
+        cp cpymo.exe cpymo-accessibility.exe
         strip cpymo.exe
         cp /mingw32/bin/SDL.dll .
         cp /mingw32/bin/libSDL_mixer-*.dll .
 
-    - name: Upload
+    - name: 'Clean'
+      run: |
+        cd ./cpymo-backends/sdl1
+        mingw32-make clean
+
+    - name: 'Build (Standard)'
+      run: |
+        cd ./cpymo-backends/sdl1
+        export USE_SDL_MIXER=1
+        mingw32-make -j ENABLE_TEXT_EXTRACT=0
+        strip cpymo.exe
+        cp /mingw32/bin/SDL.dll .
+        cp /mingw32/bin/libSDL_mixer-*.dll .
+
+    - name: 'Upload (Standard)'
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Windows (SDL 1.2)
         path: |
           ./cpymo-backends/sdl1/*.exe
+          ./cpymo-backends/sdl1/*.dll
+          ./cpymo-backends/sdl1/*.txt
+
+    - name: 'Upload (Accessibility)'
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Windows (SDL 1.2) (Accessibility)
+        path: |
+          ./cpymo-backends/sdl1/cpymo-accessibility.exe
           ./cpymo-backends/sdl1/*.dll
           ./cpymo-backends/sdl1/*.txt
 
@@ -529,18 +690,37 @@ jobs:
         sudo apt-get update
         sudo apt-get install libsdl1.2-dev libsdl-mixer1.2-dev
 
-    - name: Build
+    - name: 'Build (Accessibility)'
       run: |
         cd cpymo-backends/sdl1
         export USE_SDL_MIXER=1
         make -j ENABLE_TEXT_EXTRACT=1
         strip ./cpymo
+        cp cpymo cpymo-accessibility
 
-    - name: Upload
+    - name: 'Clean'
+      run: |
+        cd cpymo-backends/sdl1
+        make clean
+
+    - name: 'Build (Standard)'
+      run: |
+        cd cpymo-backends/sdl1
+        export USE_SDL_MIXER=1
+        make -j ENABLE_TEXT_EXTRACT=0
+        strip ./cpymo
+
+    - name: 'Upload (Standard)'
       uses: actions/upload-artifact@v4
       with:
         name: CPyMO for Linux (SDL 1.2)
         path: ./cpymo-backends/sdl1/cpymo
+
+    - name: 'Upload (Accessibility)'
+      uses: actions/upload-artifact@v4
+      with:
+        name: CPyMO for Linux (SDL 1.2) (Accessibility)
+        path: ./cpymo-backends/sdl1/cpymo-accessibility
 
   build-desktop:
     name: 'Desktop ${{ matrix.package-name }}'
@@ -733,28 +913,66 @@ jobs:
           update: true
           install: mingw-w64-i686-toolchain make
 
-      - name: 'Build'
+      - name: 'Build (Accessibility)'
         if: ${{ runner.os != 'Windows' }}
         run: |
           cd cpymo-backends/ascii-art/
           make -j ENABLE_TEXT_EXTRACT=1
           strip ./cpymo-ascii-art
+          cp cpymo-ascii-art cpymo-ascii-art-accessibility
 
-      - name: 'Build (Windows)'
+      - name: 'Build (Accessibility) (Windows)'
         shell: msys2 {0}
         if: ${{ runner.os == 'Windows' }}
         run: |
           cd cpymo-backends/ascii-art/
           make -j ENABLE_TEXT_EXTRACT=1
           strip ./cpymo-ascii-art.exe
+          cp cpymo-ascii-art.exe cpymo-ascii-art-accessibility.exe
 
-      - name: 'Upload'
+      - name: 'Clean'
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          cd cpymo-backends/ascii-art/
+          make clean
+
+      - name: 'Clean (Windows)'
+        shell: msys2 {0}
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cd cpymo-backends/ascii-art/
+          make clean
+
+      - name: 'Build (Standard)'
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          cd cpymo-backends/ascii-art/
+          make -j ENABLE_TEXT_EXTRACT=0
+          strip ./cpymo-ascii-art
+
+      - name: 'Build (Standard) (Windows)'
+        shell: msys2 {0}
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cd cpymo-backends/ascii-art/
+          make -j ENABLE_TEXT_EXTRACT=0
+          strip ./cpymo-ascii-art.exe
+
+      - name: 'Upload (Standard)'
         uses: actions/upload-artifact@v4
         with:
           name: CPyMO ASCII Art for ${{ runner.os }}
           path: |
             ./cpymo-backends/ascii-art/cpymo-ascii-art
             ./cpymo-backends/ascii-art/cpymo-ascii-art.exe
+
+      - name: 'Upload (Accessibility)'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPyMO ASCII Art for ${{ runner.os }} (Accessibility)
+          path: |
+            ./cpymo-backends/ascii-art/cpymo-ascii-art-accessibility
+            ./cpymo-backends/ascii-art/cpymo-ascii-art-accessibility.exe
 
   build-text:
     name: 'CPyMO Text'
@@ -776,25 +994,63 @@ jobs:
           update: true
           install: mingw-w64-i686-toolchain make
 
-      - name: 'Build'
+      - name: 'Build (Accessibility)'
         if: ${{ runner.os != 'Windows' }}
         run: |
           cd cpymo-backends/text/
           make -j
           strip cpymo-text
+          cp cpymo-text cpymo-text-accessibility
 
-      - name: 'Build (Windows)'
+      - name: 'Build (Accessibility) (Windows)'
         shell: msys2 {0}
         if: ${{ runner.os == 'Windows' }}
         run: |
           cd cpymo-backends/text/
           make -j
           strip cpymo-text.exe
+          cp cpymo-text.exe cpymo-text-accessibility.exe
 
-      - name: 'Upload'
+      - name: 'Clean'
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          cd cpymo-backends/text/
+          make clean
+
+      - name: 'Clean (Windows)'
+        shell: msys2 {0}
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cd cpymo-backends/text/
+          make clean
+
+      - name: 'Build (Standard)'
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          cd cpymo-backends/text/
+          make -j ENABLE_TEXT_EXTRACT=0
+          strip cpymo-text
+
+      - name: 'Build (Standard) (Windows)'
+        shell: msys2 {0}
+        if: ${{ runner.os == 'Windows' }}
+        run: |
+          cd cpymo-backends/text/
+          make -j ENABLE_TEXT_EXTRACT=0
+          strip cpymo-text.exe
+
+      - name: 'Upload (Standard)'
         uses: actions/upload-artifact@v4
         with:
           name: CPyMO Text for ${{ runner.os }}
           path: |
             ./cpymo-backends/text/cpymo-text
             ./cpymo-backends/text/cpymo-text.exe
+
+      - name: 'Upload (Accessibility)'
+        uses: actions/upload-artifact@v4
+        with:
+          name: CPyMO Text for ${{ runner.os }} (Accessibility)
+          path: |
+            ./cpymo-backends/text/cpymo-text-accessibility
+            ./cpymo-backends/text/cpymo-text-accessibility.exe
