@@ -306,7 +306,20 @@ cmake --build build-accessibility --config Release
 
 Windows SDL2 无障碍构建会把上述短反馈发送到所有支持震动的已连接手柄；没有震动硬件时自动忽略，不影响游戏输入或普通构建。
 
-macOS 桌面版会将提取的游戏文本交给系统语音合成朗读；Linux 桌面版会通过 Speech Dispatcher 的`spd-say`朗读提取文本。请安装并启用 Speech Dispatcher 及可用语音（例如发行版的`speech-dispatcher`和语音引擎包）；组件不可用时游戏会继续运行但不朗读。
+macOS 桌面版会将提取的游戏文本交给系统语音合成朗读，无需额外安装。Linux 桌面版会通过 Speech Dispatcher 的`spd-say`朗读提取文本；组件不可用时游戏会继续运行但不朗读。
+
+Linux 运行无障碍版本前，请安装并启动 Speech Dispatcher 与至少一个语音引擎：
+
+```bash
+# Debian / Ubuntu
+sudo apt install speech-dispatcher espeak-ng
+systemctl --user enable --now speech-dispatcher
+
+# Arch Linux
+sudo pacman -S speech-dispatcher espeak-ng
+```
+
+Windows 无障碍版随程序提供匹配架构的 Tolk、读屏驱动 DLL 及配置文件。请把发行包内的全部 DLL 和配置文件与`cpymo.exe`放在同一目录；不需要单独安装 Tolk。
 
 # Sony Playstation Portable 平台
 
