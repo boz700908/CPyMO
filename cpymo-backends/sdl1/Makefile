@@ -29,7 +29,9 @@ ifeq ($(LEAKCHECK), 1)
 CFLAGS += -DLEAKCHECK
 endif
 
-ifeq ($(ENABLE_TEXT_EXTRACT), 1)
+ifeq ($(ENABLE_TEXT_EXTRACT), 0)
+# Standard build: no accessibility
+else
 CFLAGS += -DENABLE_TEXT_EXTRACT
 endif
 

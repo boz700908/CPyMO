@@ -279,6 +279,8 @@ void cpymo_backend_text_extract(const char *text)
 #elif defined(__EMSCRIPTEN__)
 void cpymo_backend_text_extract_init(void)
 {
+    cpymo_sdl2_accessibility_sound_init();
+
     EM_ASM({
         var bar = document.getElementById('cpymo-accessibility-bar');
         if (!bar) {
@@ -304,6 +306,8 @@ void cpymo_backend_text_extract_init(void)
 
 void cpymo_backend_text_extract_free(void)
 {
+    cpymo_sdl2_accessibility_sound_free();
+
     EM_ASM({
         var bar = document.getElementById('cpymo-accessibility-bar');
         if (bar) {

@@ -734,6 +734,10 @@ START:
 EXIT:
 	cpymo_engine_free(&engine);
 	#ifdef ENABLE_TEXT_EXTRACT
+	#ifdef __EMSCRIPTEN__
+		extern void cpymo_emscripten_gesture_free(void);
+		cpymo_emscripten_gesture_free();
+	#endif
 	cpymo_backend_text_extract_free();
 #endif
 

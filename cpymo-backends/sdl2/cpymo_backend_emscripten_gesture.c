@@ -31,7 +31,21 @@
 extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
 extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
 
-/* Inject a key knock (keydown + keyup) into SDL event queue */
+/* Deferred key-up callback: used by knock to delay KEYUP so the engine
+ * has time to detect the key as pressed (SDL_GetKeyboardState snapshot).
+ * Without this delay, KEYDOWN+KEYUP in the same frame would be invisible. */
+static void emscripten_inject_key_up_deferred(void *scancode_ptr)
+{
+    SDL_Scancode sc = (SDL_Scancode)(uintptr_t)scancode_ptr;
+    SDL_Event ev;
+    SDL_memset(&ev, 0, sizeof(ev));
+    ev.type = SDL_KEYUP;
+    ev.key.keysym.scancode = sc;
+    ev.key.state = SDL_RELEASED;
+    SDL_PushEvent(&ev);
+}
+
+/* Inject a key knock: push KEYDOWN now, schedule KEYUP after 50ms */
 static void emscripten_inject_key_knock(SDL_Scancode scancode)
 {
     SDL_Event ev;
@@ -42,9 +56,8 @@ static void emscripten_inject_key_knock(SDL_Scancode scancode)
     ev.key.state = SDL_PRESSED;
     SDL_PushEvent(&ev);
 
-    ev.type = SDL_KEYUP;
-    ev.key.state = SDL_RELEASED;
-    SDL_PushEvent(&ev);
+    emscripten_async_call(emscripten_inject_key_up_deferred,
+        (void *)(uintptr_t)scancode, 50);
 }
 
 /* Inject a key down event */
@@ -213,9 +226,15 @@ void cpymo_emscripten_gesture_init(void)
             gesture.fingerCount = 0;
             gesture.isLongPress = false;
             gesture.moved = false;
+            gesture.tapCount = 0;
+            gesture.lastTapTime = 0;
+            gesture.lastTapX = 0;
+            gesture.lastTapY = 0;
             gesture.twoFingerStartTime = 0;
             gesture.twoFingerStartX = 0;
             gesture.twoFingerStartY = 0;
+            gesture.twoFingerTapCount = 0;
+            gesture.twoFingerLastTapTime = 0;
             gesture.twoFingerDoublePressHeld = false;
         }
 
@@ -414,6 +433,25 @@ void cpymo_emscripten_gesture_init(void)
         });
 
         console.log('[CPyMO] Accessibility gesture system initialized');
+    });
+}
+
+/* ================================================================
+ * Cleanup gesture system (remove event listeners)
+ * ================================================================ */
+void cpymo_emscripten_gesture_free(void)
+{
+    EM_ASM({
+        var canvas = document.querySelector('canvas');
+        if (!canvas) return;
+
+        /* Remove listeners by cloning and replacing the canvas node.
+         * This is the simplest way to remove all event listeners
+         * without keeping references to the handler functions. */
+        var clone = canvas.cloneNode(true);
+        if (canvas.parentNode) {
+            canvas.parentNode.replaceChild(clone, canvas);
+        }
     });
 }
 

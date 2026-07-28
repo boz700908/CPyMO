@@ -134,7 +134,10 @@ void cpymo_backend_text_extract_init(void) {}
 void cpymo_backend_text_extract_free(void) {}
 
 void cpymo_backend_text_extract(const char *text)
-{ puts(text); }
+{
+    if (text == NULL || text[0] == '\0') return;
+    puts(text);
+}
 
 /* Stub: sound & vibration not available in text backend */
 void cpymo_sdl2_accessibility_play_sound(int sound_type) { (void)sound_type; }
