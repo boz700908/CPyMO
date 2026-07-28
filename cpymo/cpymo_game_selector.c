@@ -349,6 +349,10 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 			return err;
 		}
 #endif
+
+		cpymo_engine_extract_text_cstr(e, l->game_selector_empty);
+		cpymo_engine_extract_text_cstr(e, l->game_selector_empty_secondary);
+		cpymo_engine_extract_text_submit(e);
 		
 		return CPYMO_ERR_SUCC;
 	}

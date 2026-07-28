@@ -415,6 +415,8 @@ void cpymo_engine_extract_text(cpymo_engine *e, cpymo_str str)
 
 void cpymo_engine_extract_text_submit(cpymo_engine *e)
 {
+	if (e->text_extract_buffer_size == 0) return;
+
 	e->text_extract_buffer[e->text_extract_buffer_size] = '\0';
 	cpymo_backend_text_extract(e->text_extract_buffer);
 	e->text_extract_buffer_size = 0;

@@ -338,7 +338,9 @@ error_t cpymo_msgbox_ui_enter(
 	}
 
 	cpymo_engine_extract_text(e, message);
-	cpymo_engine_extract_text_cstr(e, l->msgbox_cancel);
+	cpymo_engine_extract_text_cstr(e, l->msgbox_ok);
+	if (okcancel_callback)
+		cpymo_engine_extract_text_cstr(e, l->msgbox_cancel);
 	cpymo_engine_extract_text_submit(e);
 
 	return err;

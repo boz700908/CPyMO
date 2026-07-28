@@ -164,6 +164,8 @@ void cpymo_backend_text_extract_free(void)
 
 void cpymo_backend_text_extract(const char *text)
 {
+	if (text == NULL || text[0] == '\0') return;
+
     int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
     if (wide_len == 0) return;
 
@@ -181,6 +183,8 @@ void cpymo_backend_text_extract_free(void) {}
 
 void cpymo_backend_text_extract(const char *text)
 {
+	if (text == NULL || text[0] == '\0') return;
+
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
     extern void cpymo_android_text_to_speech(const char *text);
 

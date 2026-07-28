@@ -129,7 +129,7 @@ brew install libxcb
 * 若`NO_CONSOLE`环境变量存在或通过-a传入并设置为1，则禁用命令行窗口，使得CPyMO仅创建一个游戏窗口。
 * 若`RC_FILE`环境变量存在或通过-a传入，则允许传入用户指定的资源文件（主要用于修改图标）。
 * 若`TARGET`环境变量存在或通过-a传入，则允许用户通过TARGET指定输出的可执行文件名称。
-* 若`ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD`环境变量为1或通过-a传入1，则 Windows 版本会通过 Tolk 将游戏文本输出到读屏软件（用于视障玩家）。Tolk 的 x86、x64、ARM64 运行库和导入库已随项目置于`third_party/tolk`；`TOLK`可用于覆盖该目录，`TOLK_ARCH`默认为`x64`，可设为`x86`或`arm64`。
+* 若`ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD`环境变量为1或通过-a传入1，则 Windows 版本会通过 Tolk 将游戏文本输出到读屏软件（用于视障玩家）。Tolk 的 x86、x64、ARM64 运行库、导入库及读屏驱动配置文件已随项目置于`third_party/tolk`；`TOLK`可用于覆盖该目录，`TOLK_ARCH`默认为`x64`，可设为`x86`或`arm64`。
 * 若`ENABLE_EXIT_CONFIRM`环境变量为1或通过-a传入1，则会在退出游戏时询问是否要退出。
 * 若`LEAKCHECK`环境变量为1或通过-a传入1，则会启动stb_leakcheck进行内存泄漏检查。
 * 若`DISABLE_VSYNC`环境变量为1或通过-a传入1，则禁用垂直同步并以最高可能帧率运行。
