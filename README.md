@@ -304,7 +304,7 @@ cmake --build build-accessibility --config Release
 * 双指左滑复制最近朗读，双指右滑将最近朗读追加到剪贴板。
 * 进入、菜单、选择会播放对应的系统提示音；导航、确认、跳过和复制使用短触觉反馈，取消使用较长反馈，语义与 Android 无障碍包一致。
 
-Windows、Linux 和 macOS 的 SDL2 无障碍构建也会把上述短反馈发送到所有支持震动的已连接手柄；没有震动硬件时自动忽略，不影响游戏输入或普通构建。
+Windows SDL2 无障碍构建会把上述短反馈发送到所有支持震动的已连接手柄；没有震动硬件时自动忽略，不影响游戏输入或普通构建。
 
 # Sony Playstation Portable 平台
 

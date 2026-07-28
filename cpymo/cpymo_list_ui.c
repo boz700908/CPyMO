@@ -15,9 +15,6 @@ extern void cpymo_ios_accessibility_play_sound(int sound_type);
 extern void cpymo_windows_accessibility_play_sound(int sound_type);
 extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
 #define CPYMO_VISUAL_HELP_PLAY_SOUND(X) do { cpymo_windows_accessibility_play_sound(X); cpymo_sdl2_accessibility_vibrate(10); } while (0)
-#elif defined(ENABLE_TEXT_EXTRACT)
-extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
-#define CPYMO_VISUAL_HELP_PLAY_SOUND(X) cpymo_sdl2_accessibility_vibrate(10)
 #else
 #define CPYMO_VISUAL_HELP_PLAY_SOUND(X)
 #endif

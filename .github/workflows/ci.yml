@@ -388,7 +388,10 @@ jobs:
         install: mingw-w64-i686-toolchain mingw-w64-i686-SDL
 
     - name: Install SDL_mixer 1.2
-      run: pacman -U --noconfirm https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL_mixer-1.2.12-9-any.pkg.tar.zst
+      run: |
+        pacman -U --noconfirm https://repo.msys2.org/mingw/mingw32/mingw-w64-i686-SDL_mixer-1.2.12-9-any.pkg.tar.zst
+        mkdir -p /mingw32/include/SDL
+        ln -sf ../SDL_mixer.h /mingw32/include/SDL/SDL_mixer.h
 
     - name: 'Build'
       run: |
