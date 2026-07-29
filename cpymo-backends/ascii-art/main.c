@@ -165,6 +165,7 @@ int main(int argc, char **argv)
                 error_t err = init_context();
                 if (err != CPYMO_ERR_SUCC) {
                     printf("[Error] Can not init context: %s\n", cpymo_error_message(err));
+                    ret = -1;
                     goto EXIT;
                 }
             }
@@ -185,6 +186,7 @@ int main(int argc, char **argv)
         }
     }
 
+EXIT:
 // cleaning
     cpymo_engine_free(&engine);
     free_context();
