@@ -670,8 +670,6 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 	cpymo_key_pluse_init(&ui->ok, e->input.ok);
 	cpymo_key_pluse_init(&ui->mouse_button, e->input.mouse_button);
 
-	cpymo_backend_text_extract(cpymo_localization_get(e)->config_bgmvol);
-
 	err = cpymo_backend_text_create(
 		&ui->inc_btn, 
 		&ui->inc_btn_w,
