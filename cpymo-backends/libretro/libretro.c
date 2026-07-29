@@ -11,7 +11,7 @@
 #include "libretro.h"
 
 #include "../../cpymo/cpymo_engine.h"
-#include "../../endianness.h"
+#include "../../endianness.h/endianness.h"
 #include "../software/cpymo_backend_software.h"
 #include "../include/cpymo_backend_audio.h"
 #include "../include/cpymo_backend_movie.h"

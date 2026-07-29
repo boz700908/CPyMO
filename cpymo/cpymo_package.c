@@ -4,7 +4,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "../endianness.h"
+#include "../endianness.h/endianness.h"
 #include "../stb/stb_image.h"
 #include <assert.h>
 
