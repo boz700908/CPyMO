@@ -1,6 +1,10 @@
 ﻿cmake_minimum_required (VERSION 3.8)
 
-project ("cpymo")
+if (APPLE)
+	project ("cpymo" LANGUAGES C CXX OBJC)
+else ()
+	project ("cpymo" LANGUAGES C CXX)
+endif ()
 
 option(ENABLE_ACCESSIBILITY "Enable accessibility features (TTS, sound effects, vibration)" OFF)
 

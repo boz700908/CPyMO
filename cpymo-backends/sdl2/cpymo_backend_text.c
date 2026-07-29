@@ -146,6 +146,8 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
 
 #endif
 
+#ifdef ENABLE_TEXT_EXTRACT
+
 /* ================================================================
  * Platform-specific TTS includes
  * ================================================================ */
@@ -166,8 +168,6 @@ extern void cpymo_macos_accessibility_announce(const char *text);
 extern void cpymo_ios_accessibility_announce(const char *text);
 extern void cpymo_ios_accessibility_play_sound(int sound_type);
 #endif
-
-#ifdef ENABLE_TEXT_EXTRACT
 
 /* === Sound type constants (aligned with Android) === */
 #define SOUND_ENTER  1
@@ -240,27 +240,6 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
 }
 
 #endif /* !Android && !iOS */
-
-/* === Vibration via gamepad (aligned with Android haptic) === */
-void cpymo_sdl2_accessibility_vibrate(int milliseconds)
-{
-    extern SDL_GameController **gamecontrollers;
-    extern size_t gamecontrollers_count;
-
-    for (size_t i = 0; i < gamecontrollers_count; ++i) {
-        if (gamecontrollers[i] != NULL)
-            SDL_GameControllerRumble(gamecontrollers[i], SDL_MAX_UINT16, SDL_MAX_UINT16, (Uint32)milliseconds);
-    }
-
-#ifdef __EMSCRIPTEN__
-    /* Browser Vibration API for mobile web */
-    EM_ASM({
-        if (navigator.vibrate) {
-            navigator.vibrate($0);
-        }
-    }, milliseconds);
-#endif
-}
 
 /* ================================================================
  * Platform-specific TTS backends

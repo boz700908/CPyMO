@@ -130,8 +130,10 @@ float cpymo_backend_text_width(
     float single_character_size_in_logical_screen) 
 { return t.len * single_character_size_in_logical_screen; }
 
+#ifdef ENABLE_TEXT_EXTRACT
 void cpymo_backend_text_extract(const char *text)
 { puts(text); }
+#endif
 
 #ifdef _WIN32
 #include <windows.h>

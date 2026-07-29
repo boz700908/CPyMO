@@ -16,6 +16,12 @@ size_t gamecontrollers_count = 0;
 static bool ios_accessibility_skip_held;
 #endif
 
+#ifdef ENABLE_TEXT_EXTRACT
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 void cpymo_sdl2_accessibility_vibrate(int milliseconds)
 {
     for (size_t i = 0; i < gamecontrollers_count; ++i) {
@@ -32,6 +38,8 @@ void cpymo_sdl2_accessibility_vibrate(int milliseconds)
     }, milliseconds);
 #endif
 }
+
+#endif /* ENABLE_TEXT_EXTRACT */
 
 cpymo_input cpymo_input_snapshot()
 {
