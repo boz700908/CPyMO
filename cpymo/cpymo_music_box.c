@@ -171,8 +171,6 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 	box->music_title_text = (char **)malloc(sizeof(char *) * box->music_count);
 	if (box->music_title_text)
 		memset(box->music_title_text, 0, sizeof(char *) * box->music_count);
-	cpymo_list_ui_set_selection_changed_callback(
-		e, &cpymo_musicbox_visual_help_selection_change);
 #endif
 
 	do {
@@ -212,6 +210,12 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 	} while (cpymo_parser_next_line(&p) && i < box->music_count);
 
 	assert(i == box->music_count);
+
+#ifdef ENABLE_TEXT_EXTRACT
+	cpymo_list_ui_set_selection_changed_callback(
+		e, &cpymo_musicbox_visual_help_selection_change);
+#endif
+
 	cpymo_list_ui_set_current_node(e, cpymo_list_ui_encode_uint_node_enc(0));
 
 	return CPYMO_ERR_SUCC;
