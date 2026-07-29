@@ -124,7 +124,7 @@ error_t cpymo_backend_text_create(
     cpymo_backend_text_internal *out_text =
         (cpymo_backend_text_internal *)
         malloc(sizeof(cpymo_backend_text_internal));
-    if (out == NULL) {
+    if (out_text == NULL) {
         SDL_FreeSurface(text);
         return CPYMO_ERR_OUT_OF_MEM;
     }
@@ -141,7 +141,7 @@ error_t cpymo_backend_text_create(
     black.g = 0;
     black.b = 0;
     out_text->shadow = TTF_RenderUTF8_Blended(font, str, black);
-    if (out_text) {
+    if (out_text->shadow) {
         SDL_Surface *shadow_opt = SDL_DisplayFormatAlpha(out_text->shadow);
         SDL_FreeSurface(out_text->shadow);
         out_text->shadow = shadow_opt;

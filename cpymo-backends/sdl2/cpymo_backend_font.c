@@ -115,7 +115,7 @@ error_t cpymo_backend_font_init(const char *gamedir)
 	}
 #endif
 
-#ifdef __LINUX__
+#ifdef __linux__
 	const char *fonts[] = {
 		// Ubuntu
 		"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",

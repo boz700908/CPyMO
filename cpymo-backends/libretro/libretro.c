@@ -327,10 +327,18 @@ bool retro_load_game(const struct retro_game_info *game)
         log_cb(RETRO_LOG_ERROR, "stat: %s\n", strerror(errno));
         return false;
     }
-    const char *gamepath = S_ISDIR(sb.st_mode) ? game->path : dirname(strdup(game->path));
-    char *gamedir = realpath(gamepath, NULL);
-    chdir(gamedir);
-    err = cpymo_engine_init(&engine, gamedir);
+    char *dup_path = NULL;
+	const char *gamepath;
+	if (S_ISDIR(sb.st_mode)) {
+		gamepath = game->path;
+	} else {
+		dup_path = strdup(game->path);
+		gamepath = dirname(dup_path);
+	}
+	char *gamedir = realpath(gamepath, NULL);
+	chdir(gamedir);
+	err = cpymo_engine_init(&engine, gamedir);
+	free(dup_path);
     mkdir("save", 0755);
     if (err != CPYMO_ERR_SUCC) {
         log_cb(RETRO_LOG_ERROR, "cpymo_engine_init: %s\n", cpymo_error_message(err));

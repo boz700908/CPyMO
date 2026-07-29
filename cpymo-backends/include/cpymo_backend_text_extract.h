@@ -33,8 +33,10 @@
 #elif defined(__APPLE__) && !defined(__IOS__)
 #include <TargetConditionals.h>
 #if TARGET_OS_OSX
+#ifdef __OBJC__
 #import <AppKit/AppKit.h>
-#import <AudioToolbox/AudioToolbox.h>
+#endif
+#include <AudioToolbox/AudioToolbox.h>
 #endif
 #elif defined(__linux__)
 #include <signal.h>
@@ -135,13 +137,14 @@ void cpymo_backend_text_extract(const char *text)
 }
 
 #elif defined(__APPLE__) && !defined(__IOS__)
-/* macOS NSSpeechSynthesizer */
+/* macOS NSSpeechSynthesizer (Objective-C only) */
 void cpymo_backend_text_extract_init(void) {}
 
 void cpymo_backend_text_extract_free(void) {}
 
 void cpymo_backend_text_extract(const char *text)
 {
+#ifdef __OBJC__
 	if (text == NULL || text[0] == '\0') return;
 
 	NSString *announcement = [NSString stringWithUTF8String:text];
@@ -153,6 +156,9 @@ void cpymo_backend_text_extract(const char *text)
 		[speaker stopSpeaking];
 		[speaker startSpeakingString:announcement];
 	});
+#else
+	(void)text;
+#endif
 }
 
 #elif defined(__linux__)

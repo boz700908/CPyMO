@@ -28,6 +28,65 @@ enum {
     CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_END
 };
 
+/* ================================================================
+ * CPyMOExploreGestureRecognizer
+ *
+ * Aligned with Android's OnePress+MOVE→onScan gesture.
+ * Recognizes: single finger holds for 200ms, then moves.
+ * Provides continuous mouse warp during the drag for exploring.
+ * ================================================================ */
+@interface CPyMOExploreGestureRecognizer : UIGestureRecognizer
+@property(nonatomic) CFTimeInterval startTime;
+@property(nonatomic) BOOL exploreStarted;
+@end
+
+@implementation CPyMOExploreGestureRecognizer
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (event.allTouches.count != 1) { self.state = UIGestureRecognizerStateFailed; return; }
+    self.startTime = CACurrentMediaTime();
+    self.exploreStarted = NO;
+}
+
+- (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (self.state == UIGestureRecognizerStateFailed) return;
+    CFTimeInterval now = CACurrentMediaTime();
+    if (!self.exploreStarted && now - self.startTime >= 0.2) {
+        self.exploreStarted = YES;
+        self.state = UIGestureRecognizerStateBegan;
+    }
+    if (self.exploreStarted) {
+        self.state = UIGestureRecognizerStateChanged;
+    }
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (self.exploreStarted) self.state = UIGestureRecognizerStateEnded;
+    else self.state = UIGestureRecognizerStateFailed;
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (self.exploreStarted) self.state = UIGestureRecognizerStateCancelled;
+    else self.state = UIGestureRecognizerStateFailed;
+}
+
+- (void)reset
+{
+    [super reset];
+    self.startTime = 0;
+    self.exploreStarted = NO;
+}
+@end
+
+/* ================================================================
+ * CPyMOAccessibilityTwoDoublePressRecognizer
+ *
+ * Recognizes: two fingers press twice (interval ≤ 0.4s),
+ * hold on the second press for skip-hold functionality.
+ * ================================================================ */
 @interface CPyMOAccessibilityTwoDoublePressRecognizer : UIGestureRecognizer
 @property(nonatomic) NSUInteger phase;
 @property(nonatomic) CFTimeInterval firstTapTime;
@@ -63,6 +122,7 @@ enum {
 
 - (void)reset
 {
+    [super reset];
     self.phase = 0;
     self.firstTapTime = 0;
 }
@@ -116,6 +176,14 @@ static void cpymo_ios_send_input(int action)
 {
     CGPoint point = [recognizer locationInView:recognizer.view];
     SDL_WarpMouseInWindow(window, (int)point.x, (int)point.y);
+}
+
+- (void)explore:(CPyMOExploreGestureRecognizer *)recognizer
+{
+    if (recognizer.state == UIGestureRecognizerStateChanged) {
+        CGPoint point = [recognizer locationInView:recognizer.view];
+        SDL_WarpMouseInWindow(window, (int)point.x, (int)point.y);
+    }
 }
 
 - (void)cancel:(UILongPressGestureRecognizer *)recognizer
@@ -218,6 +286,12 @@ static void cpymo_ios_install_accessibility_gestures(void)
     cancel.minimumPressDuration = 0.5;
     cancel.delegate = gesture_delegate;
     cancel.cancelsTouchesInView = YES;
+
+    CPyMOExploreGestureRecognizer *explore = [[CPyMOExploreGestureRecognizer alloc] initWithTarget:target action:@selector(explore:)];
+    explore.delegate = gesture_delegate;
+    explore.cancelsTouchesInView = YES;
+    [cancel requireGestureRecognizerToFail:explore];
+    [view addGestureRecognizer:explore];
     [view addGestureRecognizer:cancel];
 
     for (NSNumber *direction_number in @[@(UISwipeGestureRecognizerDirectionLeft), @(UISwipeGestureRecognizerDirectionRight)]) {

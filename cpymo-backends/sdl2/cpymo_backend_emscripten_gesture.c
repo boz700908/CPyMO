@@ -185,6 +185,9 @@ void cpymo_emscripten_gesture_init(void)
         /* Prevent default touch behaviors on canvas */
         canvas.style.touchAction = 'none';
 
+        /* Store handlers for cleanup */
+        var handlers = {};
+
         var gesture = {
             startTime: 0,
             startX: 0,
@@ -238,7 +241,7 @@ void cpymo_emscripten_gesture_init(void)
             gesture.twoFingerDoublePressHeld = false;
         }
 
-        canvas.addEventListener('touchstart', function(e) {
+        handlers.touchstart = function(e) {
             var touches = e.touches;
             gesture.fingerCount = touches.length;
             gesture.startTime = Date.now();
@@ -275,9 +278,9 @@ void cpymo_emscripten_gesture_init(void)
             }
 
             e.preventDefault();
-        }, { passive: false });
+        };
 
-        canvas.addEventListener('touchmove', function(e) {
+        handlers.touchmove = function(e) {
             if (gesture.fingerCount === 0) return;
 
             var touches = e.touches;
@@ -306,9 +309,9 @@ void cpymo_emscripten_gesture_init(void)
             }
 
             e.preventDefault();
-        }, { passive: false });
+        };
 
-        canvas.addEventListener('touchend', function(e) {
+        handlers.touchend = function(e) {
             if (gesture.fingerCount === 0) return;
 
             if (gesture.longPressTimer) {
@@ -421,16 +424,25 @@ void cpymo_emscripten_gesture_init(void)
             }
 
             resetGesture();
-        }, { passive: false });
+        };
 
-        canvas.addEventListener('touchcancel', function(e) {
+        handlers.touchcancel = function(e) {
             if (gesture.twoFingerDoublePressHeld) {
                 gesture.twoFingerDoublePressHeld = false;
                 Module.ccall('cpymo_emscripten_gesture_on_two_double_press_end',
                     null, [], []);
             }
             resetGesture();
-        });
+        };
+
+        /* Register all event listeners */
+        canvas.addEventListener('touchstart', handlers.touchstart, { passive: false });
+        canvas.addEventListener('touchmove', handlers.touchmove, { passive: false });
+        canvas.addEventListener('touchend', handlers.touchend, { passive: false });
+        canvas.addEventListener('touchcancel', handlers.touchcancel);
+
+        /* Store handlers for cleanup */
+        canvas.__cpm_gesture_handlers = handlers;
 
         console.log('[CPyMO] Accessibility gesture system initialized');
     });
@@ -445,12 +457,14 @@ void cpymo_emscripten_gesture_free(void)
         var canvas = document.querySelector('canvas');
         if (!canvas) return;
 
-        /* Remove listeners by cloning and replacing the canvas node.
-         * This is the simplest way to remove all event listeners
-         * without keeping references to the handler functions. */
-        var clone = canvas.cloneNode(true);
-        if (canvas.parentNode) {
-            canvas.parentNode.replaceChild(clone, canvas);
+        /* Remove stored event handlers */
+        if (canvas.__cpm_gesture_handlers) {
+            var handlers = canvas.__cpm_gesture_handlers;
+            canvas.removeEventListener('touchstart', handlers.touchstart);
+            canvas.removeEventListener('touchmove', handlers.touchmove);
+            canvas.removeEventListener('touchend', handlers.touchend);
+            canvas.removeEventListener('touchcancel', handlers.touchcancel);
+            delete canvas.__cpm_gesture_handlers;
         }
     });
 }

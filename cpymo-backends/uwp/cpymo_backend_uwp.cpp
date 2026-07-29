@@ -55,7 +55,6 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 	if (sub_folders.is_just()) {
 		for (unsigned i = 0; i < sub_folders.get()->Size; ++i) {
 			std::string path = w2c(sub_folders.get()->GetAt(i)->Path);
-			path = path;
 
 			cpymo_game_selector_item *cur = (cpymo_game_selector_item *)malloc(sizeof(cpymo_game_selector_item));
 			if (cur == NULL) continue;

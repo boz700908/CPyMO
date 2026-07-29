@@ -127,9 +127,9 @@
     <AppxBundle>Always</AppxBundle>
     <AppxBundlePlatforms>x86|x64|arm</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-    <!-- Set ENABLE_TEXT_EXTRACT=1 via MSBuild property to enable accessibility:
-         msbuild /p:ENABLE_TEXT_EXTRACT=1 -->
-    <ENABLE_TEXT_EXTRACT>0</ENABLE_TEXT_EXTRACT>
+    <!-- Set ENABLE_TEXT_EXTRACT=0 via MSBuild property to disable accessibility:
+         msbuild /p:ENABLE_TEXT_EXTRACT=0 -->
+    <ENABLE_TEXT_EXTRACT>1</ENABLE_TEXT_EXTRACT>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>

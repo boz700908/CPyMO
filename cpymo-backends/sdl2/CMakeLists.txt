@@ -56,7 +56,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
 	endif ()
 elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
-	set(CMAKE_C_FLAGS "-D__LINUX__")
+	# __linux__ is predefined by GCC/Clang on Linux
     target_link_libraries(cpymo PRIVATE X11)
 	if (ENABLE_ACCESSIBILITY)
 		file(GLOB ACCESSIBILITY_WAVS "${CMAKE_CURRENT_SOURCE_DIR}/enter.wav" "${CMAKE_CURRENT_SOURCE_DIR}/menu.wav" "${CMAKE_CURRENT_SOURCE_DIR}/select.wav")
