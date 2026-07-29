@@ -11,7 +11,7 @@ typedef bool (*cpymo_wait_for)(struct cpymo_engine *, float);	// wait until it's
 typedef error_t (*cpymo_wait_over_callback)(struct cpymo_engine *);	// You can register next wait operation in callback.
 
 typedef struct {
-	cpymo_wait_for waiting_for;
+	cpymo_wait_for wating_for;
 	cpymo_wait_over_callback callback;
 
 	float wait_for_seconds;
@@ -20,12 +20,12 @@ typedef struct {
 static inline void cpymo_wait_reset(cpymo_wait *wait)
 {
 	wait->callback = NULL;
-	wait->waiting_for = NULL;
+	wait->wating_for = NULL;
 }
 
-static inline bool cpymo_wait_is_waiting(cpymo_wait *wait)
+static inline bool cpymo_wait_is_wating(cpymo_wait *wait)
 {
-	return wait->waiting_for != NULL;
+	return wait->wating_for != NULL;
 }
 
 void cpymo_wait_register_with_callback(cpymo_wait *wait, cpymo_wait_for wait_for, cpymo_wait_over_callback cb);

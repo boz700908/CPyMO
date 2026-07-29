@@ -40,7 +40,6 @@ error_t cpymo_backend_masktrans_create(cpymo_backend_masktrans *out, void *mask_
 	t->ph = pad_height;
 
 	if (!C3D_TexInit(&t->tex, (u16)pad_width, (u16)pad_height, GPU_A8)) {
-		free(t->mask);
 		free(t);
 		return CPYMO_ERR_UNKNOWN;
 	}

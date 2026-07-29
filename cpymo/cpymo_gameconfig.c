@@ -90,7 +90,7 @@ static void cpymo_dispatch_gameconfig(cpymo_gameconfig *o, cpymo_str key, cpymo_
 	}
 
 	D("grayselected") {
-		o->grayselected = cpymo_str_atoi(
+		o->hint = cpymo_str_atoi(
 			cpymo_parser_curline_pop_commacell(parser)) > 0;
 		return;
 	}

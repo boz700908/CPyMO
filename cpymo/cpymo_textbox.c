@@ -4,20 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-#include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
-#define CPYMO_VISUAL_HELP_ENTER_SOUND() cpymo_android_play_sound(SOUND_ENTER)
-#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
-extern void cpymo_ios_accessibility_play_sound(int sound_type);
-extern void cpymo_ios_accessibility_vibrate(int milliseconds);
-#define CPYMO_VISUAL_HELP_ENTER_SOUND() do { cpymo_ios_accessibility_play_sound(1); cpymo_ios_accessibility_vibrate(10); } while (0)
-#elif defined(ENABLE_TEXT_EXTRACT)
-extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
-extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
-#define CPYMO_VISUAL_HELP_ENTER_SOUND() do { cpymo_sdl2_accessibility_play_sound(1); cpymo_sdl2_accessibility_vibrate(10); } while (0)
-#else
-#define CPYMO_VISUAL_HELP_ENTER_SOUND()
-#endif
+#include "cpymo_accessibility.h"
 
 typedef struct cpymo_textbox_line {
     size_t begin_pool_index, pool_slice_size;
@@ -89,7 +76,9 @@ error_t cpymo_textbox_init(
     o->timer = 0;
     o->draw_cursor = false;
 
-    CPYMO_VISUAL_HELP_ENTER_SOUND();
+    #ifdef ENABLE_TEXT_EXTRACT
+    cpymo_accessibility_play_sound(SOUND_ENTER);
+    #endif
 
     return CPYMO_ERR_SUCC;
 }

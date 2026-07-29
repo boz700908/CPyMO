@@ -139,9 +139,8 @@ static error_t cpymo_save_ui_visual_impaired_selection_changed(cpymo_engine *e, 
 {
 	if (cur) {
 		uintptr_t i = cpymo_list_ui_encode_uint_node_dec(cur);
-		const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data_const(e);
-		if (ui->items[i].orginal_text)
-			cpymo_backend_text_extract(ui->items[i].orginal_text);
+		const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data(e);
+		cpymo_backend_text_extract(ui->items[i].orginal_text);
 	}
 	return CPYMO_ERR_SUCC;
 }
@@ -167,14 +166,16 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 	
 	cpymo_list_ui_enable_loop(e);
 
+#ifdef ENABLE_TEXT_EXTRACT
+	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_save_ui_visual_impaired_selection_changed);
+	ui->items[0].orginal_text = NULL;
+#endif
+
 	ui->is_load_ui = is_load_ui;
 
 	for (size_t i = 0; i < CPYMO_MAX_SAVES; ++i) {
 		ui->items[i].text = NULL;
 		ui->items[i].is_empty_save = false;
-#ifdef ENABLE_TEXT_EXTRACT
-		ui->items[i].orginal_text = NULL;
-#endif
 	}
 
 	const float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);
@@ -286,10 +287,6 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 #ifdef ENABLE_TEXT_EXTRACT
 		ui->items[i].orginal_text = 
 			cpymo_str_copy_malloc(cpymo_str_pure(text_buf));
-		if (ui->items[i].orginal_text == NULL) {
-			cpymo_ui_exit(e);
-			return CPYMO_ERR_OUT_OF_MEM;
-		}
 #endif
 
 		if (err != CPYMO_ERR_SUCC) {
@@ -299,7 +296,8 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 	}
 
 #ifdef ENABLE_TEXT_EXTRACT
-	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_save_ui_visual_impaired_selection_changed);
+	if (ui->items[first].orginal_text)
+		cpymo_backend_text_extract(ui->items[first].orginal_text);
 #endif
 
 	return CPYMO_ERR_SUCC;

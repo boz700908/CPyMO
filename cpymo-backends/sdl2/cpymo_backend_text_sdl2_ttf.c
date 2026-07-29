@@ -7,7 +7,7 @@
 
 static TTF_Font *font = NULL;
 static int prev_ptsize = 16;
-extern SDL_Renderer *renderer;
+extern SDL_Renderer * const renderer;
 extern const cpymo_engine engine;
 
 void cpymo_backend_font_free()
@@ -99,10 +99,10 @@ error_t cpymo_backend_text_create(
 
 #if ENABLE_SDL2_TTF == 1 || ENABLE_SDL2_TTF == 3
     SDL_Color bg;
-    bg.r = 0;
-    bg.g = 0;
-    bg.b = 0;
-    bg.a = 0;
+    c.r = 0;
+    c.g = 0;
+    c.b = 0;
+    c.a = 0;
 #endif
 
 #if ENABLE_SDL2_TTF == 1
@@ -128,7 +128,7 @@ error_t cpymo_backend_text_create(
     cpymo_backend_text_internal *out_text =
         (cpymo_backend_text_internal *)
         malloc(sizeof(cpymo_backend_text_internal));
-    if (out_text == NULL) {
+    if (out == NULL) {
         SDL_DestroyTexture(text_tex);
         return CPYMO_ERR_OUT_OF_MEM;
     }

@@ -5,25 +5,12 @@
 #include <limits.h>
 #include <math.h>
 
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-#include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
-#define CPYMO_VISUAL_HELP_PLAY_SOUND(X) cpymo_android_play_sound(X)
-#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
-extern void cpymo_ios_accessibility_play_sound(int sound_type);
-extern void cpymo_ios_accessibility_vibrate(int milliseconds);
-#define CPYMO_VISUAL_HELP_PLAY_SOUND(X) do { cpymo_ios_accessibility_play_sound(X); cpymo_ios_accessibility_vibrate(10); } while (0)
-#elif defined(ENABLE_TEXT_EXTRACT)
-extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
-extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
-#define CPYMO_VISUAL_HELP_PLAY_SOUND(X) do { cpymo_sdl2_accessibility_play_sound(X); cpymo_sdl2_accessibility_vibrate(10); } while (0)
-#else
-#define CPYMO_VISUAL_HELP_PLAY_SOUND(X)
-#endif
+#include "cpymo_accessibility.h"
 
 #ifdef __3DS__
 extern bool fill_screen_enabled;
-extern bool fill_screen;
-extern bool enhanced_3ds_display_mode;
+const extern bool fill_screen;
+const extern bool enhanced_3ds_display_mode;
 #endif
 
 const static float slide_limit = 10.0f;
@@ -379,7 +366,9 @@ static error_t cpymo_list_ui_update(cpymo_engine *e, void *ui_data, float d)
 		}
 
 		if (ui->selection_changed) {
-			CPYMO_VISUAL_HELP_PLAY_SOUND(3);
+#ifdef ENABLE_TEXT_EXTRACT
+			cpymo_accessibility_play_sound(SOUND_SELECT);
+#endif
 			error_t err = ui->selection_changed(e,
 				cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
 			CPYMO_THROW(err);
@@ -405,7 +394,9 @@ static error_t cpymo_list_ui_update(cpymo_engine *e, void *ui_data, float d)
 		}
 
 		if (ui->selection_changed) {
-			CPYMO_VISUAL_HELP_PLAY_SOUND(3);
+#ifdef ENABLE_TEXT_EXTRACT
+			cpymo_accessibility_play_sound(SOUND_SELECT);
+#endif
 			error_t err = ui->selection_changed(e,
 				cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
 			CPYMO_THROW(err);
@@ -419,7 +410,9 @@ static error_t cpymo_list_ui_update(cpymo_engine *e, void *ui_data, float d)
 			cpymo_engine_request_redraw(e);
 
 			if (ui->selection_changed) {
-				CPYMO_VISUAL_HELP_PLAY_SOUND(3);
+#ifdef ENABLE_TEXT_EXTRACT
+				cpymo_accessibility_play_sound(SOUND_SELECT);
+#endif
 				error_t err = ui->selection_changed(e, 
 					cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
 				CPYMO_THROW(err);
@@ -646,11 +639,7 @@ void cpymo_list_ui_enable_loop(cpymo_engine *e)
 }
 
 void cpymo_list_ui_set_selection_changed_callback(struct cpymo_engine *e, cpymo_list_ui_selection_changed c)
-{
-	cpymo_list_ui *ui = (cpymo_list_ui *)cpymo_ui_data(e);
-	ui->selection_changed = c;
-	if (c) c(e, cpymo_list_ui_get_relative_id_to_cur(e, ui->selection_relative_to_cur));
-}
+{ ((cpymo_list_ui *)cpymo_ui_data(e))->selection_changed = c; }
 
 void cpymo_list_ui_set_scroll_enabled(struct cpymo_engine *e, bool allow_scroll)
 { ((cpymo_list_ui *)cpymo_ui_data(e))->allow_scroll = allow_scroll; }

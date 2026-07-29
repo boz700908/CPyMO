@@ -5,18 +5,18 @@
 
 void cpymo_wait_register_with_callback(cpymo_wait * wait, cpymo_wait_for wait_for, cpymo_wait_over_callback cb)
 {
-	assert(wait->waiting_for == NULL);
+	assert(wait->wating_for == NULL);
 	assert(wait->callback == NULL);
 
-	wait->waiting_for = wait_for;
+	wait->wating_for = wait_for;
 	wait->callback = cb;
 }
 
 error_t cpymo_wait_update(cpymo_wait *wait, cpymo_engine * engine, float delta_time)
 {
 	error_t err = CPYMO_ERR_SUCC;
-	if (cpymo_wait_is_waiting(wait)) {
-		if (wait->waiting_for(engine, delta_time)) {
+	if (cpymo_wait_is_wating(wait)) {
+		if (wait->wating_for(engine, delta_time)) {
 			cpymo_wait_over_callback cb = wait->callback;
 			cpymo_wait_reset(wait);
 

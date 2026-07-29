@@ -27,12 +27,8 @@ float cpymo_backend_text_width(
     float single_character_size_in_logical_screen);
 
 #ifdef ENABLE_TEXT_EXTRACT
-void cpymo_backend_text_extract_init(void);
-void cpymo_backend_text_extract_free(void);
 void cpymo_backend_text_extract(const char *text);
 #else
-#define cpymo_backend_text_extract_init()
-#define cpymo_backend_text_extract_free()
 #define cpymo_backend_text_extract(A)
 #endif
 

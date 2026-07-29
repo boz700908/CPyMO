@@ -2,11 +2,6 @@
 #include "../../cpymo/cpymo_engine.h"
 #include "../include/cpymo_backend_input.h"
 #include "cpymo_import_sdl2.h"
-#include <string.h>
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
 
 extern SDL_Renderer *renderer;
 extern SDL_Window *window;
@@ -41,7 +36,6 @@ void cpymo_sdl2_accessibility_vibrate(int milliseconds)
 cpymo_input cpymo_input_snapshot()
 {
 	cpymo_input out;
-	memset(&out, 0, sizeof(out));
 
 	const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
 
@@ -243,9 +237,8 @@ void cpymo_input_refresh_joysticks()
 	if (gamecontrollers) {
 		memset(gamecontrollers, 0, sizeof(gamecontrollers[0]) * gamecontrollers_count);
 		size_t j = 0;
-		int num_joysticks = SDL_NumJoysticks();
-		for (int i = 0; i < num_joysticks && j < gamecontrollers_count; ++i)
-			if (SDL_IsGameController(i))
-				gamecontrollers[j++] = SDL_GameControllerOpen(i);
+		for (size_t i = 0; i < gamecontrollers_count; ++i)
+			if (SDL_IsGameController((int)i))
+				gamecontrollers[j++] = SDL_GameControllerOpen((int)i);
 	}
 }

@@ -233,7 +233,6 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 		struct dirent* ent;
 		while ((ent = readdir(dir))) {
 			char *path = (char *)malloc(strlen(ent->d_name) + strlen(game_selector_dir) + 4);
-			if (path == NULL) continue;
 			sprintf(path, "%s/%s", game_selector_dir, ent->d_name);
 
 			cpymo_game_selector_item *cur = NULL;
@@ -325,10 +324,6 @@ int main(int argc, char **argv)
     extern void cpymo_backend_audio_free(void);
 
     cpymo_backend_audio_init();
-
-#ifdef ENABLE_TEXT_EXTRACT
-    cpymo_backend_text_extract_init();
-#endif
 
     extern error_t cpymo_backend_image_init(void);
     extern void cpymo_backend_image_quit(void);
@@ -457,7 +452,6 @@ int main(int argc, char **argv)
 				#else
 				goto EXIT;
 				#endif
-				break;
             }
             case SDL_VIDEOEXPOSE: redraw_system = true; break;
             case SDL_VIDEORESIZE:
@@ -531,9 +525,6 @@ EXIT:
     cpymo_backend_image_quit();
     cpymo_backend_audio_free();
     cpymo_backend_font_free();
-#ifdef ENABLE_TEXT_EXTRACT
-    cpymo_backend_text_extract_free();
-#endif
     SDL_Quit();
 
     #ifdef LEAKCHECK

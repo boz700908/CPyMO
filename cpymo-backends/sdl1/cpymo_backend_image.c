@@ -157,7 +157,6 @@ error_t cpymo_backend_image_load(
 		amask);
 
 	if (sur == NULL) {
-		free(pixels_moveintoimage);
 		return CPYMO_ERR_UNKNOWN;
 	}
 

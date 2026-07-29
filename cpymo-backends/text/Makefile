@@ -10,16 +10,10 @@ OBJS := \
 CFLAGS += \
 	-DNDEBUG \
 	-DDISABLE_AUDIO -DDISABLE_MOVIE \
+	-DENABLE_TEXT_EXTRACT \
 	-DDISABLE_STB_IMAGE \
 	-DLOW_FRAME_RATE \
 	-O3
-
-ifeq ($(ENABLE_TEXT_EXTRACT), 0)
-# Standard build: no accessibility features
-else
-# Accessibility build (default)
-CFLAGS += -DENABLE_TEXT_EXTRACT
-endif
 
 ifeq ($(LEAKCHECK), 1)
 CFLAGS += -DLEAKCHECK
@@ -27,12 +21,9 @@ endif
 
 LDFLAGS += -O3 -lm
 
-UNAME_S := $(shell uname -s)
 ifeq ($(OS), Windows_NT)
 OBJS += $(BUILD_DIR)/cpymo.res
 LDFLAGS += --static -lmingw32
-else ifeq ($(UNAME_S), Darwin)
-LDFLAGS += -framework AudioToolbox
 endif
 
 TARGET := cpymo-text

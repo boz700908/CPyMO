@@ -65,6 +65,4 @@ static inline void cpymo_bg_follow_chara_quake(cpymo_bg *bg, bool enabled)
 #endif
 }
 
-void cpymo_bg_transfer_operate(struct cpymo_engine *e);
-
 #endif

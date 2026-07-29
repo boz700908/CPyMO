@@ -69,7 +69,7 @@ static void cpymo_backend_text_draw_internal(
     cpymo_color col, float alpha)
 {
     extern cpymo_color getpixel(SDL_Surface *surface, int x, int y);
-    extern void putpixel(SDL_Surface *surface, int x, int y, cpymo_color col, Uint8 alpha);
+    extern void putpixel(SDL_Surface *surface, int x, int y, cpymo_color col);
 
     SDL_Rect clip;
     SDL_GetClipRect(framebuffer, &clip);
@@ -92,7 +92,7 @@ static void cpymo_backend_text_draw_internal(
 
 #if (FONT_RENDER_QUALITY == 0 || FONT_RENDER_QUALITY == 1)
             if (!fontsmp) continue;
-            putpixel(framebuffer, draw_x, draw_y, col, 255);
+            putpixel(framebuffer, draw_x, draw_y, col);
 #else
             float fontpx = alpha * (fontsmp / 255.0f);
             if (fontpx == 0.0f) continue;
@@ -109,7 +109,7 @@ static void cpymo_backend_text_draw_internal(
             dst.g = (uint8_t)cpymo_utils_clampf(blend_g * 255.0f, 0.0f, 255.0f);
             dst.b = (uint8_t)cpymo_utils_clampf(blend_b * 255.0f, 0.0f, 255.0f);
 
-            putpixel(framebuffer, draw_x, draw_y, dst, 255);
+            putpixel(framebuffer, draw_x, draw_y, dst);
 #endif
         }
     }
@@ -152,6 +152,3 @@ float cpymo_backend_text_width(
 
 
 #endif
-
-/* --- Accessibility (TTS + Sound) --- */
-#include "../include/cpymo_backend_text_extract.h"

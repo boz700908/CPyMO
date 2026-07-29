@@ -91,7 +91,6 @@ error_t cpymo_backend_movie_init_surface(size_t width, size_t height, enum cpymo
 	if (R_FAILED(Y2RU_SetConversionParams(&p))) {
 		C3D_TexDelete(&tex);
 		y2rExit();
-		return CPYMO_ERR_UNKNOWN;
 	}
 
 	end_interrupt = R_SUCCEEDED(Y2RU_SetTransferEndInterrupt(true));
@@ -100,7 +99,6 @@ error_t cpymo_backend_movie_init_surface(size_t width, size_t height, enum cpymo
 	if (image_buf_line_by_line == NULL) {
 		C3D_TexDelete(&tex);
 		y2rExit();
-		return CPYMO_ERR_OUT_OF_MEM;
 	}
 	
 	C3D_TexFlush(&tex);

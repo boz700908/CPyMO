@@ -17,21 +17,6 @@ LD_FLAGS = $(LD_FLAGS) /SUBSYSTEM:CONSOLE
 
 !if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1"
 CFLAGS = $(CFLAGS) -DENABLE_TEXT_EXTRACT -DENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD
-
-!ifndef TOLK
-TOLK = ..\..\third_party\tolk
-!endif
-!ifndef TOLK_INCLUDE
-TOLK_INCLUDE = $(TOLK)\include
-!endif
-!ifndef TOLK_ARCH
-TOLK_ARCH = x64
-!endif
-!ifndef TOLK_CONFIG
-TOLK_CONFIG = Release
-!endif
-CFLAGS = $(CFLAGS) -I$(TOLK_INCLUDE)
-LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG) Tolk.lib
 !endif
 
 !if "$(ENABLE_EXIT_CONFIRM)" == "1"
@@ -60,18 +45,38 @@ LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(SDL2_MIXER)/lib SDL2_mixer.lib
 CFLAGS = $(CFLAGS) -DDISABLE_AUDIO
 !endif
 
-!if "$(SDL2_STATIC)" == "1"
-SDL2_LIB = SDL2-static.lib
-!else
-SDL2_LIB = SDL2.lib
 !endif
 
+# Tolk accessibility library
+!if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1"
+!ifndef TOLK
+TOLK = ..\..\third_party\tolk
+!endif
+!ifndef TOLK_ARCH
+TOLK_ARCH = x64
+!endif
+!if "$(TOLK_ARCH)" == "x64"
+CFLAGS = $(CFLAGS) /I$(TOLK)\include
+LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
+!elseif "$(TOLK_ARCH)" == "x86"
+CFLAGS = $(CFLAGS) /I$(TOLK)\include
+LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
+!elseif "$(TOLK_ARCH)" == "arm64"
+CFLAGS = $(CFLAGS) /I$(TOLK)\include
+LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
+!endif
 !endif
 
 SRC = *.c ../../cpymo/*.c
 
 build: $(TARGET)
 	@echo Built $(TARGET)
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\Release\*.dll" . >nul
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\Release\*.ini" . >nul 2>&1
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\Release\*.conf" . >nul 2>&1
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist enter.wav copy /Y enter.wav . >nul
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist menu.wav copy /Y menu.wav . >nul
+	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist select.wav copy /Y select.wav . >nul
 
 clean:
 	@rd /S /Q $(BUILD_DIR)
@@ -90,13 +95,7 @@ $(TARGET): $(SRC) dirs $(BUILD_DIR)/cpymo.res
 		/utf-8 \
 		/O2 /Os /MP /nologo \
 		/link /LIBPATH:$(SDL2)/lib /LIBPATH:$(SDL2)/lib/manual-link \
-		SDL2main.lib $(SDL2_LIB) \
+		SDL2main.lib SDL2.lib \
 		Gdi32.lib User32.lib Imm32.lib Ole32.lib Shell32.lib Winmm.lib Secur32.lib Setupapi.lib Advapi32.lib Ws2_32.lib \
 		Version.lib Mfplat.lib OleAut32.lib Bcrypt.lib strmiids.lib Mfuuid.lib \
 		$(LD_FLAGS) /RELEASE
-	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG)\*.dll" . >nul
-	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG)\*.ini" . >nul 2>&1
-	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" copy /Y "$(TOLK)\$(TOLK_ARCH)\$(TOLK_CONFIG)\*.conf" . >nul 2>&1
-	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist enter.wav copy /Y enter.wav . >nul
-	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist menu.wav copy /Y menu.wav . >nul
-	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist select.wav copy /Y select.wav . >nul

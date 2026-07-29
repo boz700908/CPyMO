@@ -1,5 +1,4 @@
 #ifndef INCLUDE_CPYMO_TOOL_FFMPEG
-#define INCLUDE_CPYMO_TOOL_FFMPEG
 
 #include "../cpymo/cpymo_error.h"
 

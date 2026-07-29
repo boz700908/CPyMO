@@ -90,6 +90,4 @@ void cpymo_charas_play_anime(
 	size_t offsets_xy_count,
 	bool offsets_owned);
 
-void cpymo_charas_gc(cpymo_charas *p, bool trim_memory);
-
 #endif

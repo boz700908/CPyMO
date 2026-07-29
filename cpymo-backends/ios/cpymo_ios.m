@@ -160,14 +160,14 @@ static void cpymo_ios_send_input(int action)
     case UISwipeGestureRecognizerDirectionRight: action = CPYMO_IOS_ACCESSIBILITY_RIGHT; break;
     default: return;
     }
-    cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_play_sound(SOUND_SELECT);
     cpymo_ios_accessibility_vibrate(10);
     cpymo_ios_send_input(action);
 }
 
 - (void)activate:(UITapGestureRecognizer *)recognizer
 {
-    cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_play_sound(SOUND_SELECT);
     cpymo_ios_accessibility_vibrate(10);
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_OK);
 }
@@ -189,7 +189,7 @@ static void cpymo_ios_send_input(int action)
 - (void)cancel:(UILongPressGestureRecognizer *)recognizer
 {
     if (recognizer.state == UIGestureRecognizerStateBegan) {
-        cpymo_ios_accessibility_play_sound(2);
+        cpymo_ios_accessibility_play_sound(SOUND_MENU);
         cpymo_ios_accessibility_vibrate(50);
         cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
     }
@@ -197,14 +197,14 @@ static void cpymo_ios_send_input(int action)
 
 - (void)skip:(UITapGestureRecognizer *)recognizer
 {
-    cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_play_sound(SOUND_SELECT);
     cpymo_ios_accessibility_vibrate(10);
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP);
 }
 
 - (void)twoFingerCancel:(UISwipeGestureRecognizer *)recognizer
 {
-    cpymo_ios_accessibility_play_sound(2);
+    cpymo_ios_accessibility_play_sound(SOUND_MENU);
     cpymo_ios_accessibility_vibrate(50);
     cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
 }
@@ -232,7 +232,7 @@ static void cpymo_ios_send_input(int action)
         pasteboard.string = [prefix stringByAppendingString:last_announcement];
         cpymo_ios_accessibility_announce("已追加复制");
     }
-    cpymo_ios_accessibility_play_sound(3);
+    cpymo_ios_accessibility_play_sound(SOUND_SELECT);
     cpymo_ios_accessibility_vibrate(10);
 }
 @end
@@ -310,6 +310,12 @@ static void cpymo_ios_install_accessibility_gestures(void)
     two_finger_cancel.cancelsTouchesInView = YES;
     [view addGestureRecognizer:two_finger_cancel];
 }
+
+/* Sound type constants (aligned with Android) */
+#define SOUND_ENTER  1
+#define SOUND_MENU   2
+#define SOUND_SELECT 3
+
 #endif
 
 const char* get_ios_directory() {

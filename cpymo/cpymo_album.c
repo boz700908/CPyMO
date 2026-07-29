@@ -11,6 +11,7 @@
 #include "cpymo_assetloader.h"
 #include <assert.h>
 #include <ctype.h>
+#include "cpymo_accessibility.h"
 
 #define ALBUM_MAX_CGS_SINGLE_PAGE 25
 const static float album_scroll_time = 3.0f;
@@ -157,10 +158,6 @@ error_t cpymo_album_generate_album_ui_image_pixels(
 	} while (cpymo_parser_next_line(&album_list_parser));
 
 	if (cpymo_backend_image_album_ui_writable()) {
-		if (loader->gamedir == NULL) {
-			*out_image = pixels;
-			return CPYMO_ERR_SUCC;
-		}
 		char *path = (char *)malloc(strlen(loader->gamedir) + output_cache_ui_file_name.len + 32);
 		if (path != NULL) {
 			strcpy(path, loader->gamedir);
@@ -173,9 +170,8 @@ error_t cpymo_album_generate_album_ui_image_pixels(
 			strcat(path, ".png");
 
 			#ifdef CPYMO_TOOL
-			FILE *fp = fopen(path, "rb");
-			if (fp) {
-				fclose(fp);
+			if (fopen(path, "rb"))
+			{
 				free(path);
 				*out_image = pixels;
 				return CPYMO_ERR_SUCC;
@@ -280,6 +276,10 @@ typedef struct {
 	cpymo_backend_text title;
 	float title_width;
 
+#ifdef ENABLE_TEXT_EXTRACT
+	char *title_text;
+#endif
+
 	size_t cg_count;
 	cpymo_parser cg_name_parser;
 	bool force_unlock_all;
@@ -355,6 +355,12 @@ static void cpymo_album_unload_page(cpymo_engine *e, cpymo_album *a)
 		if (a->cg_infos[i].title != NULL)
 			cpymo_backend_text_free(a->cg_infos[i].title);
 		a->cg_infos[i].title = NULL;
+#ifdef ENABLE_TEXT_EXTRACT
+		if (a->cg_infos[i].title_text) {
+			free(a->cg_infos[i].title_text);
+			a->cg_infos[i].title_text = NULL;
+		}
+#endif
 	}
 
 	if (a->current_ui != NULL) {
@@ -415,11 +421,20 @@ static error_t cpymo_album_load_page(cpymo_engine *e, cpymo_album *a)
 				cg_title,
 				cpymo_gameconfig_font_size(&e->gameconfig));
 
+#ifdef ENABLE_TEXT_EXTRACT
+			cg_info->title_text = cpymo_str_copy_malloc(cg_title);
+#endif
+
 			if (err != CPYMO_ERR_SUCC) {
 				cg_info->title = NULL;
 				return err;
 			}
 		}
+#ifdef ENABLE_TEXT_EXTRACT
+		else {
+			cg_info->title_text = NULL;
+		}
+#endif
 
 		cg_info->cg_name_parser = album_list;
 		cg_info->preview_unlocked = false;
@@ -494,8 +509,15 @@ static error_t cpymo_album_next_page(cpymo_engine *e, cpymo_album *a)
 	a->current_cg_selection = 0;
 	size_t prev_page = a->current_page;
 	a->current_page = (a->current_page + 1) % a->page_count;
-	if (prev_page != a->current_page) 
-		return cpymo_album_load_page(e, a);
+	if (prev_page != a->current_page) {
+		error_t err = cpymo_album_load_page(e, a);
+#ifdef ENABLE_TEXT_EXTRACT
+		cpymo_accessibility_play_sound(SOUND_MENU);
+		if (err == CPYMO_ERR_SUCC && a->cg_count > 0 && a->cg_infos[0].title_text)
+			cpymo_backend_text_extract(a->cg_infos[0].title_text);
+#endif
+		return err;
+	}
 	else {
 		cpymo_engine_request_redraw(e);
 		return CPYMO_ERR_SUCC;
@@ -509,8 +531,15 @@ static error_t cpymo_album_prev_page(cpymo_engine *e, cpymo_album *a)
 	if (a->current_page <= 0) a->current_page = a->page_count - 1;
 	else a->current_page--;
 
-	if (prev_page != a->current_page) 
-		return cpymo_album_load_page(e, a);
+	if (prev_page != a->current_page) {
+		error_t err = cpymo_album_load_page(e, a);
+#ifdef ENABLE_TEXT_EXTRACT
+		cpymo_accessibility_play_sound(SOUND_MENU);
+		if (err == CPYMO_ERR_SUCC && a->cg_count > 0 && a->cg_infos[0].title_text)
+			cpymo_backend_text_extract(a->cg_infos[0].title_text);
+#endif
+		return err;
+	}
 	else {
 		cpymo_engine_request_redraw(e);
 		return CPYMO_ERR_SUCC;
@@ -542,6 +571,10 @@ static void cpymo_album_exit_showing_cg(cpymo_engine *e, cpymo_album *a) {
 
 	a->showing_cg = NULL;
 	cpymo_album_load_page(e, a);
+#ifdef ENABLE_TEXT_EXTRACT
+	if (a->cg_count > 0 && a->cg_infos[0].title_text)
+		cpymo_backend_text_extract(a->cg_infos[0].title_text);
+#endif
 	cpymo_input_ignore_next_mouse_button_event(e);
 }
 
@@ -630,6 +663,11 @@ static error_t cpymo_album_select_ok(cpymo_engine *e, cpymo_album *a)
 	a->showing_cg = cg_info;
 	a->showing_cg_filename_parser = a->showing_cg->cg_name_parser;
 	a->showing_cg_next_cg_id = 0;
+#ifdef ENABLE_TEXT_EXTRACT
+	cpymo_accessibility_play_sound(SOUND_ENTER);
+	if (cg_info->title_text)
+		cpymo_backend_text_extract(cg_info->title_text);
+#endif
 	cpymo_album_showing_cg_next(e, a);
 	cpymo_input_ignore_next_mouse_button_event(e);
 	return CPYMO_ERR_SUCC;
@@ -728,6 +766,11 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 
 		if (album->current_cg_selection >= (int)album->cg_count)
 			return cpymo_album_next_page(e, album);
+#ifdef ENABLE_TEXT_EXTRACT
+		cpymo_accessibility_play_sound(SOUND_SELECT);
+		if (album->cg_infos[album->current_cg_selection].title_text)
+			cpymo_backend_text_extract(album->cg_infos[album->current_cg_selection].title_text);
+#endif
 		return CPYMO_ERR_SUCC;
 	}
 
@@ -739,6 +782,11 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 			album->current_cg_selection = (int)album->cg_count - 1;
 			return err;
 		}
+#ifdef ENABLE_TEXT_EXTRACT
+		cpymo_accessibility_play_sound(SOUND_SELECT);
+		if (album->cg_infos[album->current_cg_selection].title_text)
+			cpymo_backend_text_extract(album->cg_infos[album->current_cg_selection].title_text);
+#endif
 		return CPYMO_ERR_SUCC;
 	}
 
@@ -762,6 +810,11 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 					if (album->current_cg_selection != (int)i) {
 						cpymo_engine_request_redraw(e);
 						album->current_cg_selection = (int)i;
+#ifdef ENABLE_TEXT_EXTRACT
+						cpymo_accessibility_play_sound(SOUND_SELECT);
+						if (album->cg_infos[i].title_text)
+							cpymo_backend_text_extract(album->cg_infos[i].title_text);
+#endif
 					}
 					break;
 				}
@@ -916,6 +969,11 @@ static void cpymo_album_deleter(cpymo_engine *e, void *a)
 	for (size_t i = 0; i < ALBUM_MAX_CGS_SINGLE_PAGE; ++i)
 		if (album->cg_infos[i].title != NULL)
 			cpymo_backend_text_free(album->cg_infos[i].title);
+#ifdef ENABLE_TEXT_EXTRACT
+	for (size_t i = 0; i < ALBUM_MAX_CGS_SINGLE_PAGE; ++i)
+		if (album->cg_infos[i].title_text)
+			free(album->cg_infos[i].title_text);
+#endif
 
 	#ifdef __3DS__
 	fill_screen_enabled = true;
@@ -972,6 +1030,9 @@ error_t cpymo_album_enter(
 	
 	for (size_t i = 0; i < ALBUM_MAX_CGS_SINGLE_PAGE; ++i) {
 		album->cg_infos[i].title = NULL;
+#ifdef ENABLE_TEXT_EXTRACT
+		album->cg_infos[i].title_text = NULL;
+#endif
 	}
 
 	char script_name[128];
@@ -1008,7 +1069,12 @@ error_t cpymo_album_enter(
 	album->current_cg_selection = 0;
 	album->current_page = 0;
 
-	return cpymo_album_load_page(e, album);
+	err = cpymo_album_load_page(e, album);
+#ifdef ENABLE_TEXT_EXTRACT
+	if (err == CPYMO_ERR_SUCC && album->cg_count > 0 && album->cg_infos[0].title_text)
+		cpymo_backend_text_extract(album->cg_infos[0].title_text);
+#endif
+	return err;
 }
 
 #endif

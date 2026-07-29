@@ -57,7 +57,6 @@ static error_t cpymo_tool_asset_analyze_single_script(
     if (shgetp_null(result->script, script_name)) return CPYMO_ERR_SUCC;
 
     char *script_path = malloc(strlen(gamedir) + strlen(script_name) + 13);
-    if (script_path == NULL) return CPYMO_ERR_OUT_OF_MEM;
     strcpy(script_path, gamedir);
     strcat(script_path, "/script/");
     strcat(script_path, script_name);
@@ -548,7 +547,7 @@ static void cpymo_tool_asset_analyze_single_command(
     if (cpymo_str_equals_str(cmd, "date")) {
         cpymo_str file = cpymo_parser_curline_pop_commacell(parser);
         cpymo_str_trim(&file);
-        if (!cpymo_str_equals_str(file, "")) {
+        if (!cpymo_str_equals_str(cmd, "")) {
             ADD_ASSET(r, system, file, "png", false, NULL, true);
         }
         return;

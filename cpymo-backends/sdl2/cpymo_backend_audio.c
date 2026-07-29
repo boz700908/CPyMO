@@ -21,8 +21,8 @@ extern cpymo_engine engine;
 #define SDL2_AUDIO_DEFAULT_FREQ 48000
 #endif
 
-#ifndef SDL2_AUDIO_DEFAULT_CHANNELS
-#define SDL2_AUDIO_DEFAULT_CHANNELS 2
+#ifndef SDL2_AUDIO_DEFULAT_CHANNELS
+#define SDL2_AUDIO_DEFULAT_CHANNELS 2
 #endif
 
 #ifndef SDL2_AUDIO_DEFAULT_FORMAT_SDL
@@ -40,7 +40,7 @@ extern cpymo_engine engine;
 static cpymo_backend_audio_info audio_info = {
 	SDL2_AUDIO_DEFAULT_FREQ,
 	SDL2_AUDIO_DEFAULT_FORMAT_CPYMO,
-	SDL2_AUDIO_DEFAULT_CHANNELS
+	SDL2_AUDIO_DEFULAT_CHANNELS
 };
 
 static void cpymo_backend_audio_sdl_callback(void *userdata, Uint8 * stream, int len)
@@ -84,7 +84,7 @@ void cpymo_backend_audio_init()
 	
 	SDL_memset(&want, 0, sizeof(want));
 	want.callback = &cpymo_backend_audio_sdl_callback;
-	want.channels = SDL2_AUDIO_DEFAULT_CHANNELS;
+	want.channels = SDL2_AUDIO_DEFULAT_CHANNELS;
 	want.format = SDL2_AUDIO_DEFAULT_FORMAT_SDL;
 	want.freq = SDL2_AUDIO_DEFAULT_FREQ;
 	want.samples = SDL2_AUDIO_DEFAULT_SAMPLES;
@@ -95,9 +95,6 @@ void cpymo_backend_audio_init()
 
 			if (SDL_OpenAudio(&want, NULL) == 0) {
 				audio_enabled = true;
-				audio_info.freq = want.freq;
-				audio_info.channels = want.channels;
-				audio_info.format = cpymo_backend_audio_f32;
 			}
 			else {
 				goto FAIL;
@@ -191,7 +188,5 @@ void cpymo_backend_audio_free() {}
 void cpymo_backend_audio_reset() {}
 const cpymo_backend_audio_info *cpymo_backend_audio_get_info(void) 
 { return NULL; }
-void cpymo_backend_audio_lock(void) {}
-void cpymo_backend_audio_unlock(void) {}
 
 #endif

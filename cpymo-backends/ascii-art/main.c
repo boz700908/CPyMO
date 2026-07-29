@@ -122,12 +122,7 @@ int main(int argc, char **argv)
 
     ensure_save_dir(gamedir);
 
-#ifdef ENABLE_TEXT_EXTRACT
-    cpymo_backend_text_extract_init();
-#endif
-
     printf("\033]0;%s\007", engine.gameconfig.gametitle);
-    fflush(stdout);
 
     err = init_context();
     if (err != CPYMO_ERR_SUCC) {
@@ -162,12 +157,7 @@ int main(int argc, char **argv)
             get_winsize(&cur_w, &cur_h);
             if (cur_w != render_target.w || cur_h != render_target.h) {
                 free_context();
-                error_t err = init_context();
-                if (err != CPYMO_ERR_SUCC) {
-                    printf("[Error] Can not init context: %s\n", cpymo_error_message(err));
-                    ret = -1;
-                    goto EXIT;
-                }
+                init_context();
             }
 
             memset(
@@ -186,15 +176,10 @@ int main(int argc, char **argv)
         }
     }
 
-EXIT:
 // cleaning
     cpymo_engine_free(&engine);
     free_context();
     cpymo_backend_font_free();
-
-#ifdef ENABLE_TEXT_EXTRACT
-    cpymo_backend_text_extract_free();
-#endif
 
     extern void cpymo_backend_ascii_clean(void);
     cpymo_backend_ascii_clean();

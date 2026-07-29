@@ -104,9 +104,9 @@ error_t cpymo_backend_text_create(
     cpymo_backend_text_render(NULL, &w, &h, utf8_string, scale, baseline);
     h += 4; // magic
 
-    cpymo_backend_text_impl *o = (cpymo_backend_text_impl *)malloc(sizeof(cpymo_backend_text_impl) + (size_t)w * (size_t)h);
+    cpymo_backend_text_impl *o = (cpymo_backend_text_impl *)malloc(sizeof(cpymo_backend_text_impl) + w * h);
     if (o == NULL) return CPYMO_ERR_OUT_OF_MEM;
-    memset(o, 0, sizeof(cpymo_backend_text_impl) + (size_t)w * (size_t)h);
+    memset(o, 0, sizeof(cpymo_backend_text_impl) + w * h);
     o->w = (uint16_t)w;
     o->h = (uint16_t)h;
     *out_width = cpymo_backend_text_width(utf8_string, single_character_size_in_logical_screen);
@@ -193,6 +193,3 @@ float cpymo_backend_text_width(
 
     return TEXT_CHARACTER_W_SCALE * (float)w / win_w * game_w;
 }
-
-/* --- Accessibility (TTS + Sound) --- */
-#include "../include/cpymo_backend_text_extract.h"

@@ -6,7 +6,6 @@
 #include "../cpymo-backends/include/cpymo_backend_text.h"
 #include <assert.h>
 #include <stdlib.h>
-#include <string.h>
 
 typedef struct {
 	char *music_list;
@@ -28,8 +27,7 @@ static void cpymo_music_box_deleter(cpymo_engine *e, void *ui_)
 
 	if (box->music_title)
 		for (uintptr_t i = 0; i < box->music_count; ++i)
-			if (box->music_title[i])
-				cpymo_backend_text_free(box->music_title[i]);
+			cpymo_backend_text_free(box->music_title[i]);
 
 #ifdef ENABLE_TEXT_EXTRACT
 	if (box->music_title_text) {
@@ -81,8 +79,6 @@ static error_t cpymo_musicbox_ok(struct cpymo_engine *e, void *selected)
 #ifdef ENABLE_TEXT_EXTRACT
 static error_t cpymo_musicbox_visual_help_selection_change(cpymo_engine *e, void *selected)
 {
-	if (!selected) return CPYMO_ERR_SUCC;
-
 	const cpymo_music_box *box = (cpymo_music_box *)cpymo_list_ui_data_const(e);
 	
 	if (box->music_title_text) {
@@ -169,8 +165,8 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 
 #ifdef ENABLE_TEXT_EXTRACT
 	box->music_title_text = (char **)malloc(sizeof(char *) * box->music_count);
-	if (box->music_title_text)
-		memset(box->music_title_text, 0, sizeof(char *) * box->music_count);
+	cpymo_list_ui_set_selection_changed_callback(
+		e, &cpymo_musicbox_visual_help_selection_change);
 #endif
 
 	do {
@@ -195,12 +191,9 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 		float width;
 		error_t err = cpymo_backend_text_create(&box->music_title[i], &width, music_title, box->font_size);
 		if (err != CPYMO_ERR_SUCC) {
-			for (uintptr_t j = 0; j < box->music_count; ++j)
-				if(box->music_title[j])
-					cpymo_backend_text_free(box->music_title[j]);
-			free(box->music_filename);
-			box->music_filename = NULL;
-			box->music_title = NULL;
+			for (uintptr_t i = 0; i < box->music_count; ++i)
+				if(box->music_title[i])
+					cpymo_backend_text_free(box->music_title[i]);
 			free(box->music_list);
 			box->music_list = NULL;
 			return err;
@@ -210,12 +203,11 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 	} while (cpymo_parser_next_line(&p) && i < box->music_count);
 
 	assert(i == box->music_count);
-
 	cpymo_list_ui_set_current_node(e, cpymo_list_ui_encode_uint_node_enc(0));
 
 #ifdef ENABLE_TEXT_EXTRACT
-	cpymo_list_ui_set_selection_changed_callback(
-		e, &cpymo_musicbox_visual_help_selection_change);
+	if (box->music_title_text && box->music_title_text[0])
+		cpymo_backend_text_extract(box->music_title_text[0]);
 #endif
 
 	return CPYMO_ERR_SUCC;

@@ -35,26 +35,24 @@ error_t cpymo_tool_ffmpeg_call(
     size_t flags_len = 0;
     if (flags) flags_len = 1 + strlen(flags);
 
-    size_t cmd_len = strlen(ffmpeg_command)
+    char *command = (char *)malloc(
+        strlen(ffmpeg_command)
         + strlen(src)
         + strlen(dst)
         + strlen(fmt)
         + flags_len
-        + 32;
-    char *command = (char *)malloc(cmd_len);
+        + 32);
     if (command == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
-    snprintf(command, cmd_len, "%s -i \"%s\" -y -v quiet -f %s %s%s\"%s\"",
+    sprintf(command, "%s -i \"%s\" -y -v quiet -f %s %s%s\"%s\"",
         ffmpeg_command,
         src,
         fmt,
         flags == NULL ? "" : flags,
         flags == NULL ? "" : " ",
         dst);
-    int rc = system(command);
+    system(command);
     free(command);
-
-    if (rc != 0) return CPYMO_ERR_UNKNOWN;
 
     return CPYMO_ERR_SUCC;
 }

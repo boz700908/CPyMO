@@ -158,17 +158,3 @@ void cpymo_backend_text_draw(cpymo_backend_text t, float x, float y, cpymo_color
         x_scale, y_scale, color);
 }
 
-#ifdef ENABLE_TEXT_EXTRACT
-/* Accessibility stubs for 3DS (no TTS/sound/vibration on 3DS) */
-void cpymo_backend_text_extract_init(void) {}
-void cpymo_backend_text_extract_free(void) {}
-void cpymo_backend_text_extract(const char *text)
-{
-    if (text == NULL || text[0] == '\0') return;
-    /* Output to console for debugging */
-    printf("[Accessibility] %s\n", text);
-}
-void cpymo_sdl2_accessibility_play_sound(int sound_type) { (void)sound_type; }
-void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
-#endif
-

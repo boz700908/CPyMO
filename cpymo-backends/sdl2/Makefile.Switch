@@ -66,18 +66,12 @@ CFLAGS	+=	$(INCLUDE) -D__SWITCH__ \
 			-DGAME_SELECTOR_DIR=" \"sdmc:/pymogames/\" " \
 			-DDONT_PASS_PATH_TO_FFMPEG
 
-ifeq ($(ENABLE_TEXT_EXTRACT), 0)
-# Standard build: no accessibility features
-else
-# Accessibility build (default): enable TTS, sounds, vibration
-CFLAGS += -DENABLE_TEXT_EXTRACT
-endif
-
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
+PC_LIBS     := sdl2
 LIBS	:= -Xlinker "-(" -lSDL2 -lEGL -lglapi -lnx -lswscale -lavformat -lavcodec -lavutil -lswresample -lbz2 -lz -lm -ldrm_nouveau -lstdc++ -Xlinker "-)"
 
 #---------------------------------------------------------------------------------

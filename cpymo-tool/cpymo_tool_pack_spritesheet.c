@@ -76,7 +76,7 @@ int cpymo_tool_invoke_pack_spritesheet(int argc, const char ** argv)
 	const char *output_format = NULL;
 
 	size_t input_file_count = 0;
-	const char **input_files = (const char **)malloc(argc * sizeof(char *));
+	const char **input_files = (const char **)malloc(argc * sizeof(char **));
 	if (input_files == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
 	for (int i = 2; i < argc; ++i) {

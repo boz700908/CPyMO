@@ -1,5 +1,4 @@
 #ifndef INCLUDE_CPYMO_TOOL_GAMECONFIG
-#define INCLUDE_CPYMO_TOOL_GAMECONFIG
 
 #include "../cpymo/cpymo_error.h"
 #include "../cpymo/cpymo_gameconfig.h"

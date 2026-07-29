@@ -18,10 +18,7 @@ error_t cpymo_backend_masktrans_create(
     
     cpymo_backend_software_image *img =
         (cpymo_backend_software_image *)malloc(sizeof(*img));
-    if (img == NULL) {
-        free(mask_singlechannel_moveinto);
-        return CPYMO_ERR_OUT_OF_MEM;
-    }
+    if (img == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
     img->r_offset = 0;
     img->g_offset = 0;

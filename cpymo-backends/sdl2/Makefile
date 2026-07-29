@@ -37,14 +37,17 @@ ifeq ($(DISABLE_VSYNC), 1)
 CFLAGS += -DDISABLE_VSYNC
 endif
 
+# Accessibility: Windows (Tolk TTS + WAV sounds)
 ifeq ($(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD), 1)
 CFLAGS += -DENABLE_TEXT_EXTRACT -DENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD
 endif
 
+# Accessibility: Linux (spd-say TTS + WAV sounds)
 ifeq ($(ENABLE_TEXT_EXTRACT_LINUX), 1)
 CFLAGS += -DENABLE_TEXT_EXTRACT -DENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY
 endif
 
+# Accessibility: macOS (NSSpeechSynthesizer TTS + WAV sounds)
 ifeq ($(ENABLE_TEXT_EXTRACT_MACOS), 1)
 CFLAGS += -DENABLE_TEXT_EXTRACT
 endif

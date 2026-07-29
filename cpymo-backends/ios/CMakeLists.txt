@@ -5,7 +5,7 @@ project(cpymo
         )
 
 # fix compile error for `SDL_systimer.c`
-add_compile_options(-Wno-error=declaration-after-statement)
+set(EXTRA_CFLAGS "${EXTRA_CFLAGS} -Wno-error=declaration-after-statement")
 
 find_library(LIBZ z)
 find_library(LIBBZ2 bz2)
@@ -15,15 +15,12 @@ find_library(COREMEDIA_LIBRARY CoreMedia)
 find_library(COREVIDEO_LIBRARY CoreVideo)
 find_library(FOUNDATION_LIBRARY Foundation)
 find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
-find_library(AVFOUNDATION_LIBRARY AVFoundation)
 find_library(VIDEOTOOLBOX_LIBRARY VideoToolbox)
 find_library(COREFOUNDATION_LIBRARY CoreFoundation)
 
 set(BUILD_SHARED_LIBS OFF)
 set(SDL_SHARED OFF)
 set(SDL_STATIC ON)
-
-option(ENABLE_IOS_ACCESSIBILITY "Enable VoiceOver announcements and accessibility gestures" OFF)
 
 add_subdirectory(../sdl2/SDL SDL)
 
@@ -39,15 +36,11 @@ add_definitions(
         -DEXIT_TO_GAME_SELECTOR
 )
 
-if (ENABLE_IOS_ACCESSIBILITY)
-    add_definitions(-DENABLE_TEXT_EXTRACT -DENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
-endif ()
-
 include_directories(
         "../include"
         "../../cpymo"
         "../../stb"
-        "../../"
+        "../../endianness.h"
         "./FFmpeg-iOS-build-script/thin/arm64/include"
 )
 
@@ -66,10 +59,6 @@ add_executable(
 )
 
 set_source_files_properties("./Packaging/AppIcon.icns" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-if (ENABLE_IOS_ACCESSIBILITY)
-    target_sources(cpymo PRIVATE enter.wav menu.wav select.wav)
-    set_source_files_properties(enter.wav menu.wav select.wav PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-endif ()
 set(MACOSX_BUNDLE_GUI_IDENTIFIER xyz.xydm.cpymo)
 set(MACOSX_BUNDLE_COPYRIGHT Unlicense)
 set(MACOSX_BUNDLE_BUNDLE_NAME cpymo)
@@ -127,7 +116,6 @@ target_link_libraries(cpymo PUBLIC
         ${COREVIDEO_LIBRARY}
         ${FOUNDATION_LIBRARY}
         ${AUDIOTOOLBOX_LIBRARY}
-        ${AVFOUNDATION_LIBRARY}
         ${VIDEOTOOLBOX_LIBRARY}
         ${COREFOUNDATION_LIBRARY}
         )

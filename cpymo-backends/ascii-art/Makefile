@@ -21,15 +21,7 @@ ifeq ($(LEAKCHECK), 1)
 CFLAGS += -DLEAKCHECK
 endif
 
-ifeq ($(ENABLE_TEXT_EXTRACT), 0)
-# Standard build: no accessibility
-else
-CFLAGS += -DENABLE_TEXT_EXTRACT
-endif
-
 LDFLAGS += -g -lm
-
-UNAME_S := $(shell uname -s)
 
 TARGET := cpymo-ascii-art
 
@@ -56,16 +48,14 @@ $(BUILD_DIR)/%.o: %.c
 	$(call compile,$<,$@)
 
 $(BUILD_DIR)/cpymo.res: ../sdl2/pymo-icon-windows.rc
-	@windres -i $< -o $@ -O coff
+	@windres $< $@ -O coff
 
 ifeq ($(OS), Windows_NT)
 OBJS += $(BUILD_DIR)/cpymo.res
 LDFLAGS += --static
-else ifeq ($(UNAME_S), Darwin)
-LDFLAGS += -framework AudioToolbox
 endif
 
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) $(WINDOWS_RES)
 	@echo "Linking..."
 	@$(CC) $^ -o $@ $(LDFLAGS)
 	@echo "=> $@"

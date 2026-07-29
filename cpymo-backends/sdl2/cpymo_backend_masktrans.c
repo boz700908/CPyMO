@@ -32,12 +32,12 @@ error_t cpymo_backend_masktrans_create(cpymo_backend_masktrans *out, void *mask_
 			SDL_TEXTUREACCESS_STREAMING, 
 			w, h);
 
+	SDL_SetTextureBlendMode(m->tex, SDL_BLENDMODE_BLEND);
+
 	if (m->tex == NULL) {
 		free(m);
 		return CPYMO_ERR_OUT_OF_MEM;
 	}
-
-	SDL_SetTextureBlendMode(m->tex, SDL_BLENDMODE_BLEND);
 
 	m->mask = mask_singlechannel_moveinto;
 	m->w = w;
@@ -86,15 +86,15 @@ void cpymo_backend_masktrans_draw(cpymo_backend_masktrans mt, float t, bool is_f
 			if (is_fade_in) mask = 1 - mask;
 			Uint32 *px = (Uint32 *)&((Uint8 *)pixels)[y * pitch + x * 4];
 
-Uint8 alpha;
 #ifdef LOW_QUALITY_MASKTRANS
-			alpha = mask > t ? 255 : 0;
+			*px = mask > t ? 255 : 0;
 #else
-			if (mask > t_top) alpha = 255;
-			else if (mask < t_bottom) alpha = 0;
-			else alpha = (Uint8)((mask - t_bottom) / (2 * radius) * 255.0f);
+			if (mask > t_top) mask = 1.0f;
+			else if (mask < t_bottom) mask = 0.0f;
+			else mask = (mask - t_bottom) / (2 * radius);
+
+			*px = (Uint32)(mask * 255.0f);
 #endif
-			((Uint8 *)px)[3] = alpha;
 		}
 	}
 

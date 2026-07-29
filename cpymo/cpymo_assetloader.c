@@ -13,8 +13,11 @@ error_t cpymo_assetloader_init(cpymo_assetloader * out, const cpymo_gameconfig *
 	const size_t gamedir_strlen = strlen(gamedir);
 
 	char *chbuf = (char *)malloc(gamedir_strlen + 24);
-	if (chbuf == NULL) return CPYMO_ERR_OUT_OF_MEM;
 	out->gamedir = chbuf;
+
+	out->game_config = config;
+
+	if (chbuf == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
 	strcpy(chbuf, gamedir);
 
@@ -65,7 +68,7 @@ error_t cpymo_assetloader_init(cpymo_assetloader * out, const cpymo_gameconfig *
 
 	chbuf[gamedir_strlen] = '\0';
 	
-	{ char *tmp = (char*)realloc((void *)out->gamedir, gamedir_strlen + 1); if (tmp) out->gamedir = tmp; }
+	out->gamedir = (char*)realloc((void *)out->gamedir, gamedir_strlen + 1);
 	
 	return CPYMO_ERR_SUCC;
 }

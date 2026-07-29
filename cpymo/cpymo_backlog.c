@@ -287,6 +287,7 @@ error_t cpymo_backlog_ui_enter(cpymo_engine *e)
 #ifdef ENABLE_TEXT_EXTRACT
 	cpymo_list_ui_set_selection_changed_callback(
 		e, &cpymo_backlog_ui_selection_changed);
+	cpymo_backlog_ui_extract_text(e, first);
 #endif
 
 	ui->press_key_down_to_close = true;

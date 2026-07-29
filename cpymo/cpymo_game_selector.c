@@ -108,7 +108,7 @@ static void *cpymo_game_selector_get_prev(const cpymo_engine *e, const void *ui_
 
 static void cpymo_game_selector_item_load_info(cpymo_game_selector_item *item, float fontsize)
 {
-#define FAIL { if (path) free(path); if (item->gamedir) free(item->gamedir); item->gamedir = NULL; prev = item; item = item->next; continue; }
+#define FAIL { if (item->gamedir) free(item->gamedir); item->gamedir = NULL; prev = item; item = item->next; continue; }
 
 	cpymo_game_selector_item *prev = NULL;
 	char *path = NULL;
@@ -297,6 +297,14 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 
 		ui->items = items;
 
+#ifdef ENABLE_TEXT_EXTRACT
+		{
+			cpymo_game_selector_item *first = (cpymo_game_selector_item *)cpymo_list_ui_get_current_selected_const(e);
+			if (first && first->gametitle_text)
+				cpymo_backend_text_extract(first->gametitle_text);
+		}
+#endif
+
 		#ifndef EXIT_TO_GAME_SELECTOR
 		if (ui->items != NULL)
 			if (ui->items->next == NULL && ui->items->prev == NULL)
@@ -349,10 +357,6 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 			return err;
 		}
 #endif
-
-		cpymo_engine_extract_text_cstr(e, l->game_selector_empty);
-		cpymo_engine_extract_text_cstr(e, l->game_selector_empty_secondary);
-		cpymo_engine_extract_text_submit(e);
 		
 		return CPYMO_ERR_SUCC;
 	}

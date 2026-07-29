@@ -64,15 +64,14 @@ error_t cpymo_backend_image_load(
 
 	SDL_Texture *tex = SDL_CreateTextureFromSurface(renderer, surface);
 
+	SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+
 	SDL_FreeSurface(surface);
 
 	if (tex == NULL) {
 		SDL_Log("Warning: Can not load texture: %s", SDL_GetError());
-		free(px);
 		return CPYMO_ERR_UNKNOWN;
 	}
-
-	SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
 
 	*out_image = (cpymo_backend_image)tex;
 	free(px);
@@ -326,6 +325,10 @@ static void cpymo_assetloader_sdl2_attach_mask(
 				+ ((size_t)y * mask->pitch)
 				+ ((size_t)x * mask->format->BytesPerPixel);
 
+			Uint8 dummy;
+			SDL_GetRGBA(*(Uint32 *)mask_px, mask->format,
+				&img_rgba_px[0], &dummy, &dummy, &dummy);
+
 			img_rgba_px[0] = mask_px[2];
 		}
 	}
@@ -409,8 +412,8 @@ error_t cpymo_assetloader_load_system_masktrans(
 	CPYMO_THROW(err);
 
 	SDL_Surface *sur = IMG_Load(path);
-	free(path);
 	if (sur == NULL) {
+		free(path);
 		return CPYMO_ERR_CAN_NOT_OPEN_FILE;
 	}
 

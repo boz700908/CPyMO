@@ -8,20 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-#include "../cpymo-backends/android/app/src/main/cpp/include/cpymo_android.h"
-#define CALL_VISUALLY_PLAY_SOUND(X) cpymo_android_play_sound(X)
-#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
-extern void cpymo_ios_accessibility_play_sound(int sound_type);
-extern void cpymo_ios_accessibility_vibrate(int milliseconds);
-#define CALL_VISUALLY_PLAY_SOUND(X) do { cpymo_ios_accessibility_play_sound(X); cpymo_ios_accessibility_vibrate(10); } while (0)
-#elif defined(ENABLE_TEXT_EXTRACT)
-extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
-extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
-#define CALL_VISUALLY_PLAY_SOUND(X) do { cpymo_sdl2_accessibility_play_sound(X); cpymo_sdl2_accessibility_vibrate(10); } while (0)
-#else
-#define CALL_VISUALLY_PLAY_SOUND(X)
-#endif
+#include "cpymo_accessibility.h"
 
 typedef struct cpymo_select_img_selection{
 	cpymo_backend_image image;
@@ -95,7 +82,7 @@ error_t cpymo_select_img_configuare_begin(
 {
 	sel->selections =
 		(cpymo_select_img_selection *)malloc(sizeof(cpymo_select_img_selection) * selections);
-	if (sel->selections == NULL) return CPYMO_ERR_OUT_OF_MEM;
+	if (sel->selections == NULL) return CPYMO_ERR_SUCC;
 
 	memset(sel->selections, 0, sizeof(cpymo_select_img_selection) * selections);
 
@@ -334,6 +321,8 @@ static error_t cpymo_select_img_ok(cpymo_engine *e, int sel, uint64_t hash, cpym
 	return err;
 }
 
+#define CALL_VISUALLY_PLAY_SOUND(X) cpymo_accessibility_play_sound(X)
+
 error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 {
 	if (o->selections) {
@@ -344,22 +333,16 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_select_img_move(o, 1);
 			cpymo_engine_request_redraw(e);
 
-			CALL_VISUALLY_PLAY_SOUND(3);
-#ifdef ENABLE_TEXT_EXTRACT
-			if (o->selections[o->current_selection].original_text)
-				cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
-#endif
+			CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
+			cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
 		}
 
 		if (cpymo_key_pluse_output(&o->key_up)) {
 			cpymo_select_img_move(o, -1);
 			cpymo_engine_request_redraw(e);
 
-			CALL_VISUALLY_PLAY_SOUND(3);
-#ifdef ENABLE_TEXT_EXTRACT
-			if (o->selections[o->current_selection].original_text)
-				cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
-#endif
+			CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
+			cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
 		}
 
 		if (cpymo_input_mouse_moved(e) && e->input.mouse_position_useable) {
@@ -369,11 +352,8 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 						o->current_selection = i;
 						cpymo_engine_request_redraw(e);
 
-						CALL_VISUALLY_PLAY_SOUND(3);
-#ifdef ENABLE_TEXT_EXTRACT
-						if (o->selections[o->current_selection].original_text)
-							cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
-#endif
+						CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
+						cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
 					}
 				}
 			}

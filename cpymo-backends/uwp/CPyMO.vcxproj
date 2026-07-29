@@ -127,15 +127,7 @@
     <AppxBundle>Always</AppxBundle>
     <AppxBundlePlatforms>x86|x64|arm</AppxBundlePlatforms>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-    <!-- Set ENABLE_TEXT_EXTRACT=0 via MSBuild property to disable accessibility:
-         msbuild /p:ENABLE_TEXT_EXTRACT=0 -->
-    <ENABLE_TEXT_EXTRACT>1</ENABLE_TEXT_EXTRACT>
   </PropertyGroup>
-  <ItemDefinitionGroup>
-    <ClCompile>
-      <PreprocessorDefinitions Condition="'$(ENABLE_TEXT_EXTRACT)'=='1'">ENABLE_TEXT_EXTRACT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-  </ItemDefinitionGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <IncludePath>../sdl2/SDL/include;../../cpymo;../sdl2;../include;../../endianness.h;../../stb;$(IncludePath)</IncludePath>
   </PropertyGroup>
@@ -261,17 +253,6 @@
     <Image Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Image Include="Assets\StoreLogo.png" />
     <Image Include="Assets\Wide310x150Logo.scale-200.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="enter.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="menu.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="select.wav">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\cpymo\cpymo_album.c" />

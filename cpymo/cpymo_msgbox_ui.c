@@ -8,8 +8,8 @@
 
 #ifdef __3DS__
 extern bool fill_screen_enabled;
-extern bool fill_screen;
-extern bool enhanced_3ds_display_mode;
+const extern bool fill_screen;
+const extern bool enhanced_3ds_display_mode;
 #endif
 
 typedef struct {
@@ -338,9 +338,7 @@ error_t cpymo_msgbox_ui_enter(
 	}
 
 	cpymo_engine_extract_text(e, message);
-	cpymo_engine_extract_text_cstr(e, l->msgbox_ok);
-	if (okcancel_callback)
-		cpymo_engine_extract_text_cstr(e, l->msgbox_cancel);
+	cpymo_engine_extract_text_cstr(e, l->msgbox_cancel);
 	cpymo_engine_extract_text_submit(e);
 
 	return err;

@@ -71,10 +71,7 @@ static void cpymo_backend_font_update_size(float s)
         //TTF_SetFontKerning(font, 1);
         prev_ptsize = ptsize;
         cpymo_backend_font_free();
-        error_t err = cpymo_backend_font_init(engine.assetloader.gamedir);
-        if (err != CPYMO_ERR_SUCC) {
-            printf("[Warning] Font re-init failed, text rendering may be broken.\n");
-        }
+        cpymo_backend_font_init(engine.assetloader.gamedir);
     }
 }
 
@@ -127,7 +124,7 @@ error_t cpymo_backend_text_create(
     cpymo_backend_text_internal *out_text =
         (cpymo_backend_text_internal *)
         malloc(sizeof(cpymo_backend_text_internal));
-    if (out_text == NULL) {
+    if (out == NULL) {
         SDL_FreeSurface(text);
         return CPYMO_ERR_OUT_OF_MEM;
     }
@@ -144,7 +141,7 @@ error_t cpymo_backend_text_create(
     black.g = 0;
     black.b = 0;
     out_text->shadow = TTF_RenderUTF8_Blended(font, str, black);
-    if (out_text->shadow) {
+    if (out_text) {
         SDL_Surface *shadow_opt = SDL_DisplayFormatAlpha(out_text->shadow);
         SDL_FreeSurface(out_text->shadow);
         out_text->shadow = shadow_opt;

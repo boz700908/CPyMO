@@ -61,29 +61,6 @@ cd cpymo-backends/sdl2
 nmake -f Makefile.Win32
 ```
 
-#### iOS Accessibility Build
-```bash
-cd cpymo-backends/ios
-./build-ffmpeg.sh arm64
-
-# Standard package (same role as the regular Android APK)
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-cmake --build build --config Release
-
-# Accessibility package (same role as Android Accessibility APK)
-cmake -S . -B build-accessibility -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_IOS_ACCESSIBILITY=ON
-cmake --build build-accessibility --config Release
-```
-
-`ENABLE_IOS_ACCESSIBILITY=ON` enables the same text-extraction flow as Android.
-VoiceOver receives announcements when enabled; otherwise AVSpeechSynthesizer speaks
-the same text. It provides Android-equivalent navigation, clipboard actions, and
-enter/menu/select sounds and haptic feedback without changing the iOS 9 app
-deployment target. Short haptics indicate navigation, confirmation, skipping, and
-copying; cancellation uses the system vibration feedback. Keep iOS gesture parity
-with Android: scan tap, directional swipe, double tap, long press, two-finger
-double tap, two-finger swipe, and two-finger double-press hold/release.
-
 ### Nintendo Platforms
 
 #### 3DS
@@ -188,12 +165,7 @@ make
 - `CPYMO_LANG` - Default language
 
 ### Accessibility Features
-- Desktop CMake: `ENABLE_ACCESSIBILITY=ON` is the explicit opt-in for Windows Tolk, Linux Speech Dispatcher, or macOS speech. It defaults to `OFF`, so ordinary desktop packages never narrate.
-- Windows: the accessibility configuration sends extracted text to Tolk and plays Windows enter/menu/select feedback sounds. The required x86/x64/ARM64 release libraries and driver configuration files are in `third_party/tolk`; copy the matching DLL set beside the executable.
-- Android: `ENABLE_TEXT_EXTRACT` and `ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY` enable text-to-speech and accessibility gestures.
-- iOS: `ENABLE_IOS_ACCESSIBILITY=ON` enables the Android-equivalent accessibility interaction model while retaining iOS 9 support.
-- Windows SDL2 accessibility builds send short interaction feedback to every connected controller that supports SDL rumble; unsupported controllers are ignored.
-- macOS desktop builds use `NSSpeechSynthesizer` for extracted text without external runtime dependencies. Linux desktop builds invoke Speech Dispatcher's `spd-say`; document that users need `speech-dispatcher` plus a voice engine (for example `espeak-ng`) and start its user service. Windows release folders must retain every bundled Tolk DLL and driver configuration file beside `cpymo.exe`.
+- `ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1` - Export game text to clipboard for visually impaired players
 - `ENABLE_EXIT_CONFIRM=1` - Prompt confirmation on exit
 
 ### Performance Tuning

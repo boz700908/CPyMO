@@ -1,4 +1,4 @@
-﻿#include "../../cpymo/cpymo_prelude.h"
+#include "../../cpymo/cpymo_prelude.h"
 #include "../include/cpymo_backend_text.h"
 #include "cpymo_import_sdl2.h"
 
@@ -146,6 +146,9 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
 
 #endif
 
+/* ================================================================
+ * Platform-specific TTS includes
+ * ================================================================ */
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 #include <windows.h>
 #include <Tolk.h>
@@ -165,6 +168,11 @@ extern void cpymo_ios_accessibility_play_sound(int sound_type);
 #endif
 
 #ifdef ENABLE_TEXT_EXTRACT
+
+/* === Sound type constants (aligned with Android) === */
+#define SOUND_ENTER  1
+#define SOUND_MENU   2
+#define SOUND_SELECT 3
 
 /* === Shared SDL2 Accessibility Sound System (Windows, macOS, Linux) === */
 #if !defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) && !defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
@@ -224,6 +232,7 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
         }
     }
 
+    /* Fallback to system beep */
 #if defined(_WIN32)
     UINT sound = sound_type == 1 ? MB_OK : (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
     MessageBeep(sound);
@@ -232,8 +241,32 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
 
 #endif /* !Android && !iOS */
 
-/* === Platform-specific TTS backends === */
+/* === Vibration via gamepad (aligned with Android haptic) === */
+void cpymo_sdl2_accessibility_vibrate(int milliseconds)
+{
+    extern SDL_GameController **gamecontrollers;
+    extern size_t gamecontrollers_count;
 
+    for (size_t i = 0; i < gamecontrollers_count; ++i) {
+        if (gamecontrollers[i] != NULL)
+            SDL_GameControllerRumble(gamecontrollers[i], SDL_MAX_UINT16, SDL_MAX_UINT16, (Uint32)milliseconds);
+    }
+
+#ifdef __EMSCRIPTEN__
+    /* Browser Vibration API for mobile web */
+    EM_ASM({
+        if (navigator.vibrate) {
+            navigator.vibrate($0);
+        }
+    }, milliseconds);
+#endif
+}
+
+/* ================================================================
+ * Platform-specific TTS backends
+ * ================================================================ */
+
+/* --- Windows: Tolk (SAPI, NVDA, ZD, etc.) --- */
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 void cpymo_backend_text_extract_init(void)
 {
@@ -262,11 +295,14 @@ void cpymo_backend_text_extract(const char *text)
 
     free(wide_text);
 }
+
+/* --- UWP: Windows::Media::SpeechSynthesis --- */
 #elif defined(__UWP__)
-/* UWP TTS implemented in cpymo_backend_uwp.cpp */
 void cpymo_backend_text_extract_init(void);
 void cpymo_backend_text_extract_free(void);
 void cpymo_backend_text_extract(const char *text);
+
+/* --- iOS: AVSpeechSynthesizer / VoiceOver --- */
 #elif defined(__IOS__)
 void cpymo_backend_text_extract_init(void) {}
 void cpymo_backend_text_extract_free(void) {}
@@ -276,6 +312,8 @@ void cpymo_backend_text_extract(const char *text)
     if (text == NULL || text[0] == '\0') return;
     cpymo_ios_accessibility_announce(text);
 }
+
+/* --- Emscripten: ARIA live region --- */
 #elif defined(__EMSCRIPTEN__)
 void cpymo_backend_text_extract_init(void)
 {
@@ -309,9 +347,10 @@ void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
 
-    /* Use EM_ASM_INT with inline JS to pass text via $0 */
     EM_ASM_INT({var b=document.getElementById('cpymo-accessibility-bar');if(b)b.textContent=UTF8ToString($0);return 0}, text);
 }
+
+/* --- macOS: NSSpeechSynthesizer --- */
 #elif defined(__APPLE__)
 void cpymo_backend_text_extract_init(void)
 {
@@ -328,6 +367,8 @@ void cpymo_backend_text_extract(const char *text)
     if (text == NULL || text[0] == '\0') return;
     cpymo_macos_accessibility_announce(text);
 }
+
+/* --- Linux: speech-dispatcher (spd-say) --- */
 #elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
 void cpymo_backend_text_extract_init(void)
 {
@@ -350,6 +391,8 @@ void cpymo_backend_text_extract(const char *text)
         _exit(127);
     }
 }
+
+/* --- Android / fallback --- */
 #else
 void cpymo_backend_text_extract_init(void) {}
 void cpymo_backend_text_extract_free(void) {}
@@ -360,7 +403,6 @@ void cpymo_backend_text_extract(const char *text)
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
     extern void cpymo_android_text_to_speech(const char *text);
-
     cpymo_android_text_to_speech(text);
 #endif
 
@@ -374,6 +416,5 @@ void cpymo_backend_text_extract(const char *text)
 #endif
 }
 #endif
-#endif
 
-
+#endif /* ENABLE_TEXT_EXTRACT */

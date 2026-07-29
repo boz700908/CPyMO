@@ -29,12 +29,6 @@ ifeq ($(LEAKCHECK), 1)
 CFLAGS += -DLEAKCHECK
 endif
 
-ifeq ($(ENABLE_TEXT_EXTRACT), 0)
-# Standard build: no accessibility
-else
-CFLAGS += -DENABLE_TEXT_EXTRACT
-endif
-
 ifneq ($(strip $(SDL)), "")
 CFLAGS += -I$(SDL)/include
 LDFLAGS += -L$(SDL)/lib
@@ -46,12 +40,16 @@ LDFLAGS += -L$(SDL_MIXER)/lib
 endif
 
 ifneq ($(strip $(FFMPEG)), "")
-CFLAGS += -I$(FFMPEG)/include
+CFLAGS += -I$(SDL_FFMPEG)/include
 LDFLAGS += -L$(FFMPEG)/lib
 endif
 
 ifeq ($(OS), Windows_NT)
 LDFLAGS += -lmingw32
+endif
+
+ifeq ($(strip $(ENABLE_EXIT_CONFIRM)), 1)
+CFLAGS += -DENABLE_EXIT_CONFIRM
 endif
 
 LDFLAGS += -lSDLmain -lSDL -lm

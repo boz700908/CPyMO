@@ -33,13 +33,6 @@ CFLAGS := \
 	-DENABLE_SDL2_IMAGE \
 	-DENABLE_SCREEN_FORCE_CENTERED -DDISABLE_MASKTRANS
 
-ifeq ($(ENABLE_TEXT_EXTRACT), 0)
-# Standard build: no accessibility features
-else
-# Accessibility build (default): enable TTS, sounds, vibration
-CFLAGS += -DENABLE_TEXT_EXTRACT
-endif
-
 LDFLAGS := \
 	-Wl,-zmax-page-size=128 \
 	-L. -L$(PSPDEV)/psp/lib -L$(PSPDEV)/psp/sdk/lib \

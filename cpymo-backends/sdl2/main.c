@@ -58,7 +58,7 @@
 #include <sys/types.h>
 #endif
 
-#if (defined _WIN32) || (defined __linux__) || (defined __APPLE__)
+#if (defined _WIN32) || (defined __LINUX__) || (defined __APPLE__)
 #define ENABLE_ALT_ENTER_FULLSCREEN
 #endif
 
@@ -76,7 +76,7 @@ extern void cpymo_backend_audio_free();
 
 static void set_window_icon(const char *gamedir) 
 {
-#if (defined _WIN32) || (defined __linux__) || (defined __APPLE__)
+#if (defined _WIN32) || (defined __LINUX__) || (defined __APPLE__)
 	int w, h;
 	void *icon = NULL;
 
@@ -235,7 +235,6 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 		struct dirent* ent;
 		while ((ent = readdir(dir))) {
 			char *path = (char *)malloc(strlen(ent->d_name) + strlen(game_selector_dir) + 4);
-			if (path == NULL) continue;
 			sprintf(path, "%s/%s", game_selector_dir, ent->d_name);
 
 			cpymo_game_selector_item *cur = NULL;
@@ -633,7 +632,7 @@ START:
 #ifndef __ANDROID__
 			else if (event.type == SDL_QUIT) {
 				#ifdef ENABLE_EXIT_CONFIRM
-				#ifndef DISABLE_MOVIE
+				#ifndef DISALBE_MOVIE
 				extern bool playing_movie;
 				if (playing_movie) goto EXIT;
 				#endif
@@ -740,7 +739,7 @@ EXIT:
 		cpymo_emscripten_gesture_free();
 	#endif
 	cpymo_backend_text_extract_free();
-#endif
+	#endif
 
 	extern void cpymo_input_free_joysticks();
 	cpymo_input_free_joysticks();

@@ -27,7 +27,7 @@
 #include "../include/cpymo_backend_save.h"
 
 cpymo_engine engine;
-C3D_RenderTarget *screen1 = NULL, *screen2 = NULL, *screen3 = NULL;
+C3D_RenderTarget *screen1, *screen2, *screen3 = NULL;
 float render_3d_offset;
 bool fill_screen;
 
@@ -383,7 +383,7 @@ int main(void) {
 			}
 		}
 
-		if(redraw) {
+		if(redraw || true) {
 			drawing_bottom_screen = false;
 			C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 			C2D_TargetClear(screen1, clr);

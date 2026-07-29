@@ -71,8 +71,8 @@ void cpymo_backend_ascii_submit_framebuffer(
     }
 
     sprintf(buf, "\033[%dA\033[%dD", 
-        (int)framebuffer->h,
-        (int)framebuffer->w);
+        (int)framebuffer->w,
+        (int)framebuffer->h);
     cpymo_backend_ascii_write_string(buf);
 
     arrput(framebuffer_ascii, '\0');

@@ -15,7 +15,6 @@
 #include "../software/cpymo_backend_software.h"
 #include "../include/cpymo_backend_audio.h"
 #include "../include/cpymo_backend_movie.h"
-#include "../include/cpymo_backend_text.h"
 
 #include <libswscale/swscale.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -101,7 +100,6 @@ error_t cpymo_backend_movie_init_surface(size_t width, size_t height, enum cpymo
         break;
     case cpymo_backend_movie_format_yuyv422:
         src_fmt = AV_PIX_FMT_YUYV422;
-        break;
     default:
         return CPYMO_ERR_UNSUPPORTED;
     }
@@ -156,15 +154,15 @@ void cpymo_backend_movie_free_surface(void)
 
 FILE *cpymo_backend_read_save(const char *gamedir, const char * name)
 {
-    char *path = (char *)alloca(strlen(gamedir) + strlen(name) + 16);
-    sprintf(path, "%s/save/%s", gamedir, name);
+    char *path = (char *)alloca(strlen(name) + 8);
+    sprintf(path, "save/%s", name);
     return fopen(path, "rb");
 }
 
 FILE *cpymo_backend_write_save(const char *gamedir, const char * name)
 {
-    char *path = (char *)alloca(strlen(gamedir) + strlen(name) + 16);
-    sprintf(path, "%s/save/%s", gamedir, name);
+    char *path = (char *)alloca(strlen(name) + 8);
+    sprintf(path, "save/%s", name);
     return fopen(path, "wb");
 }
 
@@ -328,18 +326,10 @@ bool retro_load_game(const struct retro_game_info *game)
         log_cb(RETRO_LOG_ERROR, "stat: %s\n", strerror(errno));
         return false;
     }
-    char *dup_path = NULL;
-	const char *gamepath;
-	if (S_ISDIR(sb.st_mode)) {
-		gamepath = game->path;
-	} else {
-		dup_path = strdup(game->path);
-		gamepath = dirname(dup_path);
-	}
-	char *gamedir = realpath(gamepath, NULL);
-	chdir(gamedir);
-	err = cpymo_engine_init(&engine, gamedir);
-	free(dup_path);
+    const char *gamepath = S_ISDIR(sb.st_mode) ? game->path : dirname(strdup(game->path));
+    char *gamedir = realpath(gamepath, NULL);
+    chdir(gamedir);
+    err = cpymo_engine_init(&engine, gamedir);
     mkdir("save", 0755);
     if (err != CPYMO_ERR_SUCC) {
         log_cb(RETRO_LOG_ERROR, "cpymo_engine_init: %s\n", cpymo_error_message(err));
@@ -362,9 +352,6 @@ bool retro_load_game(const struct retro_game_info *game)
     soft_image.a_offset = 3;
     soft_image.has_alpha_channel = false;
     soft_image.pixels = (uint8_t *)malloc(soft_image.line_stride * soft_image.h);
-    if (soft_image.pixels == NULL) {
-        return false;
-    }
 
     soft_context.font = &font;
     soft_context.render_target = &soft_image;
@@ -484,19 +471,3 @@ size_t retro_get_memory_size(unsigned id)
 {
     return 0;
 }
-
-#ifdef ENABLE_TEXT_EXTRACT
-void cpymo_backend_text_extract_init(void) {}
-
-void cpymo_backend_text_extract_free(void) {}
-
-void cpymo_backend_text_extract(const char *text)
-{
-    if (text == NULL || text[0] == '\0') return;
-    log_cb(RETRO_LOG_INFO, "[Accessibility] %s\n", text);
-}
-
-/* Stub: sound & vibration not available in libretro backend */
-void cpymo_sdl2_accessibility_play_sound(int sound_type) { (void)sound_type; }
-void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
-#endif

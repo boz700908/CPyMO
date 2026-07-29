@@ -30,13 +30,6 @@ CFLAGS := \
 	-O2 \
 	-Wall
 
-ifeq ($(ENABLE_TEXT_EXTRACT), 0)
-# Standard build: no accessibility features
-else
-# Accessibility build (default): enable TTS, sounds, vibration
-CFLAGS += -DENABLE_TEXT_EXTRACT
-endif
-
 define compile
 	@echo "$(notdir $1)"
 	@$(CC) -c -Wl,-q $1 -o $2 $(CFLAGS)
