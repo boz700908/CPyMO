@@ -344,29 +344,29 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 }
 
 #ifdef ENABLE_TEXT_EXTRACT
-static void cpymo_config_ui_extract_setting_title(cpymo_engine *e, int item_id)
+static error_t cpymo_config_ui_visual_im_help_selection_changed_callback(cpymo_engine *e, void *sel)
 {
+	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
+	const cpymo_config_ui *ui = (const cpymo_config_ui *)cpymo_list_ui_data_const(e);
 	const cpymo_localization *l = cpymo_localization_get(e);
-	const char *p = NULL;
-	switch (item_id) {
-	case ITEM_BGM_VOL: p = l->config_bgmvol; break;
-	case ITEM_SE_VOL: p = l->config_sevol; break;
-	case ITEM_VO_VOL: p = l->config_vovol; break;
-	case ITEM_FONT_SIZE: p = l->config_fontsize; break;
-	case ITEM_TEXT_SPEED: p = l->config_sayspeed; break;
-	case ITEM_SKIP_ALREADY_READ_ONLY: p = l->config_skip_mode; break;
+
+	// Title
+	const char *title = NULL;
+	switch (i) {
+	case ITEM_BGM_VOL: title = l->config_bgmvol; break;
+	case ITEM_SE_VOL: title = l->config_sevol; break;
+	case ITEM_VO_VOL: title = l->config_vovol; break;
+	case ITEM_FONT_SIZE: title = l->config_fontsize; break;
+	case ITEM_TEXT_SPEED: title = l->config_sayspeed; break;
+	case ITEM_SKIP_ALREADY_READ_ONLY: title = l->config_skip_mode; break;
 	default: assert(false);
 	}
 
-	cpymo_backend_text_extract(p);
-}
-
-static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_id, int val)
-{
-	const cpymo_localization *l = cpymo_localization_get(e);
+	// Value
 	char val_str_buf[8];
 	const char *val_str = val_str_buf;
-	switch (item_id) {
+	int val = ui->items[i].value;
+	switch (i) {
 	case ITEM_BGM_VOL:
 	case ITEM_SE_VOL:
 	case ITEM_VO_VOL:
@@ -387,7 +387,13 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_id, 
 	default: assert(false);
 	}
 
-	cpymo_backend_text_extract(val_str);
+	// Combine title + value into single TTS utterance
+	cpymo_engine_extract_text_cstr(e, title);
+	cpymo_engine_extract_text_cstr(e, "\n");
+	cpymo_engine_extract_text_cstr(e, val_str);
+	cpymo_engine_extract_text_submit(e);
+
+	return CPYMO_ERR_SUCC;
 }
 #endif
 
@@ -599,19 +605,6 @@ static error_t cpymo_config_ui_ok(cpymo_engine *e, void *sel)
 		cpymo_config_ui_item_inc(
 			e, (cpymo_config_ui *)cpymo_list_ui_data(e), i);
 }
-
-#ifdef ENABLE_TEXT_EXTRACT
-static error_t cpymo_config_ui_visual_im_help_selection_changed_callback(cpymo_engine *e, void *sel)
-{
-	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
-	const cpymo_config_ui *ui = (const cpymo_config_ui *)cpymo_list_ui_data_const(e);
-
-	cpymo_config_ui_extract_setting_title(e, i);
-	cpymo_config_ui_extract_setting_value(e, i, ui->items[i].value);
-
-	return CPYMO_ERR_SUCC;
-}
-#endif
 
 error_t cpymo_config_ui_mouse_button_just_hold(cpymo_engine *e)
 { 
