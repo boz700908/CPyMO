@@ -307,11 +307,6 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 		}
 	}
 
-#ifdef ENABLE_TEXT_EXTRACT
-	if (sel->selections[sel->current_selection].original_text)
-		cpymo_backend_text_extract(sel->selections[sel->current_selection].original_text);
-#endif
-
 	cpymo_key_hold_init(&sel->key_mouse_button, e->input.mouse_button);
 	cpymo_wait_register(wait, &cpymo_select_img_wait);
 	cpymo_input_ignore_next_mouse_button_event(e);
@@ -350,7 +345,8 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_engine_request_redraw(e);
 
 			CALL_VISUALLY_PLAY_SOUND(3);
-			cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
+			if (o->selections[o->current_selection].original_text)
+				cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
 		}
 
 		if (cpymo_key_pluse_output(&o->key_up)) {
@@ -358,7 +354,8 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_engine_request_redraw(e);
 
 			CALL_VISUALLY_PLAY_SOUND(3);
-			cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
+			if (o->selections[o->current_selection].original_text)
+				cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
 		}
 
 		if (cpymo_input_mouse_moved(e) && e->input.mouse_position_useable) {
@@ -369,7 +366,8 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 						cpymo_engine_request_redraw(e);
 
 						CALL_VISUALLY_PLAY_SOUND(3);
-						cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
+						if (o->selections[o->current_selection].original_text)
+							cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
 					}
 				}
 			}
