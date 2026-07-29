@@ -310,11 +310,17 @@ jobs:
         chmod +x ./build-psp-ffmpeg.sh
         ./build-psp-ffmpeg.sh
 
-    - name: Build (Accessibility)
+    - name: Install PSP packages
+      if: steps.cache-pspdev.outputs.cache-hit != 'true'
       run: |
         export PSPDEV=/usr/local/pspdev
         export PATH=$PATH:$PSPDEV/bin
         psp-pacman -S sdl2 sdl2-image freetype2 sdl2-ttf --noconfirm
+
+    - name: Build (Accessibility)
+      run: |
+        export PSPDEV=/usr/local/pspdev
+        export PATH=$PATH:$PSPDEV/bin
         cd ./cpymo-backends/sdl2
         make -f Makefile.PSP -j
         cp EBOOT.PBP EBOOT-accessibility.PBP
@@ -567,20 +573,24 @@ jobs:
       run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
+      if: steps.cache-vcpkg-clone.outputs.cache-hit != 'true'
       run: |
         ./vcpkg/bootstrap-vcpkg.bat
         ./vcpkg/vcpkg integrate install
 
     - name: Cache vcpkg packages
+      id: cache-vcpkg-packages
       uses: actions/cache@v4
       with:
         path: |
           ./vcpkg/packages
           ./vcpkg/buildtrees
           ./vcpkg/downloads
-        key: vcpkg-uwp-v1
+          ./vcpkg/installed
+        key: vcpkg-uwp-v2
 
     - name: Install FFmpeg
+      if: steps.cache-vcpkg-packages.outputs.cache-hit != 'true'
       run: |
         ./vcpkg/vcpkg install ffmpeg:x86-uwp ffmpeg:x64-uwp ffmpeg:arm64-uwp
 
@@ -820,32 +830,36 @@ jobs:
       run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
+      if: ${{ runner.os != 'Windows' && steps.cache-vcpkg-clone-desktop.outputs.cache-hit != 'true' }}
       run: |
         mkdir -p ~/.vcpkg
         touch ~/.vcpkg/vcpkg.path.txt
         ./vcpkg/bootstrap-vcpkg.sh
         ./vcpkg/vcpkg integrate install
-      if: ${{ runner.os != 'Windows' }}
 
     - name: Bootstrap vcpkg (Windows)
+      if: ${{ runner.os == 'Windows' && steps.cache-vcpkg-clone-desktop.outputs.cache-hit != 'true' }}
       run: |
         ./vcpkg/bootstrap-vcpkg.bat
         ./vcpkg/vcpkg integrate install
-      if: ${{ runner.os == 'Windows' }}
 
     - name: Cache vcpkg packages
+      id: cache-vcpkg-packages
       uses: actions/cache@v4
       with:
         path: |
           ./vcpkg/packages
           ./vcpkg/buildtrees
           ./vcpkg/downloads
-        key: vcpkg-${{ matrix.triplet }}-v1
+          ./vcpkg/installed
+        key: vcpkg-${{ matrix.triplet }}-v2
 
     - name: Install SDL2
+      if: steps.cache-vcpkg-packages.outputs.cache-hit != 'true'
       run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
 
     - name: Install FFMPEG
+      if: steps.cache-vcpkg-packages.outputs.cache-hit != 'true'
       run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
 
     - name: Configure CMake (Standard)
