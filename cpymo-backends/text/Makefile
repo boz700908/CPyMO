@@ -27,9 +27,12 @@ endif
 
 LDFLAGS += -O3 -lm
 
+UNAME_S := $(shell uname -s)
 ifeq ($(OS), Windows_NT)
 OBJS += $(BUILD_DIR)/cpymo.res
 LDFLAGS += --static -lmingw32
+else ifeq ($(UNAME_S), Darwin)
+LDFLAGS += -framework AudioToolbox
 endif
 
 TARGET := cpymo-text

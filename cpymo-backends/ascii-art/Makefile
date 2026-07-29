@@ -29,6 +29,8 @@ endif
 
 LDFLAGS += -g -lm
 
+UNAME_S := $(shell uname -s)
+
 TARGET := cpymo-ascii-art
 
 build: $(TARGET)
@@ -59,6 +61,8 @@ $(BUILD_DIR)/cpymo.res: ../sdl2/pymo-icon-windows.rc
 ifeq ($(OS), Windows_NT)
 OBJS += $(BUILD_DIR)/cpymo.res
 LDFLAGS += --static
+else ifeq ($(UNAME_S), Darwin)
+LDFLAGS += -framework AudioToolbox
 endif
 
 $(TARGET): $(OBJS) $(WINDOWS_RES)
