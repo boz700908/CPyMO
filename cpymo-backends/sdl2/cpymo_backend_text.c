@@ -281,50 +281,36 @@ void cpymo_backend_text_extract_init(void)
 {
     cpymo_sdl2_accessibility_sound_init();
 
-    EM_ASM({
-        var bar = document.getElementById("cpymo-accessibility-bar");
-        if (!bar) {
-            bar = document.createElement("div");
-            bar.id = "cpymo-accessibility-bar";
-            bar.setAttribute("role", "status");
-            bar.setAttribute("aria-live", "polite");
-            bar.setAttribute("aria-atomic", "true");
-            bar.style.cssText = [
-                "position:fixed",
-                "left:-9999px",
-                "top:0",
-                "width:1px",
-                "height:1px",
-                "overflow:hidden",
-                "opacity:0",
-                "pointer-events:none"
-            ].join(";");
-            document.body.appendChild(bar);
-        }
-    });
+    emscripten_run_script(
+        "var bar = document.getElementById('cpymo-accessibility-bar');"
+        "if (!bar) {"
+        "bar = document.createElement('div');"
+        "bar.id = 'cpymo-accessibility-bar';"
+        "bar.setAttribute('role', 'status');"
+        "bar.setAttribute('aria-live', 'polite');"
+        "bar.setAttribute('aria-atomic', 'true');"
+        "bar.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';"
+        "document.body.appendChild(bar);"
+        "}"
+    );
 }
 
 void cpymo_backend_text_extract_free(void)
 {
     cpymo_sdl2_accessibility_sound_free();
 
-    EM_ASM({
-        var bar = document.getElementById("cpymo-accessibility-bar");
-        if (bar) {
-            bar.parentNode.removeChild(bar);
-        }
-    });
+    emscripten_run_script(
+        "var bar = document.getElementById('cpymo-accessibility-bar');"
+        "if (bar) bar.parentNode.removeChild(bar);"
+    );
 }
 
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
 
-    EM_ASM({
-        var bar = document.getElementById("cpymo-accessibility-bar");
-        if (!bar) return;
-        bar.textContent = UTF8ToString($0);
-    }, text);
+    /* Use EM_ASM_INT with inline JS to pass text via $0 */
+    EM_ASM_INT({var b=document.getElementById('cpymo-accessibility-bar');if(b)b.textContent=UTF8ToString($0);return 0}, text);
 }
 #elif defined(__APPLE__)
 void cpymo_backend_text_extract_init(void)
