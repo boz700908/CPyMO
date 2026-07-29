@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../cpymo/cpymo_prelude.h"
+#include <stdio.h>
 
 #ifdef ENABLE_TEXT_EXTRACT
 
