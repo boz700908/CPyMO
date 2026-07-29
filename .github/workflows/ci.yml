@@ -572,6 +572,150 @@ jobs:
             ./build/build/Release/cpymo.exe
             ./build/build/Release/cpymo-tool.exe
 
+  build-desktop-accessibility:
+    name: 'Desktop (Accessibility)'
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64 ]
+
+        include:
+          - tuple: win-x64
+            os: windows-latest
+            triplet: x64-windows-static
+            arch: x64
+            package-name: "Windows x64 (Accessibility)"
+            cmake-flags: "-A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-x86
+            os: windows-latest
+            triplet: x86-windows-static
+            arch: x86
+            package-name: "Windows x86 (Accessibility)"
+            cmake-flags: "-A Win32 -DCMAKE_GENERATOR_PLATFORM=Win32 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-arm64
+            os: windows-latest
+            triplet: arm64-windows-static
+            arch: amd64_arm64
+            package-name: "Windows ARM64 (Accessibility)"
+            cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: linux-x64
+            os: ubuntu-latest
+            triplet: x64-linux
+            package-name: "Linux x64 (Accessibility)"
+            cmake-flags: "-DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "/home/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: mac-x64
+            os: macos-latest
+            triplet: x64-osx
+            package-name: "macOS x64 (Accessibility)"
+            cmake-flags: "-DCMAKE_OSX_ARCHITECTURES=x86_64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: mac-arm64
+            os: macos-latest
+            triplet: arm64-osx
+            package-name: "macOS Apple Silicon (Accessibility)"
+            cmake-flags: "-DCMAKE_OSX_ARCHITECTURES=arm64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "/Users/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    - uses: ilammy/msvc-dev-cmd@v1
+      if: ${{ runner.os == 'Windows' }}
+      with:
+        arch: ${{ matrix.arch }}
+
+    - name: Setup NASM
+      uses: ilammy/setup-nasm@v1.3.1
+      if: ${{ runner.os != 'Windows' }}
+
+    - name: Setup Dependents for MacOS
+      if: ${{ runner.os == 'macOS' }}
+      run: brew install pkg-config autoconf autoconf-archive automake libtool
+
+    - name: Setup Dependents for Ubuntu
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        sudo apt-get update
+        sudo apt install -y \
+          autoconf \
+          autoconf-archive \
+          automake \
+          libtool \
+          libltdl-dev \
+          libx11-dev \
+          libibus-1.0-dev \
+          libxft-dev \
+          libxext-dev \
+          libwayland-dev \
+          libxkbcommon-dev \
+          libegl1-mesa-dev
+
+    - name: Donwload vcpkg
+      run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
+
+    - name: Bootstrap vcpkg
+      run: |
+        mkdir -p ~/.vcpkg
+        touch ~/.vcpkg/vcpkg.path.txt
+        ./vcpkg/bootstrap-vcpkg.sh
+        ./vcpkg/vcpkg integrate install
+      if: ${{ runner.os != 'Windows' }}
+
+    - name: Bootstrap vcpkg (Windows)
+      run: |
+        ./vcpkg/bootstrap-vcpkg.bat
+        ./vcpkg/vcpkg integrate install
+      if: ${{ runner.os == 'Windows' }}
+
+    - name: Install SDL2
+      run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
+
+    - name: Install FFMPEG
+      run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
+
+    - name: Configure CMake
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Strip
+      if: ${{ runner.os != 'Windows' }}
+      run: |
+        strip ./build/build/cpymo
+        strip ./build/build/cpymo-tool
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      if: ${{ runner.os != 'Windows' }}
+      with:
+        name: CPyMO for ${{ matrix.package-name }}
+        path: |
+            ./build/build/cpymo
+            ./build/build/cpymo-tool
+            ./build/build/MinSizeRel/cpymo.exe
+            ./build/build/MinSizeRel/cpymo-tool.exe
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      if: ${{ runner.os == 'Windows' }}
+      with:
+        name: CPyMO for ${{ matrix.package-name }}
+        path: |
+            ./build/build/Release/cpymo.exe
+            ./build/build/Release/cpymo-tool.exe
+            ./build/build/Release/*.dll
+            ./build/build/Release/*.ini
+            ./build/build/Release/*.conf
+            ./build/build/Release/*.wav
+
   build-ascii-art:
     name: 'CPyMO ASCII Art'
     runs-on: ${{ matrix.os }}
