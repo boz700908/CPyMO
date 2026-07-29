@@ -166,17 +166,19 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 	
 	cpymo_list_ui_enable_loop(e);
 
-#ifdef ENABLE_TEXT_EXTRACT
-	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_save_ui_visual_impaired_selection_changed);
-	ui->items[0].orginal_text = NULL;
-#endif
-
 	ui->is_load_ui = is_load_ui;
 
 	for (size_t i = 0; i < CPYMO_MAX_SAVES; ++i) {
 		ui->items[i].text = NULL;
 		ui->items[i].is_empty_save = false;
+#ifdef ENABLE_TEXT_EXTRACT
+		ui->items[i].orginal_text = NULL;
+#endif
 	}
+
+#ifdef ENABLE_TEXT_EXTRACT
+	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_save_ui_visual_impaired_selection_changed);
+#endif
 
 	const float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);
 	size_t characters = (size_t)((float)e->gameconfig.imagesize_w / fontsize * 1.3f);

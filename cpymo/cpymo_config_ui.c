@@ -370,11 +370,11 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_id, 
 	case ITEM_BGM_VOL:
 	case ITEM_SE_VOL:
 	case ITEM_VO_VOL:
-		if (val) sprintf(val_str_buf, "%d0%%", val);
+		if (val) snprintf(val_str_buf, sizeof(val_str_buf), "%d0%%", val);
 		else val_str = "0%";
 		break;
 	case ITEM_FONT_SIZE:
-		sprintf(val_str_buf, "%d", val);
+		snprintf(val_str_buf, sizeof(val_str_buf), "%d", val);
 		break;
 	case ITEM_TEXT_SPEED:
 		assert(val >= 0 && val <= 5);
@@ -414,11 +414,11 @@ static error_t cpymo_config_ui_set_value(
 	case ITEM_BGM_VOL:	
 	case ITEM_SE_VOL:
 	case ITEM_VO_VOL:
-		if (val) sprintf(val_str_buf, "%d0%%", val);
+		if (val) snprintf(val_str_buf, sizeof(val_str_buf), "%d0%%", val);
 		else val_str = "0%";
 		break;
 	case ITEM_FONT_SIZE:
-		sprintf(val_str_buf, "%d", val);
+		snprintf(val_str_buf, sizeof(val_str_buf), "%d", val);
 		break;
 	case ITEM_TEXT_SPEED:
 		assert(val >= 0 && val <= 5);
@@ -678,10 +678,6 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 	ui->inc_btn = NULL;
 	ui->inc_btn_w = 0;
 
-#ifdef ENABLE_TEXT_EXTRACT
-	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_config_ui_visual_im_help_selection_changed_callback);
-#endif
-
 	cpymo_list_ui_set_scroll_enabled(e, false);
 	cpymo_list_ui_set_custom_update(e, &cpymo_config_ui_update);
 	cpymo_list_ui_enable_loop(e);
@@ -724,6 +720,10 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 	}
 
 	cpymo_config_ui_refresh_items(e);
+
+#ifdef ENABLE_TEXT_EXTRACT
+	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_config_ui_visual_im_help_selection_changed_callback);
+#endif
 
 	return CPYMO_ERR_SUCC;
 }
