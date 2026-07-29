@@ -179,14 +179,14 @@ void cpymo_emscripten_gesture_init(void)
          * Aligned with Android's gesture scheme
          * ================================================================ */
 
-        var canvas = document.querySelector('canvas');
+        var canvas = document.querySelector("canvas");
         if (!canvas) {
-            console.warn('[CPyMO] No canvas found, gesture support disabled');
+            console.warn("[CPyMO] No canvas found, gesture support disabled");
             return;
         }
 
         /* Prevent default touch behaviors on canvas */
-        canvas.style.touchAction = 'none';
+        canvas.style.touchAction = "none";
 
         /* Store handlers for cleanup */
         var handlers = {};
@@ -244,7 +244,7 @@ void cpymo_emscripten_gesture_init(void)
             gesture.twoFingerDoublePressHeld = false;
         }
 
-        canvas.addEventListener('touchstart', handlers.touchstart = function(e) {
+        canvas.addEventListener("touchstart", handlers.touchstart = function(e) {
             var touches = e.touches;
             gesture.fingerCount = touches.length;
             gesture.startTime = Date.now();
@@ -259,7 +259,7 @@ void cpymo_emscripten_gesture_init(void)
                 gesture.longPressTimer = setTimeout(function() {
                     gesture.isLongPress = true;
                     /* C call: long press = cancel */
-                    Module.ccall('cpymo_emscripten_gesture_on_long_press',
+                    Module.ccall("cpymo_emscripten_gesture_on_long_press",
                         null, [], []);
                     resetGesture();
                 }, LONG_PRESS_TIME);
@@ -274,7 +274,7 @@ void cpymo_emscripten_gesture_init(void)
                 gesture.twoFingerDoublePressTimer = setTimeout(function() {
                     if (!gesture.moved) {
                         gesture.twoFingerDoublePressHeld = true;
-                        Module.ccall('cpymo_emscripten_gesture_on_two_double_press_start',
+                        Module.ccall("cpymo_emscripten_gesture_on_two_double_press_start",
                             null, [], []);
                     }
                 }, DOUBLE_TAP_TIMEOUT);
@@ -283,7 +283,7 @@ void cpymo_emscripten_gesture_init(void)
             e.preventDefault();
         }, { passive: false });
 
-        canvas.addEventListener('touchmove', handlers.touchmove = function(e) {
+        canvas.addEventListener("touchmove", handlers.touchmove = function(e) {
             if (gesture.fingerCount === 0) return;
 
             var touches = e.touches;
@@ -314,7 +314,7 @@ void cpymo_emscripten_gesture_init(void)
             e.preventDefault();
         }, { passive: false });
 
-        canvas.addEventListener('touchend', handlers.touchend = function(e) {
+        canvas.addEventListener("touchend", handlers.touchend = function(e) {
             if (gesture.fingerCount === 0) return;
 
             if (gesture.longPressTimer) {
@@ -329,7 +329,7 @@ void cpymo_emscripten_gesture_init(void)
             /* Handle two-finger double press end */
             if (gesture.twoFingerDoublePressHeld) {
                 gesture.twoFingerDoublePressHeld = false;
-                Module.ccall('cpymo_emscripten_gesture_on_two_double_press_end',
+                Module.ccall("cpymo_emscripten_gesture_on_two_double_press_end",
                     null, [], []);
                 resetGesture();
                 return;
@@ -353,8 +353,8 @@ void cpymo_emscripten_gesture_init(void)
                     } else {
                         direction = dy > 0 ? 1 : 0; /* down:1, up:0 */
                     }
-                    Module.ccall('cpymo_emscripten_gesture_on_swipe',
-                        null, ['number'], [direction]);
+                    Module.ccall("cpymo_emscripten_gesture_on_swipe",
+                        null, ["number"], [direction]);
                 } else {
                     /* Single tap - check for double tap */
                     var now = Date.now();
@@ -376,8 +376,8 @@ void cpymo_emscripten_gesture_init(void)
                                 var rect = canvas.getBoundingClientRect();
                                 var mx = gesture.lastTapX - rect.left;
                                 var my = gesture.lastTapY - rect.top;
-                                Module.ccall('cpymo_emscripten_gesture_on_tap',
-                                    null, ['number', 'number'], [mx, my]);
+                                Module.ccall("cpymo_emscripten_gesture_on_tap",
+                                    null, ["number", "number"], [mx, my]);
                                 gesture.tapCount = 0;
                             }
                         }, DOUBLE_TAP_TIMEOUT);
@@ -385,7 +385,7 @@ void cpymo_emscripten_gesture_init(void)
                                now - gesture.lastTapTime < DOUBLE_TAP_TIMEOUT) {
                         /* Double tap confirmed: OK */
                         gesture.tapCount = 0;
-                        Module.ccall('cpymo_emscripten_gesture_on_double_tap',
+                        Module.ccall("cpymo_emscripten_gesture_on_double_tap",
                             null, [], []);
                     }
                 }
@@ -402,7 +402,7 @@ void cpymo_emscripten_gesture_init(void)
 
                     /* Two-finger swipe down = cancel */
                     if (dy > SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
-                        Module.ccall('cpymo_emscripten_gesture_on_two_swipe_down',
+                        Module.ccall("cpymo_emscripten_gesture_on_two_swipe_down",
                             null, [], []);
                     }
                 } else {
@@ -420,7 +420,7 @@ void cpymo_emscripten_gesture_init(void)
                     } else if (gesture.twoFingerTapCount === 1 &&
                                now - gesture.twoFingerLastTapTime < TWO_FINGER_DOUBLE_TAP_TIMEOUT) {
                         gesture.twoFingerTapCount = 0;
-                        Module.ccall('cpymo_emscripten_gesture_on_two_double_tap',
+                        Module.ccall("cpymo_emscripten_gesture_on_two_double_tap",
                             null, [], []);
                     }
                 }
@@ -429,10 +429,10 @@ void cpymo_emscripten_gesture_init(void)
             resetGesture();
         }, { passive: false });
 
-        canvas.addEventListener('touchcancel', handlers.touchcancel = function(e) {
+        canvas.addEventListener("touchcancel", handlers.touchcancel = function(e) {
             if (gesture.twoFingerDoublePressHeld) {
                 gesture.twoFingerDoublePressHeld = false;
-                Module.ccall('cpymo_emscripten_gesture_on_two_double_press_end',
+                Module.ccall("cpymo_emscripten_gesture_on_two_double_press_end",
                     null, [], []);
             }
             resetGesture();
@@ -451,16 +451,16 @@ void cpymo_emscripten_gesture_init(void)
 void cpymo_emscripten_gesture_free(void)
 {
     EM_ASM({
-        var canvas = document.querySelector('canvas');
+        var canvas = document.querySelector("canvas");
         if (!canvas) return;
 
         /* Remove stored event handlers */
         if (canvas.__cpm_gesture_handlers) {
             var handlers = canvas.__cpm_gesture_handlers;
-            canvas.removeEventListener('touchstart', handlers.touchstart);
-            canvas.removeEventListener('touchmove', handlers.touchmove);
-            canvas.removeEventListener('touchend', handlers.touchend);
-            canvas.removeEventListener('touchcancel', handlers.touchcancel);
+            canvas.removeEventListener("touchstart", handlers.touchstart);
+            canvas.removeEventListener("touchmove", handlers.touchmove);
+            canvas.removeEventListener("touchend", handlers.touchend);
+            canvas.removeEventListener("touchcancel", handlers.touchcancel);
             delete canvas.__cpm_gesture_handlers;
         }
     });
