@@ -80,6 +80,8 @@ static error_t cpymo_musicbox_ok(struct cpymo_engine *e, void *selected)
 #ifdef ENABLE_TEXT_EXTRACT
 static error_t cpymo_musicbox_visual_help_selection_change(cpymo_engine *e, void *selected)
 {
+	if (!selected) return CPYMO_ERR_SUCC;
+
 	const cpymo_music_box *box = (cpymo_music_box *)cpymo_list_ui_data_const(e);
 	
 	if (box->music_title_text) {
