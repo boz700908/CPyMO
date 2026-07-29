@@ -360,6 +360,35 @@ static void cpymo_config_ui_extract_setting_title(cpymo_engine *e, int item_id)
 
 	cpymo_backend_text_extract(p);
 }
+
+static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_id, int val)
+{
+	const cpymo_localization *l = cpymo_localization_get(e);
+	char val_str_buf[8];
+	const char *val_str = val_str_buf;
+	switch (item_id) {
+	case ITEM_BGM_VOL:
+	case ITEM_SE_VOL:
+	case ITEM_VO_VOL:
+		if (val) sprintf(val_str_buf, "%d0%%", val);
+		else val_str = "0%";
+		break;
+	case ITEM_FONT_SIZE:
+		sprintf(val_str_buf, "%d", val);
+		break;
+	case ITEM_TEXT_SPEED:
+		assert(val >= 0 && val <= 5);
+		val_str = l->config_sayspeeds[val];
+		break;
+	case ITEM_SKIP_ALREADY_READ_ONLY:
+		assert(val == 0 || val == 1);
+		val_str = l->config_skip_modes[val];
+		break;
+	default: assert(false);
+	}
+
+	cpymo_backend_text_extract(val_str);
+}
 #endif
 
 static error_t cpymo_config_ui_set_value(
@@ -402,10 +431,8 @@ static error_t cpymo_config_ui_set_value(
 	}
 
 #ifdef ENABLE_TEXT_EXTRACT
-	if (!refreshing) {
-		cpymo_config_ui_extract_setting_title(e, item_index);
+	if (!refreshing)
 		cpymo_backend_text_extract(val_str);
-	}
 #endif
 
 	error_t err = CPYMO_ERR_SUCC;
@@ -577,7 +604,10 @@ static error_t cpymo_config_ui_ok(cpymo_engine *e, void *sel)
 static error_t cpymo_config_ui_visual_im_help_selection_changed_callback(cpymo_engine *e, void *sel)
 {
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
+	const cpymo_config_ui *ui = (const cpymo_config_ui *)cpymo_list_ui_data_const(e);
+
 	cpymo_config_ui_extract_setting_title(e, i);
+	cpymo_config_ui_extract_setting_value(e, i, ui->items[i].value);
 
 	return CPYMO_ERR_SUCC;
 }
