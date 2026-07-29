@@ -26,10 +26,12 @@
 /* --- Platform-specific includes --- */
 #if defined(_WIN32)
 #include <windows.h>
+#ifdef _MSC_VER
 #include <sapi.h>
 #include <sphelper.h>
 #pragma comment(lib, "sapi.lib")
 #pragma comment(lib, "ole32.lib")
+#endif
 #elif defined(__APPLE__) && !defined(__IOS__)
 #include <TargetConditionals.h>
 #if TARGET_OS_OSX
@@ -96,7 +98,8 @@ void cpymo_sdl2_accessibility_vibrate(int milliseconds) { (void)milliseconds; }
 /* --- TTS backends --- */
 
 #if defined(_WIN32)
-/* Windows SAPI (Speech API) - no Tolk dependency, uses built-in voices */
+#ifdef _MSC_VER
+/* Windows SAPI (Speech API) - MSVC only, uses built-in voices */
 static ISpVoice *cpymo_sapi_voice = NULL;
 
 void cpymo_backend_text_extract_init(void)
@@ -135,6 +138,18 @@ void cpymo_backend_text_extract(const char *text)
 	}
 	free(wide_text);
 }
+#else
+/* MinGW / non-MSVC Windows: fallback to stdout */
+void cpymo_backend_text_extract_init(void) {}
+
+void cpymo_backend_text_extract_free(void) {}
+
+void cpymo_backend_text_extract(const char *text)
+{
+	if (text == NULL || text[0] == '\0') return;
+	fprintf(stderr, "[TTS] %s\n", text);
+}
+#endif
 
 #elif defined(__APPLE__) && !defined(__IOS__)
 /* macOS NSSpeechSynthesizer (Objective-C only) */
