@@ -69,4 +69,4 @@ elseif (APPLE AND NOT IOS)
 		add_custom_command(TARGET cpymo POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
 	endif ()
-
+endif ()
