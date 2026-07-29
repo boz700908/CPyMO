@@ -189,28 +189,27 @@ void cpymo_emscripten_gesture_init(void)
         canvas.style.touchAction = "none";
 
         /* Store handlers for cleanup */
-        var handlers = {};
+        var handlers = new Object();
 
-        var gesture = {
-            startTime: 0,
-            startX: 0,
-            startY: 0,
-            fingerCount: 0,
-            lastTapTime: 0,
-            lastTapX: 0,
-            lastTapY: 0,
-            tapCount: 0,
-            longPressTimer: null,
-            isLongPress: false,
-            moved: false,
-            twoFingerStartTime: 0,
-            twoFingerStartX: 0,
-            twoFingerStartY: 0,
-            twoFingerTapCount: 0,
-            twoFingerLastTapTime: 0,
-            twoFingerDoublePressTimer: null,
-            twoFingerDoublePressHeld: false
-        };
+        var gesture = new Object();
+        gesture.startTime = 0;
+        gesture.startX = 0;
+        gesture.startY = 0;
+        gesture.fingerCount = 0;
+        gesture.lastTapTime = 0;
+        gesture.lastTapX = 0;
+        gesture.lastTapY = 0;
+        gesture.tapCount = 0;
+        gesture.longPressTimer = null;
+        gesture.isLongPress = false;
+        gesture.moved = false;
+        gesture.twoFingerStartTime = 0;
+        gesture.twoFingerStartX = 0;
+        gesture.twoFingerStartY = 0;
+        gesture.twoFingerTapCount = 0;
+        gesture.twoFingerLastTapTime = 0;
+        gesture.twoFingerDoublePressTimer = null;
+        gesture.twoFingerDoublePressHeld = false;
 
         var SWIPE_THRESHOLD = 10;
         var LONG_PRESS_TIME = 500;
@@ -243,6 +242,9 @@ void cpymo_emscripten_gesture_init(void)
             gesture.twoFingerLastTapTime = 0;
             gesture.twoFingerDoublePressHeld = false;
         }
+
+        var opts = new Object();
+        opts.passive = false;
 
         canvas.addEventListener("touchstart", handlers.touchstart = function(e) {
             var touches = e.touches;
@@ -281,7 +283,7 @@ void cpymo_emscripten_gesture_init(void)
             }
 
             e.preventDefault();
-        }, { passive: false });
+        }, opts);
 
         canvas.addEventListener("touchmove", handlers.touchmove = function(e) {
             if (gesture.fingerCount === 0) return;
@@ -312,7 +314,7 @@ void cpymo_emscripten_gesture_init(void)
             }
 
             e.preventDefault();
-        }, { passive: false });
+        }, opts);
 
         canvas.addEventListener("touchend", handlers.touchend = function(e) {
             if (gesture.fingerCount === 0) return;
@@ -427,7 +429,7 @@ void cpymo_emscripten_gesture_init(void)
             }
 
             resetGesture();
-        }, { passive: false });
+        }, opts);
 
         canvas.addEventListener("touchcancel", handlers.touchcancel = function(e) {
             if (gesture.twoFingerDoublePressHeld) {
