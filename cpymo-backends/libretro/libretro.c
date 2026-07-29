@@ -11,7 +11,7 @@
 #include "libretro.h"
 
 #include "../../cpymo/cpymo_engine.h"
-#include "../../endianness.h/endianness.h"
+#include "../../endianness.h"
 #include "../software/cpymo_backend_software.h"
 #include "../include/cpymo_backend_audio.h"
 #include "../include/cpymo_backend_movie.h"
@@ -101,6 +101,7 @@ error_t cpymo_backend_movie_init_surface(size_t width, size_t height, enum cpymo
         break;
     case cpymo_backend_movie_format_yuyv422:
         src_fmt = AV_PIX_FMT_YUYV422;
+        break;
     default:
         return CPYMO_ERR_UNSUPPORTED;
     }
@@ -155,15 +156,15 @@ void cpymo_backend_movie_free_surface(void)
 
 FILE *cpymo_backend_read_save(const char *gamedir, const char * name)
 {
-    char *path = (char *)alloca(strlen(name) + 8);
-    sprintf(path, "save/%s", name);
+    char *path = (char *)alloca(strlen(gamedir) + strlen(name) + 16);
+    sprintf(path, "%s/save/%s", gamedir, name);
     return fopen(path, "rb");
 }
 
 FILE *cpymo_backend_write_save(const char *gamedir, const char * name)
 {
-    char *path = (char *)alloca(strlen(name) + 8);
-    sprintf(path, "save/%s", name);
+    char *path = (char *)alloca(strlen(gamedir) + strlen(name) + 16);
+    sprintf(path, "%s/save/%s", gamedir, name);
     return fopen(path, "wb");
 }
 
@@ -361,6 +362,9 @@ bool retro_load_game(const struct retro_game_info *game)
     soft_image.a_offset = 3;
     soft_image.has_alpha_channel = false;
     soft_image.pixels = (uint8_t *)malloc(soft_image.line_stride * soft_image.h);
+    if (soft_image.pixels == NULL) {
+        return false;
+    }
 
     soft_context.font = &font;
     soft_context.render_target = &soft_image;

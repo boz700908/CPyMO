@@ -36,6 +36,8 @@ static error_t cpymo_backend_font_try_load_font(const char *path)
 	CPYMO_THROW(err);
 
 	if (stbtt_InitFont(&font, ttf_buffer, stbtt_GetFontOffsetForIndex(ttf_buffer, 0)) == 0) {
+		free(ttf_buffer);
+		ttf_buffer = NULL;
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	}
 
@@ -84,6 +86,7 @@ error_t cpymo_backend_font_init(const char *gamedir)
 
 #ifdef _WIN32
 	const char *windir = getenv("windir");
+	if (windir == NULL) windir = "C:\\Windows";
 	path = (char *)alloca(strlen(windir) + 32);
 	if (path == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
@@ -165,13 +168,14 @@ error_t cpymo_backend_font_init(const char *gamedir)
 	PlFontData font_infos[PlSharedFontType_Total];
 	s32 total_fonts;
 	r = plGetSharedFont(SetLanguage_ZHCN, font_infos, PlSharedFontType_Total, &total_fonts);
-	if (R_FAILED(r)) return CPYMO_ERR_NOT_FOUND;
+	if (R_FAILED(r)) { plExit(); return CPYMO_ERR_NOT_FOUND; }
 	for (s32 i = 1; i < total_fonts; ++i) {		// Skip 0 font, font 0 is shit.
 		const void *address = font_infos[i].address;
 		if (stbtt_InitFont(&font, address, stbtt_GetFontOffsetForIndex(address, 0)) == 0) {
 			continue;
 		}
 
+		plExit();
 		return CPYMO_ERR_SUCC;
 	}
 	plExit();

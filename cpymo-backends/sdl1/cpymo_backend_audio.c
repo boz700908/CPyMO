@@ -108,7 +108,7 @@ void cpymo_backend_audio_unlock(void)
 
 #endif
 
-#if (defined DISABLE_AUDIO || defined ENABLE_SDL_MIXER_AUDIO_BACKEND)
+#elif (defined DISABLE_AUDIO || defined ENABLE_SDL_MIXER_AUDIO_BACKEND)
 void cpymo_backend_audio_init(void) {}
 void cpymo_backend_audio_free(void) {}
 #endif

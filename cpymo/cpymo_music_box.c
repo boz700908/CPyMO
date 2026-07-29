@@ -28,7 +28,8 @@ static void cpymo_music_box_deleter(cpymo_engine *e, void *ui_)
 
 	if (box->music_title)
 		for (uintptr_t i = 0; i < box->music_count; ++i)
-			cpymo_backend_text_free(box->music_title[i]);
+			if (box->music_title[i])
+				cpymo_backend_text_free(box->music_title[i]);
 
 #ifdef ENABLE_TEXT_EXTRACT
 	if (box->music_title_text) {
@@ -196,9 +197,12 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 		float width;
 		error_t err = cpymo_backend_text_create(&box->music_title[i], &width, music_title, box->font_size);
 		if (err != CPYMO_ERR_SUCC) {
-			for (uintptr_t i = 0; i < box->music_count; ++i)
-				if(box->music_title[i])
-					cpymo_backend_text_free(box->music_title[i]);
+			for (uintptr_t j = 0; j < box->music_count; ++j)
+				if(box->music_title[j])
+					cpymo_backend_text_free(box->music_title[j]);
+			free(box->music_filename);
+			box->music_filename = NULL;
+			box->music_title = NULL;
 			free(box->music_list);
 			box->music_list = NULL;
 			return err;

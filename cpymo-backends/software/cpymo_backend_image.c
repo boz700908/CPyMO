@@ -57,6 +57,7 @@ error_t cpymo_backend_image_load(
         break;
     default:
         printf("[Error] Can not load from format %d.\n", format);
+        free(img);
         return CPYMO_ERR_INVALID_ARG;
     }
 

@@ -23,7 +23,7 @@ if (ENABLE_TEXT_EXTRACT)
   target_compile_definitions(cpymo_libretro PRIVATE -DENABLE_TEXT_EXTRACT)
 endif ()
 target_link_options(cpymo_libretro PRIVATE
-  -Wl,--version-script=${CMAKE_SOURCE_DIR}/link.T
+  -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/link.T
   -Wl,--no-undefined -lm
   # TODO: link ffmpeg statically
   -lavcodec -lavformat -lavutil -lswresample -lswscale

@@ -3,7 +3,7 @@
 #include "cpymo_engine.h"
 #include <string.h>
 #include "../cpymo-backends/include/cpymo_backend_save.h"
-#include "../endianness.h/endianness.h"
+#include "../endianness.h"
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>

@@ -202,6 +202,7 @@ error_t cpymo_backend_image_load(
             new_px, new_width, new_height, new_width * channels, channels))
         {
             free(new_px);
+            free(pixels_moveintoimage);
             return CPYMO_ERR_UNKNOWN;
         }
 
@@ -221,7 +222,10 @@ error_t cpymo_backend_image_load(
         channels, width, height, pad_width, pad_height);*/
 
     cpymo_backend_image_3ds *img = (cpymo_backend_image_3ds *)malloc(sizeof(cpymo_backend_image_3ds));
-    if(img == NULL) return CPYMO_ERR_OUT_OF_MEM;
+    if(img == NULL) {
+        free(pixels_moveintoimage);
+        return CPYMO_ERR_OUT_OF_MEM;
+    }
 
     img->real_width = (u16)width;
     img->real_height = (u16)height;

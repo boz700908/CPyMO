@@ -95,6 +95,9 @@ void cpymo_backend_audio_init()
 
 			if (SDL_OpenAudio(&want, NULL) == 0) {
 				audio_enabled = true;
+				audio_info.freq = want.freq;
+				audio_info.channels = want.channels;
+				audio_info.format = cpymo_backend_audio_f32;
 			}
 			else {
 				goto FAIL;

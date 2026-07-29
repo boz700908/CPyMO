@@ -1,3 +1,6 @@
+#ifndef POSIX_WIN32_H
+#define POSIX_WIN32_H
+
 #ifndef _WIN32
 #include <dirent.h>
 #include <sys/stat.h>
@@ -12,6 +15,8 @@
 
 #ifndef mkdir
 #define mkdir(A, B) _mkdir(A)
+#endif
+
 #endif
 
 #endif

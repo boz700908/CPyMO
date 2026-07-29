@@ -56,7 +56,7 @@ $(BUILD_DIR)/%.o: %.c
 	$(call compile,$<,$@)
 
 $(BUILD_DIR)/cpymo.res: ../sdl2/pymo-icon-windows.rc
-	@windres $< $@ -O coff
+	@windres -i $< -o $@ -O coff
 
 ifeq ($(OS), Windows_NT)
 OBJS += $(BUILD_DIR)/cpymo.res
@@ -65,7 +65,7 @@ else ifeq ($(UNAME_S), Darwin)
 LDFLAGS += -framework AudioToolbox
 endif
 
-$(TARGET): $(OBJS) $(WINDOWS_RES)
+$(TARGET): $(OBJS)
 	@echo "Linking..."
 	@$(CC) $^ -o $@ $(LDFLAGS)
 	@echo "=> $@"

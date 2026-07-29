@@ -4,7 +4,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "../endianness.h/endianness.h"
+#include "../endianness.h"
 #include "../stb/stb_image.h"
 #include <assert.h>
 
@@ -71,8 +71,8 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 
 void cpymo_package_close(cpymo_package * package)
 {
-	free(package->files);
-	if (package->stream) fclose(package->stream);
+	if (package->files) { free(package->files); package->files = NULL; }
+	if (package->stream) { fclose(package->stream); package->stream = NULL; }
 }
 
 error_t cpymo_package_find(cpymo_package_index * out_index, const cpymo_package * package, cpymo_str filename)

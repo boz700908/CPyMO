@@ -127,6 +127,7 @@ int main(int argc, char **argv)
 #endif
 
     printf("\033]0;%s\007", engine.gameconfig.gametitle);
+    fflush(stdout);
 
     err = init_context();
     if (err != CPYMO_ERR_SUCC) {
@@ -161,7 +162,11 @@ int main(int argc, char **argv)
             get_winsize(&cur_w, &cur_h);
             if (cur_w != render_target.w || cur_h != render_target.h) {
                 free_context();
-                init_context();
+                error_t err = init_context();
+                if (err != CPYMO_ERR_SUCC) {
+                    printf("[Error] Can not init context: %s\n", cpymo_error_message(err));
+                    goto EXIT;
+                }
             }
 
             memset(

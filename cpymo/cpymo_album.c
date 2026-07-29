@@ -157,6 +157,10 @@ error_t cpymo_album_generate_album_ui_image_pixels(
 	} while (cpymo_parser_next_line(&album_list_parser));
 
 	if (cpymo_backend_image_album_ui_writable()) {
+		if (loader->gamedir == NULL) {
+			*out_image = pixels;
+			return CPYMO_ERR_SUCC;
+		}
 		char *path = (char *)malloc(strlen(loader->gamedir) + output_cache_ui_file_name.len + 32);
 		if (path != NULL) {
 			strcpy(path, loader->gamedir);

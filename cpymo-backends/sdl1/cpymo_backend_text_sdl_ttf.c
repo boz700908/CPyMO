@@ -71,7 +71,10 @@ static void cpymo_backend_font_update_size(float s)
         //TTF_SetFontKerning(font, 1);
         prev_ptsize = ptsize;
         cpymo_backend_font_free();
-        cpymo_backend_font_init(engine.assetloader.gamedir);
+        error_t err = cpymo_backend_font_init(engine.assetloader.gamedir);
+        if (err != CPYMO_ERR_SUCC) {
+            printf("[Warning] Font re-init failed, text rendering may be broken.\n");
+        }
     }
 }
 

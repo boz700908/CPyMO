@@ -108,7 +108,7 @@ static void *cpymo_game_selector_get_prev(const cpymo_engine *e, const void *ui_
 
 static void cpymo_game_selector_item_load_info(cpymo_game_selector_item *item, float fontsize)
 {
-#define FAIL { if (item->gamedir) free(item->gamedir); item->gamedir = NULL; prev = item; item = item->next; continue; }
+#define FAIL { if (path) free(path); if (item->gamedir) free(item->gamedir); item->gamedir = NULL; prev = item; item = item->next; continue; }
 
 	cpymo_game_selector_item *prev = NULL;
 	char *path = NULL;

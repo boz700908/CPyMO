@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include "../cpymo/cpymo_package.h"
 #include "../cpymo/cpymo_utils.h"
-#include "../endianness.h/endianness.h"
+#include "../endianness.h"
 
 static error_t cpymo_tool_unpack(const char *pak_path, const char *extension, const char *out_path) {
 	cpymo_package pkg;
@@ -141,8 +141,10 @@ error_t cpymo_tool_package_packer_add_file(
     cpymo_tool_package_packer *packer,
     const char *file)
 {
-	const char *filename_start1 = strrchr(file, '/') + 1;
-	const char *filename_start2 = strrchr(file, '\\') + 1;
+	const char *tmp = strrchr(file, '/');
+	const char *filename_start1 = tmp ? tmp + 1 : file;
+	tmp = strrchr(file, '\\');
+	const char *filename_start2 = tmp ? tmp + 1 : file;
 	const char *filename = filename_start1;
 	if (filename_start2 > filename) filename = filename_start2;
 	if (file > filename) filename = file;

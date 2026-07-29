@@ -32,12 +32,12 @@ error_t cpymo_backend_masktrans_create(cpymo_backend_masktrans *out, void *mask_
 			SDL_TEXTUREACCESS_STREAMING, 
 			w, h);
 
-	SDL_SetTextureBlendMode(m->tex, SDL_BLENDMODE_BLEND);
-
 	if (m->tex == NULL) {
 		free(m);
 		return CPYMO_ERR_OUT_OF_MEM;
 	}
+
+	SDL_SetTextureBlendMode(m->tex, SDL_BLENDMODE_BLEND);
 
 	m->mask = mask_singlechannel_moveinto;
 	m->w = w;

@@ -233,6 +233,7 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 		struct dirent* ent;
 		while ((ent = readdir(dir))) {
 			char *path = (char *)malloc(strlen(ent->d_name) + strlen(game_selector_dir) + 4);
+			if (path == NULL) continue;
 			sprintf(path, "%s/%s", game_selector_dir, ent->d_name);
 
 			cpymo_game_selector_item *cur = NULL;
@@ -456,6 +457,7 @@ int main(int argc, char **argv)
 				#else
 				goto EXIT;
 				#endif
+				break;
             }
             case SDL_VIDEOEXPOSE: redraw_system = true; break;
             case SDL_VIDEORESIZE:

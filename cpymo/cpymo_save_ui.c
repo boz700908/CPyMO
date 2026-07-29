@@ -176,10 +176,6 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 #endif
 	}
 
-#ifdef ENABLE_TEXT_EXTRACT
-	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_save_ui_visual_impaired_selection_changed);
-#endif
-
 	const float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);
 	size_t characters = (size_t)((float)e->gameconfig.imagesize_w / fontsize * 1.3f);
 
@@ -300,6 +296,10 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 			return err;
 		}
 	}
+
+#ifdef ENABLE_TEXT_EXTRACT
+	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_save_ui_visual_impaired_selection_changed);
+#endif
 
 	return CPYMO_ERR_SUCC;
 }
