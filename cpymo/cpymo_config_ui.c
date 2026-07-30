@@ -739,7 +739,12 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 	cpymo_key_pluse_init(&ui->ok, e->input.ok);
 	cpymo_key_pluse_init(&ui->mouse_button, e->input.mouse_button);
 
-	cpymo_backend_text_extract(cpymo_localization_get(e)->config_bgmvol);
+	#ifdef ENABLE_TEXT_EXTRACT
+	{
+		int bgm_vol = (int)roundf(cpymo_audio_get_channel_volume(CPYMO_AUDIO_CHANNEL_BGM, &e->audio) * 10);
+		cpymo_config_ui_extract_setting_name_and_value(e, ITEM_BGM_VOL, bgm_vol);
+	}
+#endif
 
 	err = cpymo_backend_text_create(
 		&ui->inc_btn, 

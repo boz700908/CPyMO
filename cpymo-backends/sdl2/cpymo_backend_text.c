@@ -184,37 +184,46 @@ static Uint32 accessibility_wav_lens[4] = {0, 0, 0, 0};
 
 void cpymo_sdl2_accessibility_sound_init(void)
 {
-    SDL_AudioSpec want, have;
-    SDL_memset(&want, 0, sizeof(want));
-    want.freq = 22050;
-    want.format = AUDIO_S16SYS;
-    want.channels = 1;
-    want.samples = 512;
-
-    accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
-        SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_FORMAT_CHANGE);
-
-    /* Try loading WAV files from executable directory first, then CWD */
+    /* Load WAV files first to get their actual audio specs */
     char *base_path = SDL_GetBasePath();
     const char *sound_files[] = { NULL, "enter.wav", "menu.wav", "select.wav" };
+    SDL_AudioSpec wav_spec = {0};
+    int have_spec = 0;
+
     for (int i = 1; i <= 3; i++) {
-        SDL_AudioSpec wav_spec;
-        /* Try executable directory */
+        SDL_AudioSpec spec;
         char full_path[1024];
+        int loaded = 0;
+
+        /* Try executable directory first */
         if (base_path) {
             snprintf(full_path, sizeof(full_path), "%s%s", base_path, sound_files[i]);
-            if (SDL_LoadWAV(full_path, &wav_spec,
+            if (SDL_LoadWAV(full_path, &spec,
                     &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) != NULL)
-                continue;
+                loaded = 1;
         }
         /* Fallback to current working directory */
-        if (SDL_LoadWAV(sound_files[i], &wav_spec,
-                &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) == NULL) {
-            accessibility_wav_bufs[i] = NULL;
-            accessibility_wav_lens[i] = 0;
+        if (!loaded) {
+            if (SDL_LoadWAV(sound_files[i], &spec,
+                    &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) == NULL) {
+                accessibility_wav_bufs[i] = NULL;
+                accessibility_wav_lens[i] = 0;
+            } else {
+                loaded = 1;
+            }
+        }
+
+        if (loaded && !have_spec) {
+            wav_spec = spec;
+            have_spec = 1;
         }
     }
     if (base_path) SDL_free(base_path);
+
+    /* Open audio device with WAV's actual spec (not hardcoded) */
+    if (have_spec) {
+        accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
+    }
 }
 
 void cpymo_sdl2_accessibility_sound_free(void)
