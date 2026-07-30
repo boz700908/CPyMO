@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <limits.h>
 
 #ifndef TEXT_LINE_Y_OFFSET
 #define TEXT_LINE_Y_OFFSET 0

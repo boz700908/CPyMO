@@ -110,7 +110,7 @@ error_t cpymo_package_read_file_from_index(char *out_buffer, const cpymo_package
 	assert(package->has_stream_reader == false);
 	#endif
 	
-	if (index->file_offset > LONG_MAX ||
+	if ((uintmax_t)index->file_offset > (uintmax_t)LONG_MAX ||
 		fseek(package->stream, (long)index->file_offset, SEEK_SET) != 0)
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	if (index->file_length == 0) return CPYMO_ERR_SUCC;
@@ -229,7 +229,8 @@ error_t cpymo_package_stream_reader_seek(size_t seek, cpymo_package_stream_reade
 		return CPYMO_ERR_OUT_OF_MEM;
 	}
 
-	if (r->file_offset > LONG_MAX - seek ||
+	if (seek > (size_t)LONG_MAX ||
+		r->file_offset > (size_t)LONG_MAX - seek ||
 		fseek(r->stream, (long)(r->file_offset + seek), SEEK_SET) != 0)
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	r->current = seek;
