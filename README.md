@@ -399,9 +399,11 @@ CPyMO 为视障玩家提供了全平台统一的无障碍支持，包括语音�
 - Android：使用 Android TextToSpeech API
 
 **音效反馈**：在操作时播放短促音效，帮助确认操作已被识别：
-- 确认/进入（enter.wav）
-- 取消/菜单（menu.wav）
-- 选择/切换（select.wav）
+- 确认/进入
+- 取消/菜单
+- 选择/切换
+- 桌面端/iOS 使用 WAV 格式（enter.wav、menu.wav、select.wav）
+- Android 使用 OGG 格式（enter.ogg、menu.ogg、select.ogg）
 
 **震动反馈**（与 Android 对齐）：
 - 轻震 10ms：选择/切换项
