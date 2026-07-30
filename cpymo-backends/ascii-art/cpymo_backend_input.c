@@ -2,6 +2,7 @@
 #include "../include/cpymo_backend_input.h"
 #include <string.h>
 #include <ctype.h>
+#include <stdio.h>
 
 #ifdef _WIN32
 

@@ -288,7 +288,13 @@ jobs:
           chmod +x ./build-ffmpeg.sh
           sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability -Wno-error=unguarded-availability-new"/g' ./build-ffmpeg.sh
           sed -i '' 's/--enable-pic"/--enable-pic --disable-securetransport"/g' ./build-ffmpeg.sh
-          ./build-ffmpeg.sh arm64
+          for attempt in 1 2 3; do
+            rm -rf ffmpeg-4.3.1 thin
+            if ./build-ffmpeg.sh arm64; then exit 0; fi
+            echo "iOS FFmpeg build failed on attempt $attempt"
+            sleep 10
+          done
+          exit 1
 
       - name: Configure CMake
         shell: bash
@@ -328,7 +334,13 @@ jobs:
           chmod +x ./build-ffmpeg.sh
           sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability -Wno-error=unguarded-availability-new"/g' ./build-ffmpeg.sh
           sed -i '' 's/--enable-pic"/--enable-pic --disable-securetransport"/g' ./build-ffmpeg.sh
-          ./build-ffmpeg.sh arm64
+          for attempt in 1 2 3; do
+            rm -rf ffmpeg-4.3.1 thin
+            if ./build-ffmpeg.sh arm64; then exit 0; fi
+            echo "iOS FFmpeg build failed on attempt $attempt"
+            sleep 10
+          done
+          exit 1
 
       - name: Configure CMake
         shell: bash
