@@ -70,19 +70,25 @@ cpymo_input cpymo_input_snapshot()
 		out.ok = 
 			keyboard[SDL_SCANCODE_KP_ENTER] || 
 			keyboard[SDL_SCANCODE_RETURN] || 
-			keyboard[SDL_SCANCODE_SPACE];
+			keyboard[SDL_SCANCODE_SPACE] ||
+			keyboard[SDL_SCANCODE_BUTTON_A] ||
+			keyboard[SDL_SCANCODE_BUTTON_Y];
 		out.cancel = 
 			keyboard[SDL_SCANCODE_ESCAPE] || 
 			keyboard[SDL_SCANCODE_CANCEL] || 
 			keyboard[SDL_SCANCODE_AC_BACK] ||
 			keyboard[SDL_SCANCODE_MENU] ||
-			keyboard[SDL_SCANCODE_APPLICATION];
+			keyboard[SDL_SCANCODE_APPLICATION] ||
+			keyboard[SDL_SCANCODE_BUTTON_B] ||
+			keyboard[SDL_SCANCODE_BUTTON_X];
 		out.skip = 
 			keyboard[SDL_SCANCODE_LCTRL] || 
-			keyboard[SDL_SCANCODE_RCTRL];
+			keyboard[SDL_SCANCODE_RCTRL] ||
+			keyboard[SDL_SCANCODE_BUTTON_RIGHTSHOULDER];
 		out.hide_window = 
 			keyboard[SDL_SCANCODE_LSHIFT] || 
-			keyboard[SDL_SCANCODE_RSHIFT];
+			keyboard[SDL_SCANCODE_RSHIFT] ||
+			keyboard[SDL_SCANCODE_BUTTON_LEFTSHOULDER];
 #ifdef ENABLE_TEXT_EXTRACT
 		/* Shift+C = copy, Shift+D = append copy */
 		out.copy = (keyboard[SDL_SCANCODE_LSHIFT] || keyboard[SDL_SCANCODE_RSHIFT])

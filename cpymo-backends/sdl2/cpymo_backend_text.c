@@ -194,6 +194,7 @@ extern void cpymo_ios_accessibility_play_sound(int sound_type);
 extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
 
 static SDL_AudioDeviceID accessibility_audio_dev = 0;
+static SDL_AudioSpec accessibility_audio_spec = {0};
 static Uint8 *accessibility_wav_bufs[4] = {NULL, NULL, NULL, NULL};
 static Uint32 accessibility_wav_lens[4] = {0, 0, 0, 0};
 
@@ -290,6 +291,7 @@ void cpymo_sdl2_accessibility_sound_init(void)
 
     /* Open audio device with WAV's actual spec (not hardcoded) */
     if (have_spec) {
+        accessibility_audio_spec = wav_spec;
         accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
         if (accessibility_audio_dev) {
             /* Prime the audio pipeline: queue a tiny silence buffer and unpause
@@ -324,6 +326,32 @@ void cpymo_sdl2_accessibility_sound_free(void)
     if (last_spoken_text) {
         free(last_spoken_text);
         last_spoken_text = NULL;
+    }
+}
+
+void cpymo_sdl2_accessibility_sound_reset(void)
+{
+    /* Close and reopen the audio device on the new default output.
+     * Windows reassigns the default device when headphones are
+     * plugged/unplugged; reopened devices pick up the new output. */
+    if (accessibility_audio_dev) {
+        SDL_CloseAudioDevice(accessibility_audio_dev);
+        accessibility_audio_dev = 0;
+    }
+    if (accessibility_audio_spec.format == 0) return;
+
+    accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &accessibility_audio_spec, NULL, 0);
+    if (accessibility_audio_dev) {
+        int bytes_per_sample = (int)SDL_AUDIO_BITSIZE(accessibility_audio_spec.format) / 8;
+        int channels = (int)accessibility_audio_spec.channels;
+        int silence_samples = (accessibility_audio_spec.freq * channels) / 200;
+        Uint32 silence_len = (Uint32)(silence_samples * bytes_per_sample);
+        Uint8 *silence = (Uint8 *)SDL_calloc(1, silence_len);
+        if (silence) {
+            SDL_QueueAudio(accessibility_audio_dev, silence, silence_len);
+            SDL_PauseAudioDevice(accessibility_audio_dev, 0);
+            SDL_free(silence);
+        }
     }
 }
 

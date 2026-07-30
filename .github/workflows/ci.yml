@@ -322,7 +322,16 @@ jobs:
         export ANDROID_SDK_HOME=$ANDROID_HOME
         cd cpymo-backends/android/
         chmod +x ./build-android-ffmpeg.sh
-        ./build-android-ffmpeg.sh
+        # Retry up to 3 times on network errors (git.ffmpeg.org can return 502)
+        for i in 1 2 3; do
+          if ./build-android-ffmpeg.sh; then
+            echo "FFmpeg build succeeded on attempt $i"
+            break
+          else
+            echo "FFmpeg build failed on attempt $i, retrying..."
+            sleep 5
+          fi
+        done
 
     - name: Build APK
       run: |
