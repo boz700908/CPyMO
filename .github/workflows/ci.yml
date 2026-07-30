@@ -253,6 +253,45 @@ jobs:
           name: CPyMO for iOS
           path: ./cpymo.ipa
 
+  build-ios-accessibility:
+    name: 'iOS (Accessibility)'
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+
+      - name: Build FFmpeg
+        shell: bash
+        working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
+        run: |
+          chmod +x ./build-ffmpeg.sh
+          sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability"/g' ./build-ffmpeg.sh
+          ./build-ffmpeg.sh arm64
+
+      - name: Configure CMake
+        shell: bash
+        working-directory: ./cpymo-backends/ios
+        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON
+
+      - name: Build IPA
+        shell: bash
+        working-directory: ./cpymo-backends/ios
+        run: |
+          cmake --build build -j $(sysctl -n hw.physicalcpu) --config Release
+          cd ./build
+          mkdir Payload
+          mv cpymo.app Payload/
+          zip -r cpymo.ipa Payload
+          mv ./cpymo.ipa ../../../cpymo-accessibility.ipa
+
+      - name: Upload
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: CPyMO for iOS (Accessibility)
+          path: ./cpymo-accessibility.ipa
+
   build-android:
     name: 'Android'
     runs-on: ubuntu-22.04

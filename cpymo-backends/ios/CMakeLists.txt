@@ -4,6 +4,8 @@ project(cpymo
         LANGUAGES C OBJC
         )
 
+option(ENABLE_ACCESSIBILITY "Enable iOS accessibility features (TTS, sound effects, vibration, gestures)" OFF)
+
 # fix compile error for `SDL_systimer.c`
 set(EXTRA_CFLAGS "${EXTRA_CFLAGS} -Wno-error=declaration-after-statement")
 
@@ -17,6 +19,7 @@ find_library(FOUNDATION_LIBRARY Foundation)
 find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
 find_library(VIDEOTOOLBOX_LIBRARY VideoToolbox)
 find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+find_library(AVFOUNDATION_LIBRARY AVFoundation)
 
 set(BUILD_SHARED_LIBS OFF)
 set(SDL_SHARED OFF)
@@ -35,6 +38,13 @@ add_definitions(
         -DGAME_SELECTOR_COUNT_PER_SCREEN=4
         -DEXIT_TO_GAME_SELECTOR
 )
+
+if (ENABLE_ACCESSIBILITY)
+    add_definitions(
+        -DENABLE_TEXT_EXTRACT
+        -DENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
+    )
+endif ()
 
 include_directories(
         "../include"
@@ -57,6 +67,16 @@ add_executable(
         Packaging/LaunchScreen.storyboard
 #        ../sdl2/SDL/src/main/uikit/SDL_uikit_main.c
 )
+
+if (ENABLE_ACCESSIBILITY)
+    set(ACCESSIBILITY_WAVS
+        "../sdl2/enter.wav"
+        "../sdl2/menu.wav"
+        "../sdl2/select.wav"
+    )
+    target_sources(cpymo PRIVATE ${ACCESSIBILITY_WAVS})
+    set_source_files_properties(${ACCESSIBILITY_WAVS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+endif ()
 
 set_source_files_properties("./Packaging/AppIcon.icns" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 set(MACOSX_BUNDLE_GUI_IDENTIFIER xyz.xydm.cpymo)
@@ -118,4 +138,5 @@ target_link_libraries(cpymo PUBLIC
         ${AUDIOTOOLBOX_LIBRARY}
         ${VIDEOTOOLBOX_LIBRARY}
         ${COREFOUNDATION_LIBRARY}
+        ${AVFOUNDATION_LIBRARY}
         )

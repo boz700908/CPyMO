@@ -373,11 +373,15 @@ void cpymo_ios_accessibility_play_sound(int sound_type) {
     if (sound_type >= 1 && sound_type <= 3 && players[sound_type]) {
         players[sound_type].currentTime = 0;
         [players[sound_type] play];
-        return;
+    } else {
+        SystemSoundID sound = sound_type == 1 ? 1104 : (sound_type == 2 ? 1155 : 1103);
+        AudioServicesPlaySystemSound(sound);
     }
 
-    SystemSoundID sound = sound_type == 1 ? 1104 : (sound_type == 2 ? 1155 : 1103);
-    AudioServicesPlaySystemSound(sound);
+    /* === Vibration (aligned with Android) === */
+    /* 10ms = light (select/switch), 50ms = heavy (cancel/menu) */
+    int vibrate_ms = (sound_type == SOUND_MENU) ? 50 : 10;
+    cpymo_ios_accessibility_vibrate(vibrate_ms);
 }
 
 void cpymo_ios_accessibility_vibrate(int milliseconds) {
