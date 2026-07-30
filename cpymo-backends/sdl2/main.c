@@ -428,7 +428,8 @@ START:
 #endif
 		SDL_INIT_VIDEO |
 		SDL_INIT_JOYSTICK |
-		SDL_INIT_GAMECONTROLLER) != 0) {
+		SDL_INIT_GAMECONTROLLER |
+		SDL_INIT_HAPTIC) != 0) {
 		SDL_Log("[Error] Unable to initialize SDL: %s", SDL_GetError());
 		return -1;
 	}

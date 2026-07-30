@@ -12,6 +12,11 @@ float mouse_wheel;
 SDL_GameController **gamecontrollers = NULL;
 size_t gamecontrollers_count = 0;
 
+#ifdef ENABLE_TEXT_EXTRACT
+static SDL_Haptic **haptics = NULL;
+static size_t haptics_count = 0;
+#endif
+
 #ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
 static bool ios_accessibility_skip_held;
 #endif
@@ -24,9 +29,18 @@ static bool ios_accessibility_skip_held;
 
 void cpymo_sdl2_accessibility_vibrate(int milliseconds)
 {
-    for (size_t i = 0; i < gamecontrollers_count; ++i) {
-        if (gamecontrollers[i] != NULL)
-            SDL_GameControllerRumble(gamecontrollers[i], SDL_MAX_UINT16, SDL_MAX_UINT16, (Uint32)milliseconds);
+    /* Primary: SDL_Haptic rumble (works with most controllers on Windows) */
+    for (size_t i = 0; i < haptics_count; ++i) {
+        if (haptics[i] != NULL)
+            SDL_HapticRumblePlay(haptics[i], 1.0f, (Uint32)milliseconds);
+    }
+
+    /* Fallback: SDL_GameControllerRumble (XInput controllers) */
+    if (haptics_count == 0) {
+        for (size_t i = 0; i < gamecontrollers_count; ++i) {
+            if (gamecontrollers[i] != NULL)
+                SDL_GameControllerRumble(gamecontrollers[i], 0xFFFF, 0xFFFF, (Uint32)milliseconds);
+        }
     }
 
 #ifdef __EMSCRIPTEN__
@@ -228,6 +242,14 @@ void cpymo_input_free_joysticks()
 	if (gamecontrollers) free(gamecontrollers);
 	gamecontrollers = NULL;
 	gamecontrollers_count = 0;
+
+#ifdef ENABLE_TEXT_EXTRACT
+	for (size_t i = 0; i < haptics_count; ++i)
+		if (haptics[i]) SDL_HapticClose(haptics[i]);
+	if (haptics) free(haptics);
+	haptics = NULL;
+	haptics_count = 0;
+#endif
 }
 
 void cpymo_input_refresh_joysticks() 
@@ -249,4 +271,26 @@ void cpymo_input_refresh_joysticks()
 			if (SDL_IsGameController((int)i))
 				gamecontrollers[j++] = SDL_GameControllerOpen((int)i);
 	}
+
+#ifdef ENABLE_TEXT_EXTRACT
+	/* Open haptic devices from game controllers for rumble */
+	haptics_count = gamecontrollers_count;
+	if (haptics_count) {
+		haptics = (SDL_Haptic **)malloc(sizeof(haptics[0]) * haptics_count);
+		if (haptics) {
+			memset(haptics, 0, sizeof(haptics[0]) * haptics_count);
+			for (size_t i = 0; i < haptics_count; ++i) {
+				if (gamecontrollers[i]) {
+					SDL_Joystick *joy = SDL_GameControllerGetJoystick(gamecontrollers[i]);
+					SDL_Haptic *haptic = SDL_HapticOpenFromJoystick(joy);
+					if (haptic && SDL_HapticRumbleInit(haptic) == 0) {
+						haptics[i] = haptic;
+					} else if (haptic) {
+						SDL_HapticClose(haptic);
+					}
+				}
+			}
+		}
+	}
+#endif
 }
