@@ -341,7 +341,8 @@ int main(void) {
 	osTickCounterStart(&tickCounter);
 
 	void cpymo_backend_audio_unlock(void);
-	cpymo_backend_audio_unlock();
+	extern bool cpymo_backend_audio_enabled(void);
+	if (cpymo_backend_audio_enabled()) cpymo_backend_audio_unlock();
 
 	while (aptMainLoop()) {
 		if(aptShouldClose()) break;

@@ -7,6 +7,7 @@
 #include "../include/cpymo_backend_audio.h"
 
 static bool audio_enabled = false;
+static Thread audio_thread = NULL;
 
 #define SAMPLERATE 32000
 #define SAMPLESPERBUF (SAMPLERATE / 60)
@@ -166,7 +167,14 @@ void cpymo_backend_audio_init()
 
     audio_enabled = true;
 
-    threadCreate(cpymo_backend_audio_thread, NULL, 0x10000, 0x18, -1, true);
+    audio_thread = threadCreate(cpymo_backend_audio_thread, NULL, 0x10000, 0x18, -1, true);
+    if (audio_thread == NULL) {
+        audio_enabled = false;
+        ndspExit();
+        linearFree(audio_buf);
+        audio_buf = NULL;
+        printf("[Error] Failed to create audio thread.\n");
+    }
 }
 
 void cpymo_backend_audio_free() 
@@ -174,19 +182,25 @@ void cpymo_backend_audio_free()
     if(audio_enabled) {
         audio_enabled = false;
         LightEvent_Signal(&audio_event);
+		if (audio_thread) {
+			threadJoin(audio_thread, U64_MAX);
+			threadFree(audio_thread);
+			audio_thread = NULL;
+		}
 
         ndspExit();
         linearFree(audio_buf);
+		audio_buf = NULL;
     }
 }
 
 void cpymo_backend_audio_lock() 
 {
-    LightLock_Lock(&audio_lock);
+    if (audio_enabled) LightLock_Lock(&audio_lock);
 }
 
 void cpymo_backend_audio_unlock()
 {
-    LightLock_Unlock(&audio_lock);
+    if (audio_enabled) LightLock_Unlock(&audio_lock);
 }
 
