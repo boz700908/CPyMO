@@ -254,7 +254,10 @@ void cpymo_input_refresh_joysticks()
 {
 	cpymo_input_free_joysticks();
 
-	for (int i = 0; i < SDL_NumJoysticks(); ++i) 
+	int total_joysticks = SDL_NumJoysticks();
+
+	/* Count game controllers */
+	for (int i = 0; i < total_joysticks; ++i) 
 		if (SDL_IsGameController(i)) 
 			gamecontrollers_count++;
 
@@ -265,28 +268,40 @@ void cpymo_input_refresh_joysticks()
 	if (gamecontrollers) {
 		memset(gamecontrollers, 0, sizeof(gamecontrollers[0]) * gamecontrollers_count);
 		size_t j = 0;
-		for (size_t i = 0; i < gamecontrollers_count; ++i)
-			if (SDL_IsGameController((int)i))
-				gamecontrollers[j++] = SDL_GameControllerOpen((int)i);
+		for (int i = 0; i < total_joysticks; ++i)
+			if (SDL_IsGameController(i))
+				gamecontrollers[j++] = SDL_GameControllerOpen(i);
 	}
 
 #ifdef ENABLE_TEXT_EXTRACT
-	/* Open haptic devices from game controllers for rumble */
-	haptics_count = gamecontrollers_count;
-	if (haptics_count) {
-		haptics = (SDL_Haptic **)malloc(sizeof(haptics[0]) * haptics_count);
-		if (haptics) {
-			memset(haptics, 0, sizeof(haptics[0]) * haptics_count);
-			for (size_t i = 0; i < haptics_count; ++i) {
-				if (gamecontrollers[i]) {
-					SDL_Joystick *joy = SDL_GameControllerGetJoystick(gamecontrollers[i]);
-					SDL_Haptic *haptic = SDL_HapticOpenFromJoystick(joy);
-					if (haptic && SDL_HapticRumbleInit(haptic) == 0) {
-						haptics[i] = haptic;
-					} else if (haptic) {
-						SDL_HapticClose(haptic);
+	/* Open haptic from joysticks that are NOT game controllers.
+	 * Must NOT open haptic from a joystick already owned by SDL_GameController;
+	 * doing so conflicts with SDL_GameControllerRumble on Windows/XInput. */
+	{
+		int non_gc_count = 0;
+		for (int i = 0; i < total_joysticks; ++i)
+			if (!SDL_IsGameController(i))
+				non_gc_count++;
+
+		if (non_gc_count) {
+			haptics = (SDL_Haptic **)malloc(sizeof(haptics[0]) * non_gc_count);
+			if (haptics) {
+				memset(haptics, 0, sizeof(haptics[0]) * non_gc_count);
+				size_t j = 0;
+				for (int i = 0; i < total_joysticks; ++i) {
+					if (SDL_IsGameController(i)) continue;
+					SDL_Joystick *joy = SDL_JoystickOpen(i);
+					if (joy) {
+						SDL_Haptic *haptic = SDL_HapticOpenFromJoystick(joy);
+						if (haptic && SDL_HapticRumbleInit(haptic) == 0) {
+							haptics[j++] = haptic;
+						} else if (haptic) {
+							SDL_HapticClose(haptic);
+						}
+						SDL_JoystickClose(joy);
 					}
 				}
+				haptics_count = j;
 			}
 		}
 	}
