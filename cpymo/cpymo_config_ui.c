@@ -390,8 +390,44 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_inde
 
 static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int item_index, int val)
 {
-	cpymo_config_ui_extract_setting_name(e, item_index);
-	cpymo_config_ui_extract_setting_value(e, item_index, val);
+	const cpymo_localization *l = cpymo_localization_get(e);
+	const char *name = NULL;
+	switch (item_index) {
+	case ITEM_BGM_VOL: name = l->config_bgmvol; break;
+	case ITEM_SE_VOL: name = l->config_sevol; break;
+	case ITEM_VO_VOL: name = l->config_vovol; break;
+	case ITEM_FONT_SIZE: name = l->config_fontsize; break;
+	case ITEM_TEXT_SPEED: name = l->config_sayspeed; break;
+	case ITEM_SKIP_ALREADY_READ_ONLY: name = l->config_skip_mode; break;
+	default: assert(false);
+	}
+
+	char val_str_buf[32];
+	const char *val_str = val_str_buf;
+	switch (item_index) {
+	case ITEM_BGM_VOL:
+	case ITEM_SE_VOL:
+	case ITEM_VO_VOL:
+		if (val) sprintf(val_str_buf, "%d0%%", val);
+		else val_str = "0%";
+		break;
+	case ITEM_FONT_SIZE:
+		sprintf(val_str_buf, "%d", val);
+		break;
+	case ITEM_TEXT_SPEED:
+		assert(val >= 0 && val <= 5);
+		val_str = l->config_sayspeeds[val];
+		break;
+	case ITEM_SKIP_ALREADY_READ_ONLY:
+		assert(val == 0 || val == 1);
+		val_str = l->config_skip_modes[val];
+		break;
+	}
+
+	/* Concatenate name and value into a single TTS call to avoid interruption */
+	char combined[256];
+	snprintf(combined, sizeof(combined), "%s %s", name, val_str);
+	cpymo_backend_text_extract(combined);
 }
 #endif
 
