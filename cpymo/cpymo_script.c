@@ -46,7 +46,8 @@ error_t cpymo_script_create_bootloader(cpymo_script **out, char *startscript)
 
     script->script_name[0] = '\0';
 
-	script->script_content = (char *)malloc(strlen(script_format) + strlen(startscript));
+	/* sprintf adds the terminating NUL after substituting startscript. */
+	script->script_content = (char *)malloc(strlen(script_format) + strlen(startscript) + 1);
     if (script->script_content == NULL) {
         free(script);
         return CPYMO_ERR_OUT_OF_MEM;

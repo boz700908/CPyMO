@@ -19,7 +19,7 @@ void cpymo_str_trim_start(cpymo_str * span)
 {
 	size_t i;
 	for (i = 0; i < span->len; ++i)
-		if (span->begin[i] < 0 || !isblank(span->begin[i]))
+		if (span->begin[i] < 0 || !isblank((unsigned char)span->begin[i]))
 			break;
 
 	span->begin += i;
@@ -29,7 +29,7 @@ void cpymo_str_trim_start(cpymo_str * span)
 void cpymo_str_trim_end(cpymo_str * span)
 {
 	if (span->len) {
-		if (span->begin[span->len - 1] > 0 && isblank(span->begin[span->len - 1])) {
+		if (span->begin[span->len - 1] > 0 && isblank((unsigned char)span->begin[span->len - 1])) {
 			span->len--;
 			cpymo_str_trim_end(span);
 		}
@@ -38,6 +38,7 @@ void cpymo_str_trim_end(cpymo_str * span)
 
 void cpymo_str_copy(char *dst, size_t buffer_size, cpymo_str span)
 {
+	if (dst == NULL || buffer_size == 0) return;
 	size_t copy_count = buffer_size - 1;
 	if (span.len < copy_count) copy_count = span.len;
 
@@ -104,7 +105,7 @@ cpymo_color cpymo_str_as_color(cpymo_str span)
 	if (span.len < 1 || span.begin[0] != '#') return cpymo_color_error;
 
 	for (size_t i = 0; i < span.len - 1; ++i) 
-		if (span.begin[i + 1] < 0 || !isxdigit((int)span.begin[i + 1]))
+		if (span.begin[i + 1] < 0 || !isxdigit((unsigned char)span.begin[i + 1]))
 			return cpymo_color_error;
 	
 	cpymo_color c;
@@ -173,7 +174,7 @@ bool cpymo_str_starts_with_str_ignore_case(cpymo_str span, const char * prefix)
 		span.len--;
 		span.begin++;
 		prefix++;
-		return cpymo_str_starts_with_str(span, prefix);
+		return cpymo_str_starts_with_str_ignore_case(span, prefix);
 	}
 	else return false;
 }
@@ -186,7 +187,7 @@ bool cpymo_str_starts_with_str(cpymo_str span, const char *prefix)
 		span.len--;
 		span.begin++;
 		prefix++;
-		return cpymo_str_starts_with_str_ignore_case(span, prefix);
+		return cpymo_str_starts_with_str(span, prefix);
 	}
 	else return false;
 }
@@ -291,7 +292,7 @@ cpymo_str cpymo_str_split(cpymo_str *tail, size_t skip)
 
 void cpymo_str_hash_step(uint64_t *hash, char ch)
 {
-	const static uint64_t hash_seed = 131313;
+	static const uint64_t hash_seed = 131313;
 	*hash = (*hash * hash_seed) + ch;
 }
 

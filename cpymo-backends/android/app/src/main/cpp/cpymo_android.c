@@ -1,5 +1,6 @@
 ﻿#include <cpymo_prelude.h>
 #include "include/cpymo_android.h"
+#include <cpymo_backend_input.h>
 
 #include <jni.h>
 #include <SDL.h>
@@ -7,9 +8,8 @@
 
 static jclass mVisualHelperClass;
 static jmethodID midTextToSpeech;
-static jmethodID midPlaySound;
-static jmethodID midCopyLastSpeechText;
-static jmethodID midAppendCopyLastSpeechText;
+static jmethodID midPlayAccessibilityFeedback;
+static jmethodID midCopySpeechText;
 static jclass mControllerManagerClass;
 static jmethodID midPollInputDevices;
 static SDL_atomic_t input_device_changed;
@@ -31,10 +31,15 @@ Java_xyz_xydm_cpymo_Config_nativeInputDeviceChanged(JNIEnv *env, jclass clazz)
 }
 
 JNIEXPORT void JNICALL
-Java_xyz_xydm_cpymo_Config_nativeAccessibilityCopy(JNIEnv *env, jclass clazz, jboolean append)
+Java_xyz_xydm_cpymo_Config_nativeAccessibilityAction(JNIEnv *env, jclass clazz, jint action)
 {
-    extern void cpymo_android_accessibility_request_copy(bool append);
-    cpymo_android_accessibility_request_copy(append == JNI_TRUE);
+#if defined ENABLE_TEXT_EXTRACT && defined ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
+    cpymo_accessibility_enqueue_action((cpymo_accessibility_action)action);
+#else
+    (void)env;
+    (void)clazz;
+    (void)action;
+#endif
 }
 
 JNIEXPORT void JNICALL
@@ -42,15 +47,17 @@ Java_xyz_xydm_cpymo_VisualHelper_nativeSetupJNI(JNIEnv *env, jclass clazz)
 {
     mVisualHelperClass = (jclass)((*env)->NewGlobalRef(env, clazz));
     midTextToSpeech = (*env)->GetStaticMethodID(env, clazz, "textToSpeech", "(Ljava/lang/String;)Z");
-    midPlaySound = (*env)->GetStaticMethodID(env, clazz, "playSound", "(I)V");
-    midCopyLastSpeechText = (*env)->GetStaticMethodID(env, clazz, "copyLastSpeechText", "()V");
-    midAppendCopyLastSpeechText = (*env)->GetStaticMethodID(env, clazz, "appendCopyLastSpeechText", "()V");
+    midPlayAccessibilityFeedback = (*env)->GetStaticMethodID(env, clazz,
+        "playAccessibilityFeedback", "(I)V");
+    midCopySpeechText = (*env)->GetStaticMethodID(env, clazz, "copySpeechText", "(Ljava/lang/String;Z)V");
 }
 
 void cpymo_android_text_to_speech(const char* text)
 {
     JNIEnv *env = SDL_AndroidGetJNIEnv();
+    if (env == NULL || mVisualHelperClass == NULL || midTextToSpeech == NULL) return;
     jstring jtext = (*env)->NewStringUTF(env, text);
+    if (jtext == NULL) return;
     (*env)->CallStaticBooleanMethod(env, mVisualHelperClass, midTextToSpeech, jtext);
     (*env)->DeleteLocalRef(env, jtext);
 }
@@ -58,15 +65,19 @@ void cpymo_android_text_to_speech(const char* text)
 void cpymo_android_play_sound(int sound_type)
 {
     JNIEnv *env = SDL_AndroidGetJNIEnv();
-    (*env)->CallStaticVoidMethod(env, mVisualHelperClass, midPlaySound, sound_type);
+    if (env == NULL || mVisualHelperClass == NULL || midPlayAccessibilityFeedback == NULL) return;
+    (*env)->CallStaticVoidMethod(env, mVisualHelperClass, midPlayAccessibilityFeedback, sound_type);
 }
 
-void cpymo_android_copy_last_speech_text(bool append)
+void cpymo_android_copy_speech_text(const char *text, bool append)
 {
     JNIEnv *env = SDL_AndroidGetJNIEnv();
-    jmethodID method = append ? midAppendCopyLastSpeechText : midCopyLastSpeechText;
-    if (env && mVisualHelperClass && method)
-        (*env)->CallStaticVoidMethod(env, mVisualHelperClass, method);
+    if (text == NULL || env == NULL || mVisualHelperClass == NULL || midCopySpeechText == NULL) return;
+    jstring jtext = (*env)->NewStringUTF(env, text);
+    if (jtext == NULL) return;
+    (*env)->CallStaticVoidMethod(env, mVisualHelperClass, midCopySpeechText, jtext,
+        append ? JNI_TRUE : JNI_FALSE);
+    (*env)->DeleteLocalRef(env, jtext);
 }
 
 void cpymo_android_refresh_input_devices(void)

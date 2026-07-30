@@ -4,29 +4,16 @@
 #import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
 #include <SDL.h>
+#include <cpymo_backend_input.h>
 
 extern SDL_Window *window;
 
 #ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
-static NSString *last_announcement;
 static AVSpeechSynthesizer *speech_synthesizer;
-static SDL_atomic_t pending_input_action;
 
 void cpymo_ios_accessibility_announce(const char *text);
 void cpymo_ios_accessibility_play_sound(int sound_type);
 void cpymo_ios_accessibility_vibrate(int milliseconds);
-
-enum {
-    CPYMO_IOS_ACCESSIBILITY_UP = 1,
-    CPYMO_IOS_ACCESSIBILITY_DOWN,
-    CPYMO_IOS_ACCESSIBILITY_LEFT,
-    CPYMO_IOS_ACCESSIBILITY_RIGHT,
-    CPYMO_IOS_ACCESSIBILITY_OK,
-    CPYMO_IOS_ACCESSIBILITY_CANCEL,
-    CPYMO_IOS_ACCESSIBILITY_SKIP,
-    CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_START,
-    CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_END
-};
 
 /* Sound type constants (aligned with Android) */
 #define SOUND_ENTER  1
@@ -146,9 +133,9 @@ enum {
 
 static CPyMOAccessibilityGestureDelegate *gesture_delegate;
 
-static void cpymo_ios_send_input(int action)
+static void cpymo_ios_send_input(cpymo_accessibility_action action)
 {
-    SDL_AtomicSet(&pending_input_action, action);
+    cpymo_accessibility_enqueue_action(action);
 }
 
 @interface CPyMOAccessibilityGestures : NSObject
@@ -159,10 +146,10 @@ static void cpymo_ios_send_input(int action)
 {
     int action = 0;
     switch (recognizer.direction) {
-    case UISwipeGestureRecognizerDirectionUp: action = CPYMO_IOS_ACCESSIBILITY_UP; break;
-    case UISwipeGestureRecognizerDirectionDown: action = CPYMO_IOS_ACCESSIBILITY_DOWN; break;
-    case UISwipeGestureRecognizerDirectionLeft: action = CPYMO_IOS_ACCESSIBILITY_LEFT; break;
-    case UISwipeGestureRecognizerDirectionRight: action = CPYMO_IOS_ACCESSIBILITY_RIGHT; break;
+    case UISwipeGestureRecognizerDirectionUp: action = CPYMO_ACCESSIBILITY_ACTION_UP; break;
+    case UISwipeGestureRecognizerDirectionDown: action = CPYMO_ACCESSIBILITY_ACTION_DOWN; break;
+    case UISwipeGestureRecognizerDirectionLeft: action = CPYMO_ACCESSIBILITY_ACTION_LEFT; break;
+    case UISwipeGestureRecognizerDirectionRight: action = CPYMO_ACCESSIBILITY_ACTION_RIGHT; break;
     default: return;
     }
     cpymo_ios_accessibility_play_sound(SOUND_SELECT);
@@ -174,7 +161,7 @@ static void cpymo_ios_send_input(int action)
 {
     cpymo_ios_accessibility_play_sound(SOUND_SELECT);
     cpymo_ios_accessibility_vibrate(10);
-    cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_OK);
+    cpymo_ios_send_input(CPYMO_ACCESSIBILITY_ACTION_OK);
 }
 
 - (void)scan:(UITapGestureRecognizer *)recognizer
@@ -196,7 +183,7 @@ static void cpymo_ios_send_input(int action)
     if (recognizer.state == UIGestureRecognizerStateBegan) {
         cpymo_ios_accessibility_play_sound(SOUND_MENU);
         cpymo_ios_accessibility_vibrate(50);
-        cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
+        cpymo_ios_send_input(CPYMO_ACCESSIBILITY_ACTION_CANCEL);
     }
 }
 
@@ -204,41 +191,31 @@ static void cpymo_ios_send_input(int action)
 {
     cpymo_ios_accessibility_play_sound(SOUND_SELECT);
     cpymo_ios_accessibility_vibrate(10);
-    cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP);
+    cpymo_ios_send_input(CPYMO_ACCESSIBILITY_ACTION_SKIP);
 }
 
 - (void)twoFingerCancel:(UISwipeGestureRecognizer *)recognizer
 {
     cpymo_ios_accessibility_play_sound(SOUND_MENU);
     cpymo_ios_accessibility_vibrate(50);
-    cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_CANCEL);
+    cpymo_ios_send_input(CPYMO_ACCESSIBILITY_ACTION_CANCEL);
 }
 
 - (void)twoDoublePress:(CPyMOAccessibilityTwoDoublePressRecognizer *)recognizer
 {
     if (recognizer.state == UIGestureRecognizerStateBegan) {
         cpymo_ios_accessibility_vibrate(20);
-        cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_START);
+        cpymo_ios_send_input(CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_START);
     } else {
         cpymo_ios_accessibility_vibrate(20);
-        cpymo_ios_send_input(CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_END);
+        cpymo_ios_send_input(CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_END);
     }
 }
 
 - (void)copy:(UISwipeGestureRecognizer *)recognizer
 {
-    if (last_announcement == nil) return;
-    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
-    if (recognizer.direction == UISwipeGestureRecognizerDirectionLeft) {
-        pasteboard.string = last_announcement;
-        cpymo_ios_accessibility_announce("已复制");
-    } else {
-        NSString *prefix = pasteboard.string.length ? [pasteboard.string stringByAppendingString:@"\n"] : @"";
-        pasteboard.string = [prefix stringByAppendingString:last_announcement];
-        cpymo_ios_accessibility_announce("已追加复制");
-    }
-    cpymo_ios_accessibility_play_sound(SOUND_SELECT);
-    cpymo_ios_accessibility_vibrate(10);
+    cpymo_ios_send_input(recognizer.direction == UISwipeGestureRecognizerDirectionLeft
+        ? CPYMO_ACCESSIBILITY_ACTION_COPY : CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY);
 }
 @end
 
@@ -333,7 +310,6 @@ void cpymo_ios_accessibility_announce(const char *text) {
     NSString *announcement = [NSString stringWithUTF8String:text];
     if (announcement == nil || announcement.length == 0) return;
 
-    last_announcement = announcement;
     void (^post_announcement)(void) = ^{
         cpymo_ios_install_accessibility_gestures();
         if (UIAccessibilityIsVoiceOverRunning()) {
@@ -351,9 +327,25 @@ void cpymo_ios_accessibility_announce(const char *text) {
     else dispatch_async(dispatch_get_main_queue(), post_announcement);
 }
 
-int cpymo_ios_accessibility_take_input_action(void)
+void cpymo_ios_accessibility_copy_speech_text(const char *text, bool append)
 {
-    return SDL_AtomicSet(&pending_input_action, 0);
+    if (text == NULL || text[0] == '\0') return;
+
+    NSString *announcement = [NSString stringWithUTF8String:text];
+    if (announcement == nil || announcement.length == 0) return;
+
+    void (^copy_text)(void) = ^{
+        UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+        if (append && pasteboard.string.length) {
+            pasteboard.string = [pasteboard.string stringByAppendingFormat:@"\n%@", announcement];
+        } else {
+            pasteboard.string = announcement;
+        }
+        cpymo_ios_accessibility_play_sound(SOUND_SELECT);
+        cpymo_ios_accessibility_announce(append ? "已追加复制" : "已复制");
+    };
+    if ([NSThread isMainThread]) copy_text();
+    else dispatch_async(dispatch_get_main_queue(), copy_text);
 }
 
 void cpymo_ios_accessibility_play_sound(int sound_type) {

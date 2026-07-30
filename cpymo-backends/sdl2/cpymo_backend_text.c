@@ -508,9 +508,17 @@ void cpymo_backend_text_extract(const char *text)
     cpymo_ios_accessibility_announce(text);
 }
 
-/* Copy/append-copy handled in iOS native layer */
-void cpymo_backend_text_copy_last(void) {}
-void cpymo_backend_text_append_copy_last(void) {}
+void cpymo_backend_text_copy_last(void)
+{
+    extern void cpymo_ios_accessibility_copy_speech_text(const char *text, bool append);
+    cpymo_ios_accessibility_copy_speech_text(last_spoken_text, false);
+}
+
+void cpymo_backend_text_append_copy_last(void)
+{
+    extern void cpymo_ios_accessibility_copy_speech_text(const char *text, bool append);
+    cpymo_ios_accessibility_copy_speech_text(last_spoken_text, true);
+}
 
 /* --- Emscripten: ARIA live region --- */
 #elif defined(__EMSCRIPTEN__)
@@ -530,14 +538,11 @@ void cpymo_backend_text_extract_init(void)
         "document.body.appendChild(bar);"
         "}"
         "if (!window.cpymoAccessibilityGestures && Module.canvas) {"
-        "var c=Module.canvas,s=null,lastTap=0,hold=0;"
-        "var key=function(k,down){c.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{key:k,code:k,bubbles:true}));};"
-        "var knock=function(k){key(k,true);setTimeout(function(){key(k,false)},16);};"
-        "var shortcut=function(k,code){c.dispatchEvent(new KeyboardEvent('keydown',{key:'Shift',code:'ShiftLeft',bubbles:true}));c.dispatchEvent(new KeyboardEvent('keydown',{key:k,code:code,bubbles:true,shiftKey:true}));setTimeout(function(){c.dispatchEvent(new KeyboardEvent('keyup',{key:k,code:code,bubbles:true,shiftKey:true}));c.dispatchEvent(new KeyboardEvent('keyup',{key:'Shift',code:'ShiftLeft',bubbles:true}))},16);};"
-        "var vibrate=function(ms){if(navigator.vibrate)navigator.vibrate(ms);};"
+        "var c=Module.canvas,s=null,lastSingleTap=0,lastTwoTap=0,hold=0;"
+        "var action=function(a){if(Module._cpymo_accessibility_enqueue_action)Module._cpymo_accessibility_enqueue_action(a);};"
         "var direction=function(dx,dy){return Math.abs(dx)>Math.abs(dy)?(dx>0?'ArrowRight':'ArrowLeft'):(dy>0?'ArrowDown':'ArrowUp');};"
-        "c.addEventListener('touchstart',function(e){if(e.touches.length===1){var t=e.touches[0];s={x:t.clientX,y:t.clientY,n:1};hold=setTimeout(function(){knock('Escape');vibrate(50);s=null},500)}else if(e.touches.length===2){clearTimeout(hold);var a=e.touches[0],b=e.touches[1];s={x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2,n:2};var now=Date.now();if(now-lastTap<300){hold=setTimeout(function(){key('ControlLeft',true);vibrate(20)},200)}lastTap=now}},{passive:true});"
-        "c.addEventListener('touchend',function(e){clearTimeout(hold);if(!s)return;var t=e.changedTouches[0],dx=t.clientX-s.x,dy=t.clientY-s.y;if(s.n===2&&e.touches.length===0){key('ControlLeft',false);if(Math.max(Math.abs(dx),Math.abs(dy))>32){var d=direction(dx,dy);if(d==='ArrowLeft')shortcut('c','KeyC');else if(d==='ArrowRight')shortcut('d','KeyD');else if(d==='ArrowDown')knock('Escape');vibrate(d==='ArrowDown'?50:10)}}else if(s.n===1){if(Math.max(Math.abs(dx),Math.abs(dy))>32){knock(direction(dx,dy));vibrate(10)}else if(Date.now()-lastTap<300){knock('Enter');vibrate(10)}}s=null},{passive:true});"
+        "c.addEventListener('touchstart',function(e){var now=Date.now();if(e.touches.length===1){var t=e.touches[0];s={x:t.clientX,y:t.clientY,n:1,doubleTap:now-lastSingleTap<300};lastSingleTap=now;hold=setTimeout(function(){action(6);s=null},500)}else if(e.touches.length===2){clearTimeout(hold);var a=e.touches[0],b=e.touches[1];s={x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2,n:2,skipHold:now-lastTwoTap<300};if(s.skipHold)hold=setTimeout(function(){action(8)},200);lastTwoTap=now}},{passive:true});"
+        "c.addEventListener('touchend',function(e){clearTimeout(hold);if(!s)return;var t=e.changedTouches[0],dx=t.clientX-s.x,dy=t.clientY-s.y,d=direction(dx,dy);if(s.n===2&&e.touches.length===0){if(s.skipHold)action(9);if(Math.max(Math.abs(dx),Math.abs(dy))>32){if(d==='ArrowLeft')action(10);else if(d==='ArrowRight')action(11);else if(d==='ArrowDown')action(6)}}else if(s.n===1){if(Math.max(Math.abs(dx),Math.abs(dy))>32){action(d==='ArrowUp'?1:d==='ArrowDown'?2:d==='ArrowLeft'?3:4)}else if(s.doubleTap)action(5)}s=null},{passive:true});"
         "window.cpymoAccessibilityGestures=true;"
         "}"
     );
@@ -632,20 +637,17 @@ void cpymo_backend_text_extract(const char *text)
 #endif
 }
 
-/* Android keeps the system clipboard bridge in Java, but all input dispatch
- * and de-duplication is shared with the other platforms. */
+/* Android keeps the system clipboard bridge in Java, while the shared backend
+ * remains the sole owner of the last game text and input de-duplication. */
 #if defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY)
 void cpymo_backend_text_copy_last(void) {
-    extern void cpymo_android_copy_last_speech_text(bool append);
-    cpymo_android_copy_last_speech_text(false);
+    extern void cpymo_android_copy_speech_text(const char *text, bool append);
+    cpymo_android_copy_speech_text(last_spoken_text, false);
 }
 void cpymo_backend_text_append_copy_last(void) {
-    extern void cpymo_android_copy_last_speech_text(bool append);
-    cpymo_android_copy_last_speech_text(true);
+    extern void cpymo_android_copy_speech_text(const char *text, bool append);
+    cpymo_android_copy_speech_text(last_spoken_text, true);
 }
-#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
-void cpymo_backend_text_copy_last(void) {}
-void cpymo_backend_text_append_copy_last(void) {}
 #endif
 
 #endif

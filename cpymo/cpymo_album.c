@@ -11,10 +11,11 @@
 #include "cpymo_assetloader.h"
 #include <assert.h>
 #include <ctype.h>
+#include <stdint.h>
 #include "cpymo_accessibility.h"
 
 #define ALBUM_MAX_CGS_SINGLE_PAGE 25
-const static float album_scroll_time = 3.0f;
+static const float album_scroll_time = 3.0f;
 
 #ifdef CPYMO_TOOL
 bool cpymo_backend_image_album_ui_writable(void);
@@ -29,6 +30,7 @@ extern bool fill_screen_enabled;
 static void cpymo_album_generate_album_ui_image_pixels_cut(
 	void **pixels, int *w, int *h, float ratio)
 {
+	if (*w <= 0 || *h <= 0 || ratio <= 0.0f) return;
 	float cur_ratio = (float)*w / (float)*h;
 	int new_w = *w;
 	int new_h = *h;
@@ -39,7 +41,8 @@ static void cpymo_album_generate_album_ui_image_pixels_cut(
 	else if (cur_ratio < ratio) new_h = (int)(*w / ratio);
 	if (new_w == *w && new_h == *h) return;
 
-	uint8_t *pixels_cut = (uint8_t *)malloc(new_w * new_h * 3);
+	if ((size_t)new_w > SIZE_MAX / 3 / (size_t)new_h) return;
+	uint8_t *pixels_cut = (uint8_t *)malloc((size_t)new_w * (size_t)new_h * 3);
 	if (pixels_cut == NULL) return;
 
 	uint8_t *pixels_src = (uint8_t *)*pixels;
@@ -88,6 +91,8 @@ error_t cpymo_album_generate_album_ui_image_pixels(
 			*ref_h = (size_t)h2;
 		}
 		else {
+			if (*ref_h == 0 || *ref_w > SIZE_MAX / 3 / *ref_h)
+				return CPYMO_ERR_OUT_OF_MEM;
 			pixels = (stbi_uc *)malloc(*ref_w * *ref_h * 3);
 			if (pixels == NULL) return CPYMO_ERR_OUT_OF_MEM;
 			memset(pixels, 0, *ref_w * *ref_h * 3);

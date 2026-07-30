@@ -11,6 +11,14 @@ typedef struct cpymo_textbox_line {
     float y;
 } cpymo_textbox_line;
 
+/* The three pools share one allocation.  sizeof this union is a multiple of
+ * every member alignment, including the pointer-sized text handles. */
+typedef union cpymo_textbox_storage_alignment {
+    cpymo_backend_text text;
+    float coordinate;
+    cpymo_textbox_line line;
+} cpymo_textbox_storage_alignment;
+
 error_t cpymo_textbox_init(
     cpymo_textbox *o, 
     float x, float y, 
@@ -37,10 +45,22 @@ error_t cpymo_textbox_init(
         if (o->backlog_buf == NULL) return CPYMO_ERR_OUT_OF_MEM;
     }
 
+    if (o->chars_pool_max_size > SIZE_MAX /
+        (sizeof(cpymo_backend_text) + sizeof(float))) {
+        if (o->backlog_buf) free(o->backlog_buf);
+        return CPYMO_ERR_OUT_OF_MEM;
+    }
+
     size_t pools_size = o->chars_pool_max_size *
         (sizeof(cpymo_backend_text) + sizeof(float));
-    size_t lines_offset = (pools_size + sizeof(cpymo_textbox_line) - 1) /
-        sizeof(cpymo_textbox_line) * sizeof(cpymo_textbox_line);
+    size_t alignment = sizeof(cpymo_textbox_storage_alignment);
+    if (pools_size > SIZE_MAX - (alignment - 1) ||
+        o->max_lines > (SIZE_MAX - pools_size - (alignment - 1)) /
+            sizeof(cpymo_textbox_line)) {
+        if (o->backlog_buf) free(o->backlog_buf);
+        return CPYMO_ERR_OUT_OF_MEM;
+    }
+    size_t lines_offset = ((pools_size + alignment - 1) / alignment) * alignment;
     uint8_t *mem = (uint8_t *)malloc(
         lines_offset + o->max_lines * sizeof(cpymo_textbox_line));
     if (mem == NULL) {

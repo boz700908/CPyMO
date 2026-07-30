@@ -2176,8 +2176,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     @Override
     public void onLongPress(MotionEvent event) {
-        VisualHelper.vibrate(50);
-        VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_ESCAPE);
+        Config.nativeAccessibilityAction(Config.ACCESSIBILITY_CANCEL);
     }
 
     @Override
@@ -2187,55 +2186,49 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     @Override
     public void onSlide(MotionEvent event, @NonNull SlideDetector.Direction direction) {
-        VisualHelper.vibrate(10);
         switch (direction) {
-            case Up: VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_DPAD_UP); break;
-            case Down: VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_DPAD_DOWN); break;
-            case Left: VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_DPAD_LEFT); break;
-            case Right: VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_DPAD_RIGHT); break;
+            case Up: Config.nativeAccessibilityAction(Config.ACCESSIBILITY_UP); break;
+            case Down: Config.nativeAccessibilityAction(Config.ACCESSIBILITY_DOWN); break;
+            case Left: Config.nativeAccessibilityAction(Config.ACCESSIBILITY_LEFT); break;
+            case Right: Config.nativeAccessibilityAction(Config.ACCESSIBILITY_RIGHT); break;
         }
     }
 
     @Override
     public void onDoubleTap(MotionEvent event) {
-        VisualHelper.vibrate(10);
-        VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_ENTER);
+        Config.nativeAccessibilityAction(Config.ACCESSIBILITY_OK);
     }
 
     @Override
     public void onTwoDoubleTap(MotionEvent event) {
-        VisualHelper.vibrate(10);
-        VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_CTRL_LEFT);
+        Config.nativeAccessibilityAction(Config.ACCESSIBILITY_SKIP);
     }
 
     @Override
     public void onTwoSlide(MotionEvent event, SlideDetector.Direction direction) {
         switch (direction) {
             case Left: {
-                Config.nativeAccessibilityCopy(false);
+                Config.nativeAccessibilityAction(Config.ACCESSIBILITY_COPY);
                 break;
             }
             case Right: {
-                Config.nativeAccessibilityCopy(true);
+                Config.nativeAccessibilityAction(Config.ACCESSIBILITY_APPEND_COPY);
                 break;
             }
             case Down: {
-                VisualHelper.vibrate(50);
-                VisualHelper.sendKeyKnock(KeyEvent.KEYCODE_ESCAPE);
+                Config.nativeAccessibilityAction(Config.ACCESSIBILITY_CANCEL);
             }
         }
     }
 
     @Override
     public void onTwoDoublePressStart(MotionEvent event) {
-        VisualHelper.vibrate(20);
-        SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_CTRL_LEFT);
+        Config.nativeAccessibilityAction(Config.ACCESSIBILITY_SKIP_HOLD_START);
     }
 
     @Override
     public void onTwoDoublePressEnd(MotionEvent event) {
-        VisualHelper.vibrate(20);
-        SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_CTRL_LEFT);
+        Config.nativeAccessibilityAction(Config.ACCESSIBILITY_SKIP_HOLD_END);
     }
 
     /* gesture callback methods end */

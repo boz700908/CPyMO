@@ -4,16 +4,14 @@ plugins {
 
 Boolean ENABLE_TEXT_EXTRACT = false
 Boolean ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY = false
-if (System.getenv("ENABLE_TEXT_EXTRACT") == null) {
-    ENABLE_TEXT_EXTRACT = project.property("ENABLE_TEXT_EXTRACT").toBoolean()
-} else {
-    ENABLE_TEXT_EXTRACT = true
-}
-if (System.getenv("ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY") == null) {
-    ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY = project.property("ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY").toBoolean()
-} else {
-    ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY = true
-}
+def textExtractEnv = System.getenv("ENABLE_TEXT_EXTRACT")
+def androidAccessibilityEnv = System.getenv("ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY")
+ENABLE_TEXT_EXTRACT = textExtractEnv == null
+        ? project.property("ENABLE_TEXT_EXTRACT").toBoolean()
+        : textExtractEnv.toBoolean()
+ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY = androidAccessibilityEnv == null
+        ? project.property("ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY").toBoolean()
+        : androidAccessibilityEnv.toBoolean()
 
 android {
     compileSdk 32

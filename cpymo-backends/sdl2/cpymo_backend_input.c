@@ -17,25 +17,24 @@ static SDL_Haptic **haptics = NULL;
 static size_t haptics_count = 0;
 #endif
 
-#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
-static bool ios_accessibility_skip_held;
-#endif
-
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-static SDL_atomic_t android_accessibility_copy;
-static SDL_atomic_t android_accessibility_append_copy;
-
-void cpymo_android_accessibility_request_copy(bool append)
-{
-    SDL_AtomicSet(append ? &android_accessibility_append_copy : &android_accessibility_copy, 1);
-}
-#endif
-
 #ifdef ENABLE_TEXT_EXTRACT
+static SDL_atomic_t accessibility_action;
+static bool accessibility_skip_held;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#define CPYMO_ACCESSIBILITY_EXPORT EMSCRIPTEN_KEEPALIVE
+#else
+#define CPYMO_ACCESSIBILITY_EXPORT
 #endif
+
+CPYMO_ACCESSIBILITY_EXPORT void cpymo_accessibility_enqueue_action(
+	cpymo_accessibility_action action)
+{
+	if (action > CPYMO_ACCESSIBILITY_ACTION_NONE &&
+		action <= CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY)
+		SDL_AtomicSet(&accessibility_action, (int)action);
+}
 
 void cpymo_sdl2_accessibility_vibrate(int milliseconds)
 {
@@ -112,25 +111,22 @@ cpymo_input cpymo_input_snapshot()
 		out.hide_window = 0;
 	}
 
-#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
-	extern int cpymo_ios_accessibility_take_input_action(void);
-	switch (cpymo_ios_accessibility_take_input_action()) {
-	case 1: out.up = true; break;
-	case 2: out.down = true; break;
-	case 3: out.left = true; break;
-	case 4: out.right = true; break;
-	case 5: out.ok = true; break;
-	case 6: out.cancel = true; break;
-	case 7: out.skip = true; break;
-	case 8: ios_accessibility_skip_held = true; break;
-	case 9: ios_accessibility_skip_held = false; break;
+#ifdef ENABLE_TEXT_EXTRACT
+	switch ((cpymo_accessibility_action)SDL_AtomicSet(&accessibility_action, 0)) {
+	case CPYMO_ACCESSIBILITY_ACTION_UP: out.up = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_DOWN: out.down = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_LEFT: out.left = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_RIGHT: out.right = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_OK: out.ok = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_CANCEL: out.cancel = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_SKIP: out.skip = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_START: accessibility_skip_held = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_END: accessibility_skip_held = false; break;
+	case CPYMO_ACCESSIBILITY_ACTION_COPY: out.copy = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY: out.append_copy = true; break;
+	case CPYMO_ACCESSIBILITY_ACTION_NONE: break;
 	}
-	out.skip = out.skip || ios_accessibility_skip_held;
-#endif
-
-#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
-	out.copy = out.copy || SDL_AtomicSet(&android_accessibility_copy, 0) != 0;
-	out.append_copy = out.append_copy || SDL_AtomicSet(&android_accessibility_append_copy, 0) != 0;
+	out.skip = out.skip || accessibility_skip_held;
 #endif
 
 #ifdef DISABLE_MOUSE

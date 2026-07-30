@@ -16,6 +16,7 @@
 #include "../../cpymo/cpymo_engine.h"
 #include "../software/cpymo_backend_software.h"
 #include <stdio.h>
+#include <stdint.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../stb/stb_image.h"
@@ -41,6 +42,9 @@ static error_t init_context(void)
     extern void get_winsize(size_t *w, size_t *h);
 
     get_winsize(&render_target.w, &render_target.h);
+    if (render_target.w == 0 || render_target.h == 0 ||
+        render_target.w > SIZE_MAX / 3 / render_target.h)
+        return CPYMO_ERR_OUT_OF_MEM;
     render_target.line_stride = render_target.w * 3;
     render_target.pixel_stride = 3;
     render_target.r_offset = 0;

@@ -305,7 +305,9 @@ error_t cpymo_msgbox_ui_enter(
 
 	ui->okcancel_callback = okcancel_callback;
 	ui->okcancel_callback_data = okcancel_callback_data;
-	ui->selection = okcancel_callback ? -1 : 0;
+	/* The visible and spoken first button is always Confirm.  Starting on
+	 * Cancel made directional navigation disagree with the dialog layout. */
+	ui->selection = 0;
 	cpymo_key_hold_init(&ui->mouse_button, e->input.mouse_button);
 
 	float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);

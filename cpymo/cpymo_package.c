@@ -4,18 +4,21 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <stdint.h>
 #include "../endianness.h/endianness.h"
 #include "../stb/stb_image.h"
 #include <assert.h>
 
 error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 {
+	if (out_package == NULL || path == NULL) return CPYMO_ERR_INVALID_ARG;
 #ifdef DEBUG
 	out_package->has_stream_reader = false;
 #endif
-	
-	if (out_package == NULL) return CPYMO_ERR_INVALID_ARG;
-
+	out_package->stream = NULL;
+	out_package->files = NULL;
+	out_package->file_count = 0;
 	out_package->stream = fopen(path, "rb");
 	if (out_package->stream == NULL) return CPYMO_ERR_CAN_NOT_OPEN_FILE;
 
@@ -30,10 +33,19 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 
 	if (count != 1) {
 		fclose(out_package->stream);
+		out_package->stream = NULL;
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	}
 
-	out_package->files = (cpymo_package_index *)malloc(sizeof(cpymo_package_index) * out_package->file_count);
+	if ((uint64_t)out_package->file_count * sizeof(cpymo_package_index) > SIZE_MAX) {
+		fclose(out_package->stream);
+		out_package->stream = NULL;
+		return CPYMO_ERR_OUT_OF_MEM;
+	}
+
+	out_package->files = (cpymo_package_index *)malloc(
+		out_package->file_count == 0 ? 1 :
+		sizeof(cpymo_package_index) * out_package->file_count);
 
 	if (out_package->files == NULL) {
 		fclose(out_package->stream);
@@ -64,8 +76,12 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 
 void cpymo_package_close(cpymo_package * package)
 {
+	if (package == NULL) return;
 	free(package->files);
-	fclose(package->stream);
+	if (package->stream) fclose(package->stream);
+	package->files = NULL;
+	package->stream = NULL;
+	package->file_count = 0;
 }
 
 error_t cpymo_package_find(cpymo_package_index * out_index, const cpymo_package * package, cpymo_str filename)
@@ -94,7 +110,10 @@ error_t cpymo_package_read_file_from_index(char *out_buffer, const cpymo_package
 	assert(package->has_stream_reader == false);
 	#endif
 	
-	fseek(package->stream, index->file_offset, SEEK_SET);
+	if (index->file_offset > LONG_MAX ||
+		fseek(package->stream, (long)index->file_offset, SEEK_SET) != 0)
+		return CPYMO_ERR_BAD_FILE_FORMAT;
+	if (index->file_length == 0) return CPYMO_ERR_SUCC;
 	const size_t count = fread(out_buffer, index->file_length, 1, package->stream);
 
 	if (count != 1) return CPYMO_ERR_BAD_FILE_FORMAT;
@@ -110,7 +129,7 @@ error_t cpymo_package_read_file(char **out_buffer, size_t *sz, const cpymo_packa
 	CPYMO_THROW(err);
 
 	*sz = idx.file_length;
-	*out_buffer = (char *)malloc(*sz);
+	*out_buffer = (char *)malloc(*sz == 0 ? 1 : *sz);
 	if (*out_buffer == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
 	err = cpymo_package_read_file_from_index(*out_buffer, package, &idx);
@@ -162,7 +181,7 @@ error_t cpymo_package_read_image_from_index(void ** pixels, int * w, int * h, in
 	return CPYMO_ERR_SUCC;
 
 #else
-	stbi_uc *file_data = (stbi_uc *)malloc(index->file_length);
+	stbi_uc *file_data = (stbi_uc *)malloc(index->file_length == 0 ? 1 : index->file_length);
 	if (file_data == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
 	error_t err = cpymo_package_read_file_from_index((char *)file_data, pkg, index);
@@ -210,8 +229,10 @@ error_t cpymo_package_stream_reader_seek(size_t seek, cpymo_package_stream_reade
 		return CPYMO_ERR_OUT_OF_MEM;
 	}
 
+	if (r->file_offset > LONG_MAX - seek ||
+		fseek(r->stream, (long)(r->file_offset + seek), SEEK_SET) != 0)
+		return CPYMO_ERR_BAD_FILE_FORMAT;
 	r->current = seek;
-	fseek(r->stream, (long)(r->file_offset + r->current), SEEK_SET);
 	
 	return CPYMO_ERR_SUCC;
 }
@@ -284,15 +305,27 @@ error_t cpymo_package_stream_reader_from_file(
 	out->package = NULL;
 #endif
 
-	fseek(file, 0, SEEK_END);
+	if (fseek(file, 0, SEEK_END) != 0) {
+#ifdef LEAKCHECK
+		free(out->leak_mark);
+#endif
+		fclose(file);
+		return CPYMO_ERR_BAD_FILE_FORMAT;
+	}
+	long file_length = ftell(file);
+	if (file_length < 0 || fseek(file, 0, SEEK_SET) != 0) {
+#ifdef LEAKCHECK
+		free(out->leak_mark);
+#endif
+		fclose(file);
+		return CPYMO_ERR_BAD_FILE_FORMAT;
+	}
 
 	out->current = 0;
-	out->file_length = (size_t)ftell(file);
+	out->file_length = (size_t)file_length;
 	out->file_offset = 0;
 	out->own_stream = true;
 	out->stream = file;
-
-	fseek(file, 0, SEEK_SET);
 
 	return CPYMO_ERR_SUCC;
 }

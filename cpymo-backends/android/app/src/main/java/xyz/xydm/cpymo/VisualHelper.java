@@ -24,7 +24,6 @@ public class VisualHelper {
 
     private static TextToSpeech mTextToSpeech;
     private static Vibrator mVibrator;
-    private static String mLastSpeakText;
     private static SoundPool mSoundPool;
 
     private static HashMap<Integer, Integer> mSoundMap = new HashMap<>();
@@ -76,7 +75,6 @@ public class VisualHelper {
         if (mTextToSpeech == null)
             return false;
         mTextToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null);
-        mLastSpeakText = text;
         return true;
     }
 
@@ -87,33 +85,13 @@ public class VisualHelper {
         return true;
     }
 
-    public static void copyLastSpeechText() {
-        if (mLastSpeakText == null) return;
-
-        SDLActivity.clipboardSetText(mLastSpeakText);
-        vibrate(10);
-        playSound(SOUND_SELECT);
-        textToSpeechWithoutCopy("已复制");
-    }
-
-    public static void appendCopyLastSpeechText() {
-        if (mLastSpeakText == null) return;
-
+    public static void copySpeechText(String speechText, boolean append) {
+        if (speechText == null || speechText.isEmpty()) return;
         String text = SDLActivity.clipboardGetText();
-        SDLActivity.clipboardSetText(text == null || text.isEmpty()
-                ? mLastSpeakText : text + "\n" + mLastSpeakText);
-        vibrate(10);
-        playSound(SOUND_SELECT);
-        textToSpeechWithoutCopy("已追加复制");
-    }
-
-    public static void sendKeyKnock(int keycode) {
-        SDLActivity.onNativeKeyDown(keycode);
-        try {
-            Thread.sleep(16);
-        } catch (Exception ignore) {
-        }
-        SDLActivity.onNativeKeyUp(keycode);
+        SDLActivity.clipboardSetText(append && text != null && !text.isEmpty()
+                ? text + "\n" + speechText : speechText);
+        playAccessibilityFeedback(SOUND_SELECT);
+        textToSpeechWithoutCopy(append ? "已追加复制" : "已复制");
     }
 
     public static void vibrate(long milliseconds) {
@@ -134,5 +112,10 @@ public class VisualHelper {
             return;
         }
         mSoundPool.play(soundID, 1, 1, 0, 0, 1);
+    }
+
+    public static void playAccessibilityFeedback(int soundType) {
+        playSound(soundType);
+        vibrate(soundType == SOUND_MENU ? 50 : 10);
     }
 }
