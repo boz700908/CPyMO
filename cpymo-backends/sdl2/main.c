@@ -590,6 +590,10 @@ START:
 		&& appletMainLoop()
 #endif
 		) {
+		#ifdef __ANDROID__
+		extern void cpymo_android_refresh_input_devices(void);
+		cpymo_android_refresh_input_devices();
+		#endif
 
 		extern float mouse_wheel;
 		mouse_wheel = 0;

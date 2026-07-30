@@ -6,7 +6,10 @@ import java.util.Comparator;
 import java.util.List;
 
 import android.content.Context;
+import android.hardware.input.InputManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
@@ -14,6 +17,8 @@ import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+
+import xyz.xydm.cpymo.Config;
 
 
 public class SDLControllerManager
@@ -173,14 +178,47 @@ class SDLJoystickHandler_API16 extends SDLJoystickHandler {
     }
 
     private final ArrayList<SDLJoystick> mJoysticks;
+    private InputManager inputManager;
+    private boolean inputDeviceListenerRegistered;
+    private final InputManager.InputDeviceListener inputDeviceListener = new InputManager.InputDeviceListener() {
+        @Override
+        public void onInputDeviceAdded(int deviceId) {
+            Config.nativeInputDeviceChanged();
+        }
+
+        @Override
+        public void onInputDeviceRemoved(int deviceId) {
+            Config.nativeInputDeviceChanged();
+        }
+
+        @Override
+        public void onInputDeviceChanged(int deviceId) {
+            Config.nativeInputDeviceChanged();
+        }
+    };
 
     public SDLJoystickHandler_API16() {
 
         mJoysticks = new ArrayList<SDLJoystick>();
     }
 
+    private void registerInputDeviceListener() {
+        if (inputDeviceListenerRegistered || SDL.getContext() == null) {
+            return;
+        }
+
+        Context context = SDL.getContext().getApplicationContext();
+        inputManager = (InputManager) context.getSystemService(Context.INPUT_SERVICE);
+        if (inputManager != null) {
+            inputManager.registerInputDeviceListener(inputDeviceListener,
+                    new Handler(Looper.getMainLooper()));
+            inputDeviceListenerRegistered = true;
+        }
+    }
+
     @Override
     public void pollInputDevices() {
+        registerInputDeviceListener();
         int[] deviceIds = InputDevice.getDeviceIds();
 
         for (int device_id : deviceIds) {

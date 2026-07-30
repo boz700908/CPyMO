@@ -175,7 +175,7 @@ cpymo_input cpymo_input_snapshot()
 
 	#define MAP_CONTROLLER(OUT_KEY, CONTROLLER_KEY) \
 		for (size_t i = 0; i < gamecontrollers_count; ++i) \
-			if (SDL_GameControllerGetButton(gamecontrollers[i], CONTROLLER_KEY)) { \
+			if (gamecontrollers[i] != NULL && SDL_GameControllerGetButton(gamecontrollers[i], CONTROLLER_KEY)) { \
 				OUT_KEY = true; \
 				break; \
 			}
@@ -211,6 +211,7 @@ cpymo_input cpymo_input_snapshot()
 
 
 	for (size_t i = 0; i < gamecontrollers_count; ++i) {
+		if (gamecontrollers[i] == NULL) continue;
 		if (abs(SDL_GameControllerGetAxis(gamecontrollers[i], SDL_CONTROLLER_AXIS_TRIGGERLEFT)) > 16384)
 			out.hide_window = true;
 		
@@ -246,7 +247,7 @@ cpymo_input cpymo_input_snapshot()
 void cpymo_input_free_joysticks() 
 {
 	for (size_t i = 0; i < gamecontrollers_count; ++i)
-		SDL_GameControllerClose(gamecontrollers[i]);
+		if (gamecontrollers[i]) SDL_GameControllerClose(gamecontrollers[i]);
 	if (gamecontrollers) free(gamecontrollers);
 	gamecontrollers = NULL;
 	gamecontrollers_count = 0;

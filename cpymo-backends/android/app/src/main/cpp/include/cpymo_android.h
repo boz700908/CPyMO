@@ -7,5 +7,6 @@
 
 void cpymo_android_text_to_speech(const char* text);
 void cpymo_android_play_sound(int sound_type);
+void cpymo_android_refresh_input_devices(void);
 
 #endif //CPYMO_CPYMO_ANDROID_H
