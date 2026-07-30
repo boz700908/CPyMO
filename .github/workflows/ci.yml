@@ -229,6 +229,7 @@ jobs:
         run: |
           chmod +x ./build-ffmpeg.sh
           sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability -Wno-error=unguarded-availability-new"/g' ./build-ffmpeg.sh
+          sed -i '' 's/--enable-pic"/--enable-pic --disable-securetransport"/g' ./build-ffmpeg.sh
           ./build-ffmpeg.sh arm64
 
       - name: Configure CMake
@@ -268,6 +269,7 @@ jobs:
         run: |
           chmod +x ./build-ffmpeg.sh
           sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability -Wno-error=unguarded-availability-new"/g' ./build-ffmpeg.sh
+          sed -i '' 's/--enable-pic"/--enable-pic --disable-securetransport"/g' ./build-ffmpeg.sh
           ./build-ffmpeg.sh arm64
 
       - name: Configure CMake
