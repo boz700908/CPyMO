@@ -150,6 +150,19 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
 #ifdef ENABLE_TEXT_EXTRACT
 
 /* ================================================================
+ * Shared last-spoken-text buffer (aligned with Android accessibility)
+ * ================================================================ */
+static char *last_spoken_text = NULL;
+
+static void save_last_spoken_text(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    if (last_spoken_text) free(last_spoken_text);
+    last_spoken_text = (char *)malloc(strlen(text) + 1);
+    if (last_spoken_text) strcpy(last_spoken_text, text);
+}
+
+/* ================================================================
  * Platform-specific TTS includes
  * ================================================================ */
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
@@ -178,9 +191,59 @@ extern void cpymo_ios_accessibility_play_sound(int sound_type);
 /* === Shared SDL2 Accessibility Sound System (Windows, macOS, Linux) === */
 #if !defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) && !defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
 
+extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
+
 static SDL_AudioDeviceID accessibility_audio_dev = 0;
 static Uint8 *accessibility_wav_bufs[4] = {NULL, NULL, NULL, NULL};
 static Uint32 accessibility_wav_lens[4] = {0, 0, 0, 0};
+
+/* Boost WAV sample amplitude to match Android SoundPool perceived volume.
+ * Android SoundPool plays at full system volume through ASSISTANCE_SONIFICATION
+ * audio path, while SDL2 outputs raw PCM without any system gain stage.
+ * A gain of 2.0x (+6dB) compensates for this difference. */
+static void amplify_wav_buffer(Uint8 *buf, Uint32 len, SDL_AudioFormat format, float gain)
+{
+    if (gain <= 1.0f || buf == NULL) return;
+
+    if (SDL_AUDIO_ISFLOAT(format)) {
+        float *samples = (float *)buf;
+        Uint32 count = len / (Uint32)sizeof(float);
+        for (Uint32 i = 0; i < count; i++) {
+            float s = samples[i] * gain;
+            if (s > 1.0f) s = 1.0f;
+            else if (s < -1.0f) s = -1.0f;
+            samples[i] = s;
+        }
+    } else if (SDL_AUDIO_ISSIGNED(format)) {
+        int bytes_per_sample = (int)SDL_AUDIO_BITSIZE(format) / 8;
+        Uint32 count = len / (Uint32)bytes_per_sample;
+        if (bytes_per_sample == 2) {
+            Sint16 *samples = (Sint16 *)buf;
+            for (Uint32 i = 0; i < count; i++) {
+                int s = (int)((float)samples[i] * gain);
+                if (s > 32767) s = 32767;
+                else if (s < -32768) s = -32768;
+                samples[i] = (Sint16)s;
+            }
+        } else if (bytes_per_sample == 4) {
+            Sint32 *samples = (Sint32 *)buf;
+            for (Uint32 i = 0; i < count; i++) {
+                float s = (float)samples[i] * gain;
+                if (s > 2147483647.0f) s = 2147483647.0f;
+                else if (s < -2147483648.0f) s = -2147483648.0f;
+                samples[i] = (Sint32)s;
+            }
+        }
+    } else {
+        /* Unsigned (e.g. 8-bit): center at 128, scale, clamp, re-center */
+        for (Uint32 i = 0; i < len; i++) {
+            int s = (int)((float)((int)buf[i] - 128) * gain) + 128;
+            if (s > 255) s = 255;
+            else if (s < 0) s = 0;
+            buf[i] = (Uint8)s;
+        }
+    }
+}
 
 void cpymo_sdl2_accessibility_sound_init(void)
 {
@@ -213,9 +276,14 @@ void cpymo_sdl2_accessibility_sound_init(void)
             }
         }
 
-        if (loaded && !have_spec) {
-            wav_spec = spec;
-            have_spec = 1;
+        if (loaded) {
+            /* Boost volume to match Android SoundPool perceived loudness */
+            amplify_wav_buffer(accessibility_wav_bufs[i], accessibility_wav_lens[i],
+                               spec.format, 2.0f);
+            if (!have_spec) {
+                wav_spec = spec;
+                have_spec = 1;
+            }
         }
     }
     if (base_path) SDL_free(base_path);
@@ -223,6 +291,21 @@ void cpymo_sdl2_accessibility_sound_init(void)
     /* Open audio device with WAV's actual spec (not hardcoded) */
     if (have_spec) {
         accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
+        if (accessibility_audio_dev) {
+            /* Prime the audio pipeline: queue a tiny silence buffer and unpause
+             * so Windows WASAPI starts its audio thread now, not on first play.
+             * No blocking wait — SDL2 audio thread runs asynchronously. */
+            int bytes_per_sample = (int)SDL_AUDIO_BITSIZE(wav_spec.format) / 8;
+            int channels = (int)wav_spec.channels;
+            int silence_samples = (wav_spec.freq * channels) / 200; /* 5ms */
+            Uint32 silence_len = (Uint32)(silence_samples * bytes_per_sample);
+            Uint8 *silence = (Uint8 *)SDL_calloc(1, silence_len);
+            if (silence) {
+                SDL_QueueAudio(accessibility_audio_dev, silence, silence_len);
+                SDL_PauseAudioDevice(accessibility_audio_dev, 0);
+                SDL_free(silence);
+            }
+        }
     }
 }
 
@@ -237,6 +320,10 @@ void cpymo_sdl2_accessibility_sound_free(void)
     if (accessibility_audio_dev) {
         SDL_CloseAudioDevice(accessibility_audio_dev);
         accessibility_audio_dev = 0;
+    }
+    if (last_spoken_text) {
+        free(last_spoken_text);
+        last_spoken_text = NULL;
     }
 }
 
@@ -260,15 +347,65 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
 #endif
     }
 
-    /* === Vibration (aligned with Android) === */
-    /* 10ms = light (select/switch), 20ms = medium (skip hold), 50ms = heavy (cancel/menu) */
-    extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
+    /* === Vibration (scaled for game controller rumble motor inertia) ===
+     * Android uses linear vibration motors that respond instantly to short pulses
+     * (10ms is perceptible). Game controller rumble motors have rotational inertia
+     * and need ~50ms minimum to spin up and be felt. We scale durations up by 6x
+     * so the perceived intensity matches Android. */
     switch (sound_type) {
-        case SOUND_ENTER:  cpymo_sdl2_accessibility_vibrate(10); break;
-        case SOUND_MENU:   cpymo_sdl2_accessibility_vibrate(50); break;
-        case SOUND_SELECT: cpymo_sdl2_accessibility_vibrate(10); break;
+        case SOUND_ENTER:  cpymo_sdl2_accessibility_vibrate(60); break;
+        case SOUND_MENU:   cpymo_sdl2_accessibility_vibrate(150); break;
+        case SOUND_SELECT: cpymo_sdl2_accessibility_vibrate(60); break;
         default: break;
     }
+}
+
+/* === Copy / append-copy last spoken text (aligned with Android) ===
+ * Android: two-finger swipe left/right
+ * Desktop: F1/F2 on keyboard, LB+DPad Left/Right on controller */
+
+/* Speak feedback without overwriting last_spoken_text (matches Android's
+ * textToSpeechWithoutCopy behavior, so repeated copies still get the
+ * original game text, not "已复制") */
+static void speak_feedback(const char *msg)
+{
+    char *saved = last_spoken_text ? SDL_strdup(last_spoken_text) : NULL;
+    cpymo_backend_text_extract(msg);
+    if (last_spoken_text) free(last_spoken_text);
+    last_spoken_text = saved;
+}
+
+void cpymo_backend_text_copy_last(void)
+{
+    if (last_spoken_text == NULL) return;
+    SDL_SetClipboardText(last_spoken_text);
+    cpymo_sdl2_accessibility_vibrate(60);
+    cpymo_sdl2_accessibility_play_sound(SOUND_SELECT);
+    speak_feedback("已复制");
+}
+
+void cpymo_backend_text_append_copy_last(void)
+{
+    if (last_spoken_text == NULL) return;
+    char *old = SDL_GetClipboardText();
+    size_t old_len = old ? strlen(old) : 0;
+    size_t new_len = strlen(last_spoken_text);
+    char *combined = (char *)malloc(old_len + new_len + 2);
+    if (combined) {
+        if (old && old_len > 0) {
+            memcpy(combined, old, old_len);
+            combined[old_len] = '\n';
+            memcpy(combined + old_len + 1, last_spoken_text, new_len + 1);
+        } else {
+            memcpy(combined, last_spoken_text, new_len + 1);
+        }
+        SDL_SetClipboardText(combined);
+        free(combined);
+    }
+    if (old) SDL_free(old);
+    cpymo_sdl2_accessibility_vibrate(60);
+    cpymo_sdl2_accessibility_play_sound(SOUND_SELECT);
+    speak_feedback("已追加复制");
 }
 
 #endif /* !Android && !iOS */
@@ -294,6 +431,7 @@ void cpymo_backend_text_extract_free(void)
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
 
     int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
     if (wide_len == 0) return;
@@ -316,13 +454,20 @@ void cpymo_backend_text_extract(const char *text);
 /* --- iOS: AVSpeechSynthesizer / VoiceOver --- */
 #elif defined(__IOS__)
 void cpymo_backend_text_extract_init(void) {}
-void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_free(void) {
+    if (last_spoken_text) { free(last_spoken_text); last_spoken_text = NULL; }
+}
 
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
     cpymo_ios_accessibility_announce(text);
 }
+
+/* Copy/append-copy handled in iOS native layer */
+void cpymo_backend_text_copy_last(void) {}
+void cpymo_backend_text_append_copy_last(void) {}
 
 /* --- Emscripten: ARIA live region --- */
 #elif defined(__EMSCRIPTEN__)
@@ -357,6 +502,7 @@ void cpymo_backend_text_extract_free(void)
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
 
     EM_ASM_INT({var b=document.getElementById('cpymo-accessibility-bar');if(b)b.textContent=UTF8ToString($0);return 0}, text);
 }
@@ -376,6 +522,7 @@ void cpymo_backend_text_extract_free(void)
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
     cpymo_macos_accessibility_announce(text);
 }
 
@@ -395,6 +542,7 @@ void cpymo_backend_text_extract_free(void)
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
 
     pid_t child = fork();
     if (child == 0) {
@@ -406,11 +554,14 @@ void cpymo_backend_text_extract(const char *text)
 /* --- Android / fallback --- */
 #else
 void cpymo_backend_text_extract_init(void) {}
-void cpymo_backend_text_extract_free(void) {}
+void cpymo_backend_text_extract_free(void) {
+    if (last_spoken_text) { free(last_spoken_text); last_spoken_text = NULL; }
+}
 
 void cpymo_backend_text_extract(const char *text)
 {
     if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
 
 #ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
     extern void cpymo_android_text_to_speech(const char *text);
@@ -426,6 +577,13 @@ void cpymo_backend_text_extract(const char *text)
     fprintf(stderr, "[Accessibility] %s\n", text);
 #endif
 }
+
+/* Stubs: copy/append-copy handled in native layer for Android/iOS */
+#if defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) || defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+void cpymo_backend_text_copy_last(void) {}
+void cpymo_backend_text_append_copy_last(void) {}
+#endif
+
 #endif
 
 #endif /* ENABLE_TEXT_EXTRACT */

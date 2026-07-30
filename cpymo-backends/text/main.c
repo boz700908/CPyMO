@@ -133,6 +133,8 @@ float cpymo_backend_text_width(
 #ifdef ENABLE_TEXT_EXTRACT
 void cpymo_backend_text_extract(const char *text)
 { puts(text); }
+void cpymo_backend_text_copy_last(void) {}
+void cpymo_backend_text_append_copy_last(void) {}
 #endif
 
 #ifdef _WIN32

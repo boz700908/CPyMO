@@ -30,10 +30,14 @@ float cpymo_backend_text_width(
 void cpymo_backend_text_extract_init(void);
 void cpymo_backend_text_extract_free(void);
 void cpymo_backend_text_extract(const char *text);
+void cpymo_backend_text_copy_last(void);
+void cpymo_backend_text_append_copy_last(void);
 #else
 #define cpymo_backend_text_extract_init()
 #define cpymo_backend_text_extract_free()
 #define cpymo_backend_text_extract(A)
+#define cpymo_backend_text_copy_last()
+#define cpymo_backend_text_append_copy_last()
 #endif
 
 #endif

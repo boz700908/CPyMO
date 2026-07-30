@@ -85,6 +85,8 @@ public class VisualHelper {
         if (mLastSpeakText == null) return;
 
         SDLActivity.clipboardSetText(mLastSpeakText);
+        vibrate(10);
+        playSound(SOUND_SELECT);
     }
 
     public static void appendCopyLastSpeechText() {
@@ -92,6 +94,8 @@ public class VisualHelper {
 
         String text = SDLActivity.clipboardGetText();
         SDLActivity.clipboardSetText(text + "\n" + mLastSpeakText);
+        vibrate(10);
+        playSound(SOUND_SELECT);
     }
 
     public static void sendKeyKnock(int keycode) {

@@ -8,6 +8,7 @@
 #include "cpymo_msgbox_ui.h"
 #include "cpymo_save_global.h"
 #include "cpymo_localization.h"
+#include "../cpymo-backends/include/cpymo_backend_text.h"
 
 static void cpymo_logo() {
 	static bool logo_printed = false;
@@ -306,6 +307,13 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 
 	if (engine->input.hide_window != engine->prev_input.hide_window)
 		cpymo_engine_request_redraw(engine);
+
+#ifdef ENABLE_TEXT_EXTRACT
+	if (engine->input.copy && !engine->prev_input.copy)
+		cpymo_backend_text_copy_last();
+	if (engine->input.append_copy && !engine->prev_input.append_copy)
+		cpymo_backend_text_append_copy_last();
+#endif
 
 	if (cpymo_ui_enabled(engine))
 		err = cpymo_ui_update(engine, delta_time_sec);
