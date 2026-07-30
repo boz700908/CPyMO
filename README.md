@@ -58,7 +58,7 @@ Sony PSP          | SDL2 | 无       | FFmpeg             | 外置字体        
 --------------- | ---- | -------- | ------------------ | ----------- | ---------------
 Linux           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     | 视障帮助
 macOS           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 加载系统字体  | 视障帮助
-iOS             | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器
+iOS             | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器,视障帮助
 Nintendo Switch | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器
 UWP             | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器
 Emscripten      | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     |
@@ -274,6 +274,10 @@ cd到`cpymo-backends/sdl2`，执行`make -j -f Makefile.Switch`即可编译到�
 
 # iOS 平台
 
+## 无障碍版本
+
+GitHub Action 和 Release 中的"CPyMO for iOS (Accessibility)"版本即为带有视障帮助的版本，包含语音朗读、音效反馈、震动提示和自定义手势操作。
+
 ## 安装
 
 可以通过Sideloady等侧载软件在iOS上侧载CPyMO for iOS。
@@ -381,26 +385,106 @@ vdpm libmikmod
 
 仅当集成了游戏时，可通过`make run -j`来使用emrun启动CPyMO。
 
+# 视障帮助（无障碍功能）
+
+CPyMO 为视障玩家提供了全平台统一的无障碍支持，包括语音朗读、音效反馈和震动提示。
+
+## 功能概述
+
+**语音朗读 (TTS)**：自动朗读游戏文本、菜单选项和设置项。各平台使用系统原生 TTS 引擎：
+- Windows：通过 [Tolk](https://github.com/dkager/tolk) 调用屏幕阅读器（NVDA、JAWS 等）
+- macOS：使用 NSSpeechSynthesizer 系统语音
+- Linux：使用 speech-dispatcher 语音服务
+- iOS：使用 AVSpeechSynthesizer，并自动适配 VoiceOver
+- Android：使用 Android TextToSpeech API
+
+**音效反馈**：在操作时播放短促音效，帮助确认操作已被识别：
+- 确认/进入（enter.wav）
+- 取消/菜单（menu.wav）
+- 选择/切换（select.wav）
+
+**震动反馈**（与 Android 对齐）：
+- 轻震 10ms：选择/切换项
+- 中震 20ms：快进保持
+- 重震 50ms：取消/长按
+- 无震动硬件的平台（桌面端）自动转移到手柄震动
+
+**自动朗读**：所有页面（游戏选择器、存档/读档、音乐盒、设置）进入时自动朗读第一个项目。
+
+**设置页面特殊行为**：浏览设置项时朗读"名称+值"，更改设置值时仅朗读"值"。
+
+## 构建无障碍版本
+
+无障碍版本与普通版本分开构建，通过构建选项控制。
+
+**CMake 构建**（桌面端、iOS）：
+```bash
+# 启用无障碍
+cmake -B build -DENABLE_ACCESSIBILITY=ON
+cmake --build build
+```
+
+**Makefile 构建**（SDL2 桌面端）：
+```bash
+# Linux/macOS
+ENABLE_TEXT_EXTRACT=1 ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1 make -j
+
+# Linux (speech-dispatcher)
+ENABLE_TEXT_EXTRACT=1 ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY=1 make -j
+
+# macOS (NSSpeechSynthesizer)
+ENABLE_TEXT_EXTRACT=1 ENABLE_TEXT_EXTRACT_MACOS_ACCESSIBILITY=1 make -j
+```
+
+**iOS**：
+```bash
+cmake -S. -Bbuild -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON
+cmake --build build
+```
+
+**Android**：
+在 `gradle.properties` 中设置：
+```properties
+ENABLE_TEXT_EXTRACT=true
+ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY=true
+```
+
+## iOS 无障碍手势
+
+无障碍版 iOS 在普通触控操作基础上叠加了以下手势：
+
+| 手势 | 功能 |
+|------|------|
+| 单指上下左右滑动 | 方向键 |
+| 单指双击 | 确认（回车） |
+| 单指按住 0.5 秒 | 取消（ESC） |
+| 单指按住后移动 | 探索模式（移动鼠标指针） |
+| 双指双击 | 快进（CTRL） |
+| 双指双击并按住 | 长按快进 |
+| 双指向左滑动 | 复制上次朗读文本到剪贴板 |
+| 双指向右滑动 | 追加复制上次朗读文本 |
+| 双指向下滑动 | 取消（ESC） |
+
+## Android 无障碍手势
+
+Android 无障碍版本通过 TalkBack 和自定义手势进行操作：
+
+| 手势 | 功能 |
+|------|------|
+| 单指轻点 | 移动鼠标位置但不点击 |
+| 单指按住并移动 | 持续移动鼠标位置但不点击 |
+| 单指双击 | 回车键 |
+| 单指长按 | ESC键 |
+| 单指上下左右滑动 | 上下左右方向键 |
+| 双指双击 | CTRL键 |
+| 双指双击并按住 | 长按CTRL键 |
+| 双指向左滑动 | 将上一次TTS朗读的内容复制到剪贴板 |
+| 双指向右滑动 | 将上一次TTS朗读的内容追加到剪贴板 |
+| 双指向下滑动 | ESC键 |
+
 # Android 平台
 
 仅支持 Android 4.3 及以上的系统，如果你需要在更低版本的Android上运行，则可以使用原版PyMO，而不是使用CPyMO。
-
-## 视障帮助
-
-GitHub Action和Release中的“CPyMO for Android (Accessibility)”版本即为带有视障帮助的版本。
-
-视障帮助功能会调用系统TTS进行朗读，并加入了一些手势操作：
-
-* 单指轻点 ==> 移动鼠标位置但不点击
-* 单指按住并移动 ==> 持续移动鼠标位置但不点击
-* 单指双击 ==> 回车键
-* 单指长按 ==> ESC键
-* 单指 **上/下/左/右** 滑动 ==> **上/下/左/右** 方向键
-* 双指双击 ==> CTRL键
-* 双指双击并按住 ==> 长按CTRL键
-* 双指向左滑动 ==> 将上一次TTS朗读的内容复制到剪贴板
-* 双指向右滑动 ==> 将上一次TTS朗读的内容追加到剪贴板
-* 双指向下滑动 ==> ESC键
 
 ## 编译
 
