@@ -305,7 +305,7 @@ bool cpymo_textbox_wait_text_fadein(cpymo_engine *e, float dt, cpymo_textbox *wh
     case 2: speed = 0.05f; break;
     case 3: speed = 0.025f; break;
     case 4: speed = 0.0125f; break;
-    default: speed = 0.0f; break;
+    default: speed = 0.05f; break;
     };
 
     error_t err = CPYMO_ERR_SUCC;

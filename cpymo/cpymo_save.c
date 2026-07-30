@@ -293,6 +293,7 @@ error_t cpymo_save_load_title(cpymo_save_title *out, FILE *save)
 		free(out->say_name);
 		out->title = NULL;
 		out->say_name = NULL;
+		return err;
 	}
 
 	return CPYMO_ERR_SUCC;

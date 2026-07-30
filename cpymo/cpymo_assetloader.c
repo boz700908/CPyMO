@@ -68,7 +68,12 @@ error_t cpymo_assetloader_init(cpymo_assetloader * out, const cpymo_gameconfig *
 
 	chbuf[gamedir_strlen] = '\0';
 	
-	out->gamedir = (char*)realloc((void *)out->gamedir, gamedir_strlen + 1);
+	char *shrunk_gamedir = (char*)realloc((void *)out->gamedir, gamedir_strlen + 1);
+	if (shrunk_gamedir == NULL) {
+		cpymo_assetloader_free(out);
+		return CPYMO_ERR_OUT_OF_MEM;
+	}
+	out->gamedir = shrunk_gamedir;
 	
 	return CPYMO_ERR_SUCC;
 }
@@ -391,7 +396,7 @@ error_t cpymo_assetloader_load_icon(
 		out, px, *w, *h, cpymo_backend_image_format_rgba);
 
 	if (e != CPYMO_ERR_SUCC) free(px);
-	return CPYMO_ERR_SUCC;
+	return e;
 }
 #endif
 #endif

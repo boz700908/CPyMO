@@ -35,7 +35,11 @@ error_t cpymo_package_open(cpymo_package *out_package, const char * path)
 
 	out_package->files = (cpymo_package_index *)malloc(sizeof(cpymo_package_index) * out_package->file_count);
 
-	if (out_package->files == NULL) return CPYMO_ERR_OUT_OF_MEM;
+	if (out_package->files == NULL) {
+		fclose(out_package->stream);
+		out_package->stream = NULL;
+		return CPYMO_ERR_OUT_OF_MEM;
+	}
 	
 	count =
 		fread(
@@ -109,7 +113,12 @@ error_t cpymo_package_read_file(char **out_buffer, size_t *sz, const cpymo_packa
 	*out_buffer = (char *)malloc(*sz);
 	if (*out_buffer == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
-	return cpymo_package_read_file_from_index(*out_buffer, package, &idx);
+	err = cpymo_package_read_file_from_index(*out_buffer, package, &idx);
+	if (err != CPYMO_ERR_SUCC) {
+		free(*out_buffer);
+		*out_buffer = NULL;
+	}
+	return err;
 }
 
 #ifdef STREAMING_LOAD_IMAGE
