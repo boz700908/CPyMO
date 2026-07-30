@@ -228,13 +228,13 @@ jobs:
         working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
         run: |
           chmod +x ./build-ffmpeg.sh
-          sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability"/g' ./build-ffmpeg.sh
+          sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability -Wno-error=unguarded-availability-new"/g' ./build-ffmpeg.sh
           ./build-ffmpeg.sh arm64
 
       - name: Configure CMake
         shell: bash
         working-directory: ./cpymo-backends/ios
-        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake  -DENABLE_BITCODE=0 -DPLATFORM=OS64
+        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake  -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
 
       - name: Build IPA
         shell: bash
@@ -267,13 +267,13 @@ jobs:
         working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
         run: |
           chmod +x ./build-ffmpeg.sh
-          sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability"/g' ./build-ffmpeg.sh
+          sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability -Wno-error=unguarded-availability-new"/g' ./build-ffmpeg.sh
           ./build-ffmpeg.sh arm64
 
       - name: Configure CMake
         shell: bash
         working-directory: ./cpymo-backends/ios
-        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON
+        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
 
       - name: Build IPA
         shell: bash
