@@ -36,9 +36,12 @@ error_t cpymo_textbox_init(
         if (o->backlog_buf == NULL) return CPYMO_ERR_OUT_OF_MEM;
     }
 
+    size_t pools_size = o->chars_pool_max_size *
+        (sizeof(cpymo_backend_text) + sizeof(float));
+    size_t lines_offset = (pools_size + sizeof(cpymo_textbox_line) - 1) /
+        sizeof(cpymo_textbox_line) * sizeof(cpymo_textbox_line);
     uint8_t *mem = (uint8_t *)malloc(
-        o->max_lines * sizeof(cpymo_textbox_line) +
-        o->chars_pool_max_size * (sizeof(cpymo_backend_text) + sizeof(float)));
+        lines_offset + o->max_lines * sizeof(cpymo_textbox_line));
     if (mem == NULL) {
         if (o->backlog_buf) free(o->backlog_buf);
         return CPYMO_ERR_OUT_OF_MEM;
@@ -48,8 +51,7 @@ error_t cpymo_textbox_init(
     o->chars_x_pool = (float *)
         (mem + o->chars_pool_max_size * sizeof(cpymo_backend_text));
 
-    o->lines = (cpymo_textbox_line *)
-        (mem + o->chars_pool_max_size * (sizeof(cpymo_backend_text) + sizeof(float)));
+    o->lines = (cpymo_textbox_line *)(mem + lines_offset);
 
     if (width < character_size * 1.5f)
         width = character_size * 1.5f;

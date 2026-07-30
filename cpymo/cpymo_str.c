@@ -101,8 +101,7 @@ cpymo_color cpymo_str_as_color(cpymo_str span)
 {
 	cpymo_str_trim(&span);
 
-	if (span.begin[0] != '#') return cpymo_color_error;
-	if (span.len < 1) return cpymo_color_error;
+	if (span.len < 1 || span.begin[0] != '#') return cpymo_color_error;
 
 	for (size_t i = 0; i < span.len - 1; ++i) 
 		if (span.begin[i + 1] < 0 || !isxdigit((int)span.begin[i + 1]))
@@ -156,7 +155,7 @@ bool cpymo_str_equals_ignore_case(cpymo_str a, cpymo_str b)
 {
 	if (a.len != b.len) return false;
 	for (size_t i = 0; i < a.len; ++i)
-		if (tolower(a.begin[i]) != tolower(b.begin[i]))
+		if (tolower((unsigned char)a.begin[i]) != tolower((unsigned char)b.begin[i]))
 			return false;
 	return true;
 }
@@ -170,11 +169,11 @@ bool cpymo_str_starts_with_str_ignore_case(cpymo_str span, const char * prefix)
 {
 	if (*prefix == '\0') return true;
 	else if (span.len == 0 && *prefix != '\0') return false;
-	else if (toupper(span.begin[0]) == toupper(*prefix)) {
+	else if (toupper((unsigned char)span.begin[0]) == toupper((unsigned char)*prefix)) {
 		span.len--;
 		span.begin++;
 		prefix++;
-		return cpymo_str_starts_with_str_ignore_case(span, prefix);
+		return cpymo_str_starts_with_str(span, prefix);
 	}
 	else return false;
 }
