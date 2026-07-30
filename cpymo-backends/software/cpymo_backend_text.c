@@ -92,6 +92,12 @@ error_t cpymo_backend_text_create(
 
     stbtt_fontinfo *font = cpymo_backend_software_cur_context->font;
 
+    if (!isfinite(single_character_size_in_logical_screen) ||
+        single_character_size_in_logical_screen <= 0.0f ||
+        game_w <= 0.0f || game_h <= 0.0f ||
+        win_w <= 0.0f || win_h <= 0.0f)
+        return CPYMO_ERR_INVALID_ARG;
+
     float height_norm = single_character_size_in_logical_screen / game_h;
     float height_screen = height_norm * win_h;
 
@@ -102,13 +108,22 @@ error_t cpymo_backend_text_create(
 
     int w, h;
     cpymo_backend_text_render(NULL, &w, &h, utf8_string, scale, baseline);
+    if (w < 0 || h < 0 || h > INT_MAX - 4)
+        return CPYMO_ERR_UNSUPPORTED;
     h += 4; // magic
 
-    cpymo_backend_text_impl *o = (cpymo_backend_text_impl *)malloc(sizeof(cpymo_backend_text_impl) + w * h);
+    /* The draw loops use uint16_t counters, so reject dimensions that cannot
+     * be represented consistently instead of truncating or overflowing. */
+    if ((unsigned int)w > UINT16_MAX || (unsigned int)h > UINT16_MAX ||
+        (size_t)w > (SIZE_MAX - sizeof(cpymo_backend_text_impl)) / (size_t)h)
+        return CPYMO_ERR_UNSUPPORTED;
+    size_t pixels_size = (size_t)w * (size_t)h;
+
+    cpymo_backend_text_impl *o = (cpymo_backend_text_impl *)malloc(sizeof(cpymo_backend_text_impl) + pixels_size);
     if (o == NULL) return CPYMO_ERR_OUT_OF_MEM;
-    memset(o, 0, sizeof(cpymo_backend_text_impl) + w * h);
-    o->w = (uint16_t)w;
-    o->h = (uint16_t)h;
+    memset(o, 0, sizeof(cpymo_backend_text_impl) + pixels_size);
+    o->w = (size_t)w;
+    o->h = (size_t)h;
     *out_width = cpymo_backend_text_width(utf8_string, single_character_size_in_logical_screen);
     cpymo_backend_text_render(o->px, &w, &h, utf8_string, scale, baseline);
     *out = o;
@@ -181,6 +196,12 @@ float cpymo_backend_text_width(
     float win_h = (float)cpymo_backend_software_cur_context->render_target->h;
 
     stbtt_fontinfo *font = cpymo_backend_software_cur_context->font;
+
+    if (!isfinite(single_character_size_in_logical_screen) ||
+        single_character_size_in_logical_screen <= 0.0f ||
+        game_w <= 0.0f || game_h <= 0.0f ||
+        win_w <= 0.0f || win_h <= 0.0f)
+        return 0.0f;
 
     float height_norm = single_character_size_in_logical_screen / game_h;
     float height_screen = height_norm * win_h;

@@ -18,7 +18,10 @@ static size_t haptics_count = 0;
 #endif
 
 #ifdef ENABLE_TEXT_EXTRACT
-static SDL_atomic_t accessibility_action;
+/* Different native gesture callbacks can enqueue more than one action before
+ * the next frame. Keep pending actions as bits so a hold-end action cannot be
+ * overwritten by a following copy or navigation action. */
+static SDL_atomic_t accessibility_actions;
 static bool accessibility_skip_held;
 
 #ifdef __EMSCRIPTEN__
@@ -32,8 +35,14 @@ CPYMO_ACCESSIBILITY_EXPORT void cpymo_accessibility_enqueue_action(
 	cpymo_accessibility_action action)
 {
 	if (action > CPYMO_ACCESSIBILITY_ACTION_NONE &&
-		action <= CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY)
-		SDL_AtomicSet(&accessibility_action, (int)action);
+		action <= CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY) {
+		int old_actions;
+		const int action_bit = 1 << ((int)action - 1);
+		do {
+			old_actions = SDL_AtomicGet(&accessibility_actions);
+		} while (!SDL_AtomicCAS(&accessibility_actions, old_actions,
+			old_actions | action_bit));
+	}
 }
 
 void cpymo_sdl2_accessibility_vibrate(int milliseconds)
@@ -112,19 +121,25 @@ cpymo_input cpymo_input_snapshot()
 	}
 
 #ifdef ENABLE_TEXT_EXTRACT
-	switch ((cpymo_accessibility_action)SDL_AtomicSet(&accessibility_action, 0)) {
-	case CPYMO_ACCESSIBILITY_ACTION_UP: out.up = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_DOWN: out.down = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_LEFT: out.left = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_RIGHT: out.right = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_OK: out.ok = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_CANCEL: out.cancel = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_SKIP: out.skip = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_START: accessibility_skip_held = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_END: accessibility_skip_held = false; break;
-	case CPYMO_ACCESSIBILITY_ACTION_COPY: out.copy = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY: out.append_copy = true; break;
-	case CPYMO_ACCESSIBILITY_ACTION_NONE: break;
+	int pending_accessibility_actions = SDL_AtomicSet(&accessibility_actions, 0);
+	for (int action = CPYMO_ACCESSIBILITY_ACTION_UP;
+		action <= CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY; ++action) {
+		if ((pending_accessibility_actions & (1 << (action - 1))) == 0)
+			continue;
+		switch ((cpymo_accessibility_action)action) {
+		case CPYMO_ACCESSIBILITY_ACTION_UP: out.up = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_DOWN: out.down = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_LEFT: out.left = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_RIGHT: out.right = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_OK: out.ok = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_CANCEL: out.cancel = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_SKIP: out.skip = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_START: accessibility_skip_held = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_SKIP_HOLD_END: accessibility_skip_held = false; break;
+		case CPYMO_ACCESSIBILITY_ACTION_COPY: out.copy = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY: out.append_copy = true; break;
+		case CPYMO_ACCESSIBILITY_ACTION_NONE: break;
+		}
 	}
 	out.skip = out.skip || accessibility_skip_held;
 #endif
