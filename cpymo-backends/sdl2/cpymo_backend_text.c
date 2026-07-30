@@ -176,8 +176,9 @@ static void save_last_spoken_text(const char *text)
 #elif defined(__APPLE__) && !defined(__IOS__)
 extern void cpymo_macos_accessibility_announce(const char *text);
 #elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
-#include <signal.h>
+#include <errno.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #elif defined(__IOS__)
 extern void cpymo_ios_accessibility_announce(const char *text);
@@ -589,7 +590,6 @@ void cpymo_backend_text_extract(const char *text)
 #elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
 void cpymo_backend_text_extract_init(void)
 {
-    signal(SIGCHLD, SIG_IGN);
     cpymo_sdl2_accessibility_sound_init();
 }
 
@@ -603,11 +603,19 @@ void cpymo_backend_text_extract(const char *text)
     if (text == NULL || text[0] == '\0') return;
     save_last_spoken_text(text);
 
-    pid_t child = fork();
-    if (child == 0) {
+    /* Reap only the short-lived launcher. The speaker is reparented after the
+     * second fork, avoiding zombies without changing the process-wide SIGCHLD
+     * disposition used by the host application. */
+    pid_t launcher = fork();
+    if (launcher == 0) {
+        pid_t speaker = fork();
+        if (speaker != 0)
+            _exit(speaker < 0 ? 127 : 0);
         execlp("spd-say", "spd-say", "--", text, (char *)NULL);
         _exit(127);
     }
+    if (launcher > 0)
+        while (waitpid(launcher, NULL, 0) < 0 && errno == EINTR) {}
 }
 
 /* --- Android / fallback --- */
