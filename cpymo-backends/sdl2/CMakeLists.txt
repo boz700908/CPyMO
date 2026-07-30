@@ -46,15 +46,23 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 		file(GLOB TOLK_RUNTIME_CONFS "${TOLK_ROOT}/${TOLK_ARCH}/Release/*.conf")
 		target_include_directories(cpymo PRIVATE "${TOLK_INCLUDE_DIR}")
 		target_link_libraries(cpymo PRIVATE "${TOLK_LIBRARY}")
-		add_custom_command(TARGET cpymo POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_DLLS} $<TARGET_FILE_DIR:cpymo>)
-		add_custom_command(TARGET cpymo POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_INIS} $<TARGET_FILE_DIR:cpymo>)
-		add_custom_command(TARGET cpymo POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_CONFS} $<TARGET_FILE_DIR:cpymo>)
+		if (TOLK_RUNTIME_DLLS)
+			add_custom_command(TARGET cpymo POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_DLLS} $<TARGET_FILE_DIR:cpymo>)
+		endif ()
+		if (TOLK_RUNTIME_INIS)
+			add_custom_command(TARGET cpymo POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_INIS} $<TARGET_FILE_DIR:cpymo>)
+		endif ()
+		if (TOLK_RUNTIME_CONFS)
+			add_custom_command(TARGET cpymo POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${TOLK_RUNTIME_CONFS} $<TARGET_FILE_DIR:cpymo>)
+		endif ()
 		file(GLOB ACCESSIBILITY_WAVS "${CMAKE_CURRENT_SOURCE_DIR}/enter.wav" "${CMAKE_CURRENT_SOURCE_DIR}/menu.wav" "${CMAKE_CURRENT_SOURCE_DIR}/select.wav")
-		add_custom_command(TARGET cpymo POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
+		if (ACCESSIBILITY_WAVS)
+			add_custom_command(TARGET cpymo POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
+		endif ()
 	endif ()
 elseif (CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_link_libraries(cpymo PRIVATE X11)

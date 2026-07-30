@@ -228,6 +228,7 @@ jobs:
         working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
         run: |
           chmod +x ./build-ffmpeg.sh
+          sed -i '' 's/CFLAGS="-arch $ARCH"/CFLAGS="-arch $ARCH -Wno-error=unguarded-availability"/g' ./build-ffmpeg.sh
           ./build-ffmpeg.sh arm64
 
       - name: Configure CMake
