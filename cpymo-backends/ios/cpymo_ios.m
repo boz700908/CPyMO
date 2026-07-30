@@ -28,6 +28,11 @@ enum {
     CPYMO_IOS_ACCESSIBILITY_SKIP_HOLD_END
 };
 
+/* Sound type constants (aligned with Android) */
+#define SOUND_ENTER  1
+#define SOUND_MENU   2
+#define SOUND_SELECT 3
+
 /* ================================================================
  * CPyMOExploreGestureRecognizer
  *
@@ -310,11 +315,6 @@ static void cpymo_ios_install_accessibility_gestures(void)
     two_finger_cancel.cancelsTouchesInView = YES;
     [view addGestureRecognizer:two_finger_cancel];
 }
-
-/* Sound type constants (aligned with Android) */
-#define SOUND_ENTER  1
-#define SOUND_MENU   2
-#define SOUND_SELECT 3
 
 #endif
 
