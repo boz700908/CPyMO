@@ -610,7 +610,7 @@ START:
 				if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
 					mouse_wheel *= -1;
 			}
-			else if (event.type == SDL_AUDIODEVICEADDED || event.type == SDL_AUDIODEVICEREMOVED) {
+			else if (event.type == SDL_AUDIODEVICEREMOVED) {
 				extern void cpymo_backend_audio_reset();
 				cpymo_backend_audio_reset();
 #ifdef ENABLE_TEXT_EXTRACT

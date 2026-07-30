@@ -56,6 +56,7 @@ struct cpymo_engine {
 #ifdef ENABLE_TEXT_EXTRACT
 	char *text_extract_buffer;
 	size_t text_extract_buffer_size, text_extract_buffer_maxsize;
+	bool text_extract_copy_latched;
 #endif
 };
 

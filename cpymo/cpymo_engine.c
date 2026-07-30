@@ -173,6 +173,7 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 	out->text_extract_buffer = NULL;
 	out->text_extract_buffer_size = 0;
 	out->text_extract_buffer_maxsize = 0;
+	out->text_extract_copy_latched = false;
 	#endif
 
 	// load config
@@ -309,10 +310,15 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 		cpymo_engine_request_redraw(engine);
 
 #ifdef ENABLE_TEXT_EXTRACT
-	if (engine->input.copy && !engine->prev_input.copy)
-		cpymo_backend_text_copy_last();
-	if (engine->input.append_copy && !engine->prev_input.append_copy)
-		cpymo_backend_text_append_copy_last();
+	if (!engine->input.copy && !engine->input.append_copy)
+		engine->text_extract_copy_latched = false;
+	else if (!engine->text_extract_copy_latched) {
+		engine->text_extract_copy_latched = true;
+		if (engine->input.copy)
+			cpymo_backend_text_copy_last();
+		else
+			cpymo_backend_text_append_copy_last();
+	}
 #endif
 
 	if (cpymo_ui_enabled(engine))
