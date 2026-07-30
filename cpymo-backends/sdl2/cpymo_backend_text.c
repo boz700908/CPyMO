@@ -392,7 +392,7 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
 
 /* === Copy / append-copy last spoken text (aligned with Android) ===
  * Android: two-finger swipe left/right
- * Desktop: F1/F2 on keyboard, LB+DPad Left/Right on controller */
+ * Desktop: Shift+C/Shift+D on keyboard, left/right stick click on controller */
 
 /* Speak feedback without overwriting last_spoken_text (matches Android's
  * textToSpeechWithoutCopy behavior, so repeated copies still get the

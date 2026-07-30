@@ -10,6 +10,7 @@
 #include "../../cpymo/cpymo_engine.h"
 #include "../../cpymo/cpymo_localization.h"
 #include "../../cpymo/cpymo_msgbox_ui.h"
+#include "../include/cpymo_backend_input.h"
 #include "../include/cpymo_backend_text.h"
 #include "cpymo_import_sdl2.h"
 #include <string.h>
@@ -67,6 +68,28 @@
 SDL_Window *window;
 SDL_Renderer *renderer;
 cpymo_engine engine;
+
+#ifdef ENABLE_TEXT_EXTRACT
+static void cpymo_sdl2_enqueue_copy_action(const SDL_Event *event)
+{
+	if (event->type == SDL_KEYDOWN) {
+		const SDL_Keysym *key = &event->key.keysym;
+		if (event->key.repeat || (key->mod & KMOD_ALT) != 0 ||
+			(key->mod & KMOD_SHIFT) == 0)
+			return;
+		if (key->scancode == SDL_SCANCODE_C)
+			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_COPY);
+		else if (key->scancode == SDL_SCANCODE_D)
+			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY);
+	}
+	else if (event->type == SDL_CONTROLLERBUTTONDOWN) {
+		if (event->cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSTICK)
+			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_COPY);
+		else if (event->cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSTICK)
+			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY);
+	}
+}
+#endif
 
 extern error_t cpymo_backend_font_init(const char *gamedir);
 extern void cpymo_backend_font_free();
@@ -600,6 +623,9 @@ START:
 		mouse_wheel = 0;
 
 		while (SDL_PollEvent(&event)) {
+			#ifdef ENABLE_TEXT_EXTRACT
+			cpymo_sdl2_enqueue_copy_action(&event);
+			#endif
 			if (event.type == SDL_WINDOWEVENT || event.type == SDL_RENDER_TARGETS_RESET)
 				redraw_by_event++;
 			else if (event.type == SDL_MOUSEWHEEL) {

@@ -101,13 +101,6 @@ cpymo_input cpymo_input_snapshot()
 		out.hide_window = 
 			keyboard[SDL_SCANCODE_LSHIFT] || 
 			keyboard[SDL_SCANCODE_RSHIFT];
-#ifdef ENABLE_TEXT_EXTRACT
-		/* Shift+C = copy, Shift+D = append copy */
-		out.copy = (keyboard[SDL_SCANCODE_LSHIFT] || keyboard[SDL_SCANCODE_RSHIFT])
-			&& keyboard[SDL_SCANCODE_C];
-		out.append_copy = (keyboard[SDL_SCANCODE_LSHIFT] || keyboard[SDL_SCANCODE_RSHIFT])
-			&& keyboard[SDL_SCANCODE_D];
-#endif
 	}
 	else {
 		out.up = 0;
@@ -217,12 +210,6 @@ cpymo_input cpymo_input_snapshot()
 	MAP_CONTROLLER(out.hide_window, SDL_CONTROLLER_BUTTON_LEFTSHOULDER);
 	MAP_CONTROLLER(out.skip, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
 	
-#ifdef ENABLE_TEXT_EXTRACT
-	/* Left stick click = copy, Right stick click = append copy */
-	MAP_CONTROLLER(out.copy, SDL_CONTROLLER_BUTTON_LEFTSTICK);
-	MAP_CONTROLLER(out.append_copy, SDL_CONTROLLER_BUTTON_RIGHTSTICK);
-#endif
-
 #if defined __SWITCH__ || defined __PSP__ || defined __PSV__
 	MAP_CONTROLLER(out.ok, SDL_CONTROLLER_BUTTON_B);
 	MAP_CONTROLLER(out.ok, SDL_CONTROLLER_BUTTON_X);
