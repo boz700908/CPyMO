@@ -20,6 +20,7 @@ error_t cpymo_textbox_init(
     cpymo_str text,
     cpymo_backlog *backlog)
 {
+	if (character_size <= 0.0f) character_size = 1.0f;
     o->max_lines = (size_t)(height / character_size);
     if (o->max_lines < 1) o->max_lines = 1;
 

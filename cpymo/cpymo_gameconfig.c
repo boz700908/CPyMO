@@ -15,7 +15,7 @@ static void cpymo_dispatch_gameconfig(cpymo_gameconfig *o, cpymo_str key, cpymo_
 	#define SETUP(FIELD, cpymo_str) \
 		cpymo_str_copy(o->FIELD, sizeof(o->FIELD), cpymo_str)
 	#define SETUP_EXT(FIELD, cpymo_str) \
-		if(cpymo_str.begin[0] == '.') { cpymo_str.begin++; cpymo_str.len--; } SETUP(FIELD, cpymo_str)
+		if(cpymo_str.len > 0 && cpymo_str.begin[0] == '.') { cpymo_str.begin++; cpymo_str.len--; } SETUP(FIELD, cpymo_str)
 	#define D(KEY) \
 		magic_key_len = strlen(KEY); \
 		if (magic_key_len == key.len && \
