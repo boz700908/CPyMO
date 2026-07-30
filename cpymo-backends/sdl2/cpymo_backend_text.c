@@ -9,6 +9,7 @@
 #include "../../stb/stb_truetype.h"
 #include "../include/cpymo_backend_image.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <memory.h>
 #include <math.h>
 #include <assert.h>
@@ -193,15 +194,27 @@ void cpymo_sdl2_accessibility_sound_init(void)
     accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
         SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_FORMAT_CHANGE);
 
+    /* Try loading WAV files from executable directory first, then CWD */
+    char *base_path = SDL_GetBasePath();
     const char *sound_files[] = { NULL, "enter.wav", "menu.wav", "select.wav" };
     for (int i = 1; i <= 3; i++) {
         SDL_AudioSpec wav_spec;
+        /* Try executable directory */
+        char full_path[1024];
+        if (base_path) {
+            snprintf(full_path, sizeof(full_path), "%s%s", base_path, sound_files[i]);
+            if (SDL_LoadWAV(full_path, &wav_spec,
+                    &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) != NULL)
+                continue;
+        }
+        /* Fallback to current working directory */
         if (SDL_LoadWAV(sound_files[i], &wav_spec,
                 &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) == NULL) {
             accessibility_wav_bufs[i] = NULL;
             accessibility_wav_lens[i] = 0;
         }
     }
+    if (base_path) SDL_free(base_path);
 }
 
 void cpymo_sdl2_accessibility_sound_free(void)
@@ -228,15 +241,25 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
                 accessibility_wav_bufs[sound_type],
                 accessibility_wav_lens[sound_type]) == 0) {
             SDL_PauseAudioDevice(accessibility_audio_dev, 0);
-            return;
         }
     }
-
-    /* Fallback to system beep */
+    else {
+        /* Fallback to system beep */
 #if defined(_WIN32)
-    UINT sound = sound_type == 1 ? MB_OK : (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
-    MessageBeep(sound);
+        UINT sound = sound_type == 1 ? MB_OK : (sound_type == 2 ? MB_ICONEXCLAMATION : MB_ICONASTERISK);
+        MessageBeep(sound);
 #endif
+    }
+
+    /* === Vibration (aligned with Android) === */
+    /* 10ms = light (select/switch), 20ms = medium (skip hold), 50ms = heavy (cancel/menu) */
+    extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
+    switch (sound_type) {
+        case SOUND_ENTER:  cpymo_sdl2_accessibility_vibrate(10); break;
+        case SOUND_MENU:   cpymo_sdl2_accessibility_vibrate(50); break;
+        case SOUND_SELECT: cpymo_sdl2_accessibility_vibrate(10); break;
+        default: break;
+    }
 }
 
 #endif /* !Android && !iOS */

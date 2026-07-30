@@ -702,6 +702,7 @@ jobs:
         path: |
             ./build/build/cpymo
             ./build/build/cpymo-tool
+            ./build/build/*.wav
             ./build/build/MinSizeRel/cpymo.exe
             ./build/build/MinSizeRel/cpymo-tool.exe
 
