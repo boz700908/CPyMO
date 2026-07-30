@@ -161,7 +161,10 @@ int main(int argc, char **argv)
             get_winsize(&cur_w, &cur_h);
             if (cur_w != render_target.w || cur_h != render_target.h) {
                 free_context();
-                init_context();
+                if (init_context() != CPYMO_ERR_SUCC) {
+                    ret = -1;
+                    break;
+                }
             }
 
             memset(

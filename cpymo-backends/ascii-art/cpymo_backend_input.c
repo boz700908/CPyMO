@@ -54,8 +54,9 @@ cpymo_input cpymo_input_snapshot()
 
     if (kbhit()) {
         int key = getch();
+		if (key == EOF) return ret;
 
-        switch (toupper(key)) {
+        switch (toupper((unsigned char)key)) {
         case 'W': ret.up = true; break;
         case 'S': ret.down = true; break;
         case 'A': ret.left = true; break;

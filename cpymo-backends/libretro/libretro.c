@@ -61,12 +61,12 @@ void cpymo_backend_audio_free()
 
 void cpymo_backend_audio_lock()
 {
-    mtx_lock(&audio_mutex);
+    if (use_audio_callback) mtx_lock(&audio_mutex);
 }
 
 void cpymo_backend_audio_unlock()
 {
-    mtx_unlock(&audio_mutex);
+    if (use_audio_callback) mtx_unlock(&audio_mutex);
 }
 
 const cpymo_backend_audio_info *cpymo_backend_audio_get_info(void)
@@ -100,6 +100,7 @@ error_t cpymo_backend_movie_init_surface(size_t width, size_t height, enum cpymo
         break;
     case cpymo_backend_movie_format_yuyv422:
         src_fmt = AV_PIX_FMT_YUYV422;
+		break;
     default:
         return CPYMO_ERR_UNSUPPORTED;
     }
@@ -326,24 +327,40 @@ bool retro_load_game(const struct retro_game_info *game)
         log_cb(RETRO_LOG_ERROR, "stat: %s\n", strerror(errno));
         return false;
     }
-    const char *gamepath = S_ISDIR(sb.st_mode) ? game->path : dirname(strdup(game->path));
+    char *gamepath = strdup(game->path);
+    if (gamepath == NULL) return false;
+    if (!S_ISDIR(sb.st_mode)) gamepath = dirname(gamepath);
+
     char *gamedir = realpath(gamepath, NULL);
-    chdir(gamedir);
-    err = cpymo_engine_init(&engine, gamedir);
-    mkdir("save", 0755);
-    if (err != CPYMO_ERR_SUCC) {
-        log_cb(RETRO_LOG_ERROR, "cpymo_engine_init: %s\n", cpymo_error_message(err));
+    free(gamepath);
+    if (gamedir == NULL || chdir(gamedir) != 0) {
+        free(gamedir);
         return false;
     }
+    err = cpymo_engine_init(&engine, gamedir);
+    if (err != CPYMO_ERR_SUCC) {
+        log_cb(RETRO_LOG_ERROR, "cpymo_engine_init: %s\n", cpymo_error_message(err));
+        free(gamedir);
+        return false;
+    }
+    mkdir("save", 0755);
     err = cpymo_backend_font_init(gamedir);
     if (err != CPYMO_ERR_SUCC) {
         log_cb(RETRO_LOG_ERROR, "cpymo_backend_font_init: %s\n", cpymo_error_message(err));
+        cpymo_engine_free(&engine);
+		free(gamedir);
         return false;
     }
     free(gamedir);
 
     soft_image.w = engine.gameconfig.imagesize_w;
     soft_image.h = engine.gameconfig.imagesize_h;
+	if (soft_image.w == 0 || soft_image.h > SIZE_MAX / 4 / soft_image.w) {
+		cpymo_engine_free(&engine);
+		free(font.data);
+		font.data = NULL;
+		return false;
+	}
     soft_image.line_stride = soft_image.w * 4;
     soft_image.pixel_stride = 4;
     soft_image.r_offset = 2;
@@ -352,6 +369,12 @@ bool retro_load_game(const struct retro_game_info *game)
     soft_image.a_offset = 3;
     soft_image.has_alpha_channel = false;
     soft_image.pixels = (uint8_t *)malloc(soft_image.line_stride * soft_image.h);
+	if (soft_image.pixels == NULL) {
+		cpymo_engine_free(&engine);
+		free(font.data);
+		font.data = NULL;
+		return false;
+	}
 
     soft_context.font = &font;
     soft_context.render_target = &soft_image;

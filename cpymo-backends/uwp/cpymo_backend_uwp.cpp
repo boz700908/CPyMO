@@ -31,12 +31,11 @@ public:
 
 template <typename T>
 maybe<T> wait_async(Windows::Foundation::IAsyncOperation<T> ^async) {
-	while(async->Status != Windows::Foundation::AsyncStatus::Completed) {
+	while(async->Status == Windows::Foundation::AsyncStatus::Started) {
 		SDL_Delay(1);
-		if (async->Status == Windows::Foundation::AsyncStatus::Error) {
-			return maybe<T>{};
-		}
 	}
+	if (async->Status != Windows::Foundation::AsyncStatus::Completed)
+		return maybe<T>{};
 	return maybe<T>{ async->GetResults() };
 }
 

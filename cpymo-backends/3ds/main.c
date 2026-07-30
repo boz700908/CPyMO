@@ -152,7 +152,9 @@ static cpymo_game_selector_item *load_game_list()
 		FS_DirectoryEntry item;
 		err = FSDIR_Read(handle, &result, 1, &item);
 
-		if (R_FAILED(err) || result != 1 || (item.attributes & FS_ATTRIBUTE_DIRECTORY) == 0) 
+		if (R_FAILED(err) || result != 1)
+			break;
+		if ((item.attributes & FS_ATTRIBUTE_DIRECTORY) == 0)
 			continue;
 
 		size_t name_len = 0;
