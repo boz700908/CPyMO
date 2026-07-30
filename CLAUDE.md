@@ -182,7 +182,7 @@ make
 - **Sound effects**: WAV files (enter.wav, menu.wav, select.wav) bundled with accessibility builds
 - **Vibration**: Light 10ms (select), Medium 20ms (skip hold), Heavy 50ms (cancel). Falls back to gamepad rumble on desktop platforms without haptic hardware.
 - **Unified API**: `cpymo/cpymo_accessibility.h` provides `cpymo_accessibility_play_sound(X)` and `cpymo_accessibility_vibrate(X)` macros that abstract platform differences. Sound types: `SOUND_ENTER=1`, `SOUND_MENU=2`, `SOUND_SELECT=3`.
-- **Unified input**: Native gesture adapters enqueue `cpymo_accessibility_action` values through `cpymo_backend_input.h`; `cpymo_input_snapshot()` is the only consumer. Do not synthesize keyboard events, mutate engine state, or maintain a platform-local copy cache in a gesture bridge.
+- **Unified input**: Native gesture adapters enqueue `cpymo_accessibility_action` values through `cpymo_backend_input.h`; `cpymo_input_snapshot()` is the only consumer. Pending actions are merged atomically so a hold-end action cannot be overwritten by a following gesture. Do not synthesize keyboard events, mutate engine state, or maintain a platform-local copy cache in a gesture bridge.
 - **Feedback compatibility**: Keep each backend's existing sound asset, volume/gain, and haptic duration unchanged when modifying accessibility behavior.
 - **Auto-read**: All pages (game selector, save/load, music box, settings) auto-read first item on entry.
 - **Settings pages**: Read "name+value" when browsing, read "value only" when changing.
