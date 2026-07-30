@@ -76,8 +76,6 @@ static bool cpymo_backend_audio_supported(const SDL_AudioSpec *spec)
 
 static SDL_AudioSpec have;
 
-static uint64_t current_audio_driver;
-
 void cpymo_backend_audio_init()
 {
 	SDL_AudioSpec want;
@@ -132,9 +130,6 @@ void cpymo_backend_audio_init()
 	SDL_LockAudio();
 	SDL_PauseAudio(0);
 
-	cpymo_str_hash_init(&current_audio_driver);
-	cpymo_str_hash_append_cstr(
-		&current_audio_driver, SDL_GetCurrentAudioDriver());
 }
 
 void cpymo_backend_audio_free()
@@ -152,13 +147,8 @@ void cpymo_backend_audio_lock(void)
 void cpymo_backend_audio_reset()
 {
 	if (audio_enabled) {
-		uint64_t current_audio_driver_hash;
-		cpymo_str_hash_init(&current_audio_driver_hash);
-		cpymo_str_hash_append_cstr(
-			&current_audio_driver_hash, SDL_GetCurrentAudioDriver());
-
-		if (current_audio_driver == current_audio_driver_hash) return;
-
+		/* A removed legacy device is already unusable even when SDL keeps the
+		 * same audio driver. Reopen it instead of comparing driver names. */
 		SDL_CloseAudio();
 
 		if (SDL_OpenAudio(&have, NULL) != 0) {
@@ -168,8 +158,6 @@ void cpymo_backend_audio_reset()
 		}
 
 		SDL_PauseAudio(0);
-
-		current_audio_driver = current_audio_driver_hash;
 	}
 	else {
 		cpymo_backend_audio_init();

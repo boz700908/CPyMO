@@ -70,23 +70,46 @@ SDL_Renderer *renderer;
 cpymo_engine engine;
 
 #ifdef ENABLE_TEXT_EXTRACT
+static bool copy_shortcut_pressed;
+static bool append_copy_shortcut_pressed;
+
 static void cpymo_sdl2_enqueue_copy_action(const SDL_Event *event)
 {
-	if (event->type == SDL_KEYDOWN) {
+	if (event->type == SDL_KEYUP) {
+		if (event->key.keysym.scancode == SDL_SCANCODE_C)
+			copy_shortcut_pressed = false;
+		else if (event->key.keysym.scancode == SDL_SCANCODE_D)
+			append_copy_shortcut_pressed = false;
+	}
+	else if (event->type == SDL_CONTROLLERBUTTONUP) {
+		if (event->cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSTICK)
+			copy_shortcut_pressed = false;
+		else if (event->cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSTICK)
+			append_copy_shortcut_pressed = false;
+	}
+	else if (event->type == SDL_KEYDOWN) {
 		const SDL_Keysym *key = &event->key.keysym;
 		if (event->key.repeat || (key->mod & KMOD_ALT) != 0 ||
 			(key->mod & KMOD_SHIFT) == 0)
 			return;
-		if (key->scancode == SDL_SCANCODE_C)
+		if (key->scancode == SDL_SCANCODE_C && !copy_shortcut_pressed) {
+			copy_shortcut_pressed = true;
 			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_COPY);
-		else if (key->scancode == SDL_SCANCODE_D)
+		}
+		else if (key->scancode == SDL_SCANCODE_D && !append_copy_shortcut_pressed) {
+			append_copy_shortcut_pressed = true;
 			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY);
+		}
 	}
 	else if (event->type == SDL_CONTROLLERBUTTONDOWN) {
-		if (event->cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSTICK)
+		if (event->cbutton.button == SDL_CONTROLLER_BUTTON_LEFTSTICK && !copy_shortcut_pressed) {
+			copy_shortcut_pressed = true;
 			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_COPY);
-		else if (event->cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSTICK)
+		}
+		else if (event->cbutton.button == SDL_CONTROLLER_BUTTON_RIGHTSTICK && !append_copy_shortcut_pressed) {
+			append_copy_shortcut_pressed = true;
 			cpymo_accessibility_enqueue_action(CPYMO_ACCESSIBILITY_ACTION_APPEND_COPY);
+		}
 	}
 }
 #endif
@@ -638,8 +661,13 @@ START:
 					mouse_wheel *= -1;
 			}
 			else if (event.type == SDL_AUDIODEVICEREMOVED) {
-				extern void cpymo_backend_audio_reset();
-				cpymo_backend_audio_reset();
+				/* SDL_OpenAudio() owns the legacy playback device with ID 1.
+				 * Accessibility feedback uses a separate SDL_OpenAudioDevice(),
+				 * whose removal must not tear down the game's BGM device. */
+				if (!event.adevice.iscapture && event.adevice.which == 1) {
+					extern void cpymo_backend_audio_reset();
+					cpymo_backend_audio_reset();
+				}
 #ifdef ENABLE_TEXT_EXTRACT
 				extern void cpymo_sdl2_accessibility_sound_reset(void);
 				cpymo_sdl2_accessibility_sound_reset();

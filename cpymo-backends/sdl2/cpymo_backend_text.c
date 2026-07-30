@@ -163,6 +163,16 @@ static void save_last_spoken_text(const char *text)
     if (last_spoken_text) strcpy(last_spoken_text, text);
 }
 
+static char *copy_last_spoken_text(void)
+{
+    if (last_spoken_text == NULL) return NULL;
+
+    size_t len = strlen(last_spoken_text);
+    char *copy = (char *)malloc(len + 1);
+    if (copy) memcpy(copy, last_spoken_text, len + 1);
+    return copy;
+}
+
 /* ================================================================
  * Platform-specific TTS includes
  * ================================================================ */
@@ -401,7 +411,7 @@ static void speak_feedback(const char *msg)
 {
     if (copy_feedback_in_progress) return;
     copy_feedback_in_progress = 1;
-    char *saved = last_spoken_text ? SDL_strdup(last_spoken_text) : NULL;
+    char *saved = copy_last_spoken_text();
     cpymo_backend_text_extract(msg);
     if (last_spoken_text) free(last_spoken_text);
     last_spoken_text = saved;
@@ -412,7 +422,6 @@ void cpymo_backend_text_copy_last(void)
 {
     if (last_spoken_text == NULL) return;
     SDL_SetClipboardText(last_spoken_text);
-    cpymo_sdl2_accessibility_vibrate(60);
     cpymo_sdl2_accessibility_play_sound(SOUND_SELECT);
     speak_feedback("已复制");
 }
@@ -440,7 +449,6 @@ void cpymo_backend_text_append_copy_last(void)
         free(combined);
     }
     if (old) SDL_free(old);
-    cpymo_sdl2_accessibility_vibrate(60);
     cpymo_sdl2_accessibility_play_sound(SOUND_SELECT);
     speak_feedback("已追加复制");
 }

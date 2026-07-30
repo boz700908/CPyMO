@@ -23,6 +23,9 @@ typedef struct {
 	float cancel_btn_width;
 
 	int selection;
+	/* The action that opened this dialog may still be visible as an input
+	 * release on the next update. Consume that inherited confirmation once. */
+	bool ignore_initial_confirm_input;
 
 	error_t(*okcancel_callback)(cpymo_engine *e, void *data, bool);
 	void *okcancel_callback_data;
@@ -105,6 +108,11 @@ static int cpymo_msgbox_ui_get_mouse_selection(cpymo_engine *e)
 static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 {
 	cpymo_msgbox_ui *ui = (cpymo_msgbox_ui *)ui_data;
+	if (ui->ignore_initial_confirm_input) {
+		if (!e->input.ok && !e->input.mouse_button)
+			ui->ignore_initial_confirm_input = false;
+		return CPYMO_ERR_SUCC;
+	}
 
 	enum cpymo_key_hold_result mbs = cpymo_key_hold_update(
 		e, &ui->mouse_button, dt, e->input.mouse_button);
@@ -308,6 +316,9 @@ error_t cpymo_msgbox_ui_enter(
 	/* The visible and spoken first button is always Confirm.  Starting on
 	 * Cancel made directional navigation disagree with the dialog layout. */
 	ui->selection = 0;
+	ui->ignore_initial_confirm_input =
+		e->input.ok || e->prev_input.ok ||
+		e->input.mouse_button || e->prev_input.mouse_button;
 	cpymo_key_hold_init(&ui->mouse_button, e->input.mouse_button);
 
 	float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);
