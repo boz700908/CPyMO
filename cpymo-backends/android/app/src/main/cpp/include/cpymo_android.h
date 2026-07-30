@@ -1,6 +1,8 @@
 #ifndef CPYMO_CPYMO_ANDROID_H
 #define CPYMO_CPYMO_ANDROID_H
 
+#include <stdbool.h>
+
 #define SOUND_ENTER 1
 #define SOUND_MENU 2
 #define SOUND_SELECT 3
