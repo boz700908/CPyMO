@@ -235,7 +235,7 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ./cpymo-backends/ios
-        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake  -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
+        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake  -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
 
       - name: Build IPA
         shell: bash
@@ -275,7 +275,7 @@ jobs:
       - name: Configure CMake
         shell: bash
         working-directory: ./cpymo-backends/ios
-        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
+        run: cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
 
       - name: Build IPA
         shell: bash
