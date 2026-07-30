@@ -632,8 +632,18 @@ void cpymo_backend_text_extract(const char *text)
 #endif
 }
 
-/* Stubs: copy/append-copy handled in native layer for Android/iOS */
-#if defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) || defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+/* Android keeps the system clipboard bridge in Java, but all input dispatch
+ * and de-duplication is shared with the other platforms. */
+#if defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY)
+void cpymo_backend_text_copy_last(void) {
+    extern void cpymo_android_copy_last_speech_text(bool append);
+    cpymo_android_copy_last_speech_text(false);
+}
+void cpymo_backend_text_append_copy_last(void) {
+    extern void cpymo_android_copy_last_speech_text(bool append);
+    cpymo_android_copy_last_speech_text(true);
+}
+#elif defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
 void cpymo_backend_text_copy_last(void) {}
 void cpymo_backend_text_append_copy_last(void) {}
 #endif

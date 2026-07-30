@@ -2212,15 +2212,11 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
     public void onTwoSlide(MotionEvent event, SlideDetector.Direction direction) {
         switch (direction) {
             case Left: {
-                VisualHelper.vibrate(10);
-                VisualHelper.copyLastSpeechText();
-                VisualHelper.textToSpeechWithoutCopy("已复制");
+                Config.nativeAccessibilityCopy(false);
                 break;
             }
             case Right: {
-                VisualHelper.vibrate(10);
-                VisualHelper.appendCopyLastSpeechText();
-                VisualHelper.textToSpeechWithoutCopy("已追加复制");
+                Config.nativeAccessibilityCopy(true);
                 break;
             }
             case Down: {

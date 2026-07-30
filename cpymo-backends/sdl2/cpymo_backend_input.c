@@ -21,6 +21,16 @@ static size_t haptics_count = 0;
 static bool ios_accessibility_skip_held;
 #endif
 
+#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
+static SDL_atomic_t android_accessibility_copy;
+static SDL_atomic_t android_accessibility_append_copy;
+
+void cpymo_android_accessibility_request_copy(bool append)
+{
+    SDL_AtomicSet(append ? &android_accessibility_append_copy : &android_accessibility_copy, 1);
+}
+#endif
+
 #ifdef ENABLE_TEXT_EXTRACT
 
 #ifdef __EMSCRIPTEN__
@@ -116,6 +126,11 @@ cpymo_input cpymo_input_snapshot()
 	case 9: ios_accessibility_skip_held = false; break;
 	}
 	out.skip = out.skip || ios_accessibility_skip_held;
+#endif
+
+#ifdef ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY
+	out.copy = out.copy || SDL_AtomicSet(&android_accessibility_copy, 0) != 0;
+	out.append_copy = out.append_copy || SDL_AtomicSet(&android_accessibility_append_copy, 0) != 0;
 #endif
 
 #ifdef DISABLE_MOUSE

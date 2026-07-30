@@ -93,15 +93,18 @@ public class VisualHelper {
         SDLActivity.clipboardSetText(mLastSpeakText);
         vibrate(10);
         playSound(SOUND_SELECT);
+        textToSpeechWithoutCopy("已复制");
     }
 
     public static void appendCopyLastSpeechText() {
         if (mLastSpeakText == null) return;
 
         String text = SDLActivity.clipboardGetText();
-        SDLActivity.clipboardSetText(text + "\n" + mLastSpeakText);
+        SDLActivity.clipboardSetText(text == null || text.isEmpty()
+                ? mLastSpeakText : text + "\n" + mLastSpeakText);
         vibrate(10);
         playSound(SOUND_SELECT);
+        textToSpeechWithoutCopy("已追加复制");
     }
 
     public static void sendKeyKnock(int keycode) {
