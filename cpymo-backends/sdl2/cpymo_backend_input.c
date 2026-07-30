@@ -29,18 +29,16 @@ static bool ios_accessibility_skip_held;
 
 void cpymo_sdl2_accessibility_vibrate(int milliseconds)
 {
-    /* Primary: SDL_Haptic rumble (works with most controllers on Windows) */
+    /* Primary: SDL_GameControllerRumble (XInput / Xbox controllers) */
+    for (size_t i = 0; i < gamecontrollers_count; ++i) {
+        if (gamecontrollers[i] != NULL)
+            SDL_GameControllerRumble(gamecontrollers[i], 0xFFFF, 0xFFFF, (Uint32)milliseconds);
+    }
+
+    /* Fallback: SDL_Haptic rumble (DirectInput / non-XInput controllers) */
     for (size_t i = 0; i < haptics_count; ++i) {
         if (haptics[i] != NULL)
             SDL_HapticRumblePlay(haptics[i], 1.0f, (Uint32)milliseconds);
-    }
-
-    /* Fallback: SDL_GameControllerRumble (XInput controllers) */
-    if (haptics_count == 0) {
-        for (size_t i = 0; i < gamecontrollers_count; ++i) {
-            if (gamecontrollers[i] != NULL)
-                SDL_GameControllerRumble(gamecontrollers[i], 0xFFFF, 0xFFFF, (Uint32)milliseconds);
-        }
     }
 
 #ifdef __EMSCRIPTEN__
