@@ -438,6 +438,13 @@ void cpymo_backend_text_append_copy_last(void)
 
 #endif /* !Android && !iOS */
 
+/* Android and iOS use their native accessibility feedback paths.  The SDL2
+ * event loop still requests an audio-device reset, so provide a no-op rather
+ * than making these builds depend on the desktop WAV implementation. */
+#if defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY) || defined(ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY)
+void cpymo_sdl2_accessibility_sound_reset(void) {}
+#endif
+
 /* ================================================================
  * Platform-specific TTS backends
  * ================================================================ */

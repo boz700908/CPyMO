@@ -9,23 +9,34 @@
 error_t cpymo_utils_loadfile(const char *path, char **outbuf, size_t *len)
 {
 	assert(*outbuf == NULL);
+	*len = 0;
 
 	FILE *f = fopen(path, "rb");
 	if (f == NULL) return CPYMO_ERR_CAN_NOT_OPEN_FILE;
 
-	fseek(f, 0, SEEK_END);
-	*len = ftell(f);
-	fseek(f, 0, SEEK_SET);
+	if (fseek(f, 0, SEEK_END) != 0) {
+		fclose(f);
+		return CPYMO_ERR_CAN_NOT_OPEN_FILE;
+	}
+	long file_len = ftell(f);
+	if (file_len < 0 || fseek(f, 0, SEEK_SET) != 0) {
+		fclose(f);
+		return CPYMO_ERR_CAN_NOT_OPEN_FILE;
+	}
+	*len = (size_t)file_len;
 
-	*outbuf = (char *)malloc(*len);
+	/* malloc(0) is implementation-defined; callers may legitimately load an
+	 * empty asset and still expect a valid buffer. */
+	*outbuf = (char *)malloc(*len == 0 ? 1 : *len);
 	if (*outbuf == NULL) {
 		fclose(f);
 		return CPYMO_ERR_OUT_OF_MEM;
 	}
 
-	if (fread(*outbuf, *len, 1, f) != 1) {
+	if (*len != 0 && fread(*outbuf, *len, 1, f) != 1) {
 		fclose(f);
 		free(*outbuf);
+		*outbuf = NULL;
 		return CPYMO_ERR_CAN_NOT_OPEN_FILE;
 	}
 

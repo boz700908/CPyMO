@@ -36,6 +36,8 @@ static error_t cpymo_backend_font_try_load_font(const char *path)
 	CPYMO_THROW(err);
 
 	if (stbtt_InitFont(&font, ttf_buffer, stbtt_GetFontOffsetForIndex(ttf_buffer, 0)) == 0) {
+		free(ttf_buffer);
+		ttf_buffer = NULL;
 		return CPYMO_ERR_BAD_FILE_FORMAT;
 	}
 
@@ -84,6 +86,7 @@ error_t cpymo_backend_font_init(const char *gamedir)
 
 #ifdef _WIN32
 	const char *windir = getenv("windir");
+	if (windir == NULL || windir[0] == '\0') return CPYMO_ERR_CAN_NOT_OPEN_FILE;
 	path = (char *)alloca(strlen(windir) + 32);
 	if (path == NULL) return CPYMO_ERR_OUT_OF_MEM;
 
@@ -102,7 +105,7 @@ error_t cpymo_backend_font_init(const char *gamedir)
 		"msmincho.ttc",
 		"simhei.ttf",
 		"simkai.ttf",
-		"simsun.ttc"
+		"simsun.ttc",
 		"simsunb.ttf",
 		"simfang.ttf",
 		"SIMLI.ttf"
