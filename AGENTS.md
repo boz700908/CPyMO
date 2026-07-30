@@ -139,6 +139,9 @@ make run -j -f Makefile.Emscripten
 Configure `Makefile.Emscripten`:
 - `WASM=1` for WebAssembly, `WASM=0` for JavaScript
 - `BUILD_GAME_DIR` to integrate a game directory
+- `ENABLE_ACCESSIBILITY=1` builds the Web accessibility variant with an off-screen ARIA status region, sound feedback, vibration where available, and mobile accessibility gestures.
+
+Manual CI can accept `web_game_archive_url` (a ZIP direct link, redirects supported) together with `web_build_type` (`js` or `wasm`) to build and upload a packaged Web game artifact.
 
 ### Development Tool
 ```bash

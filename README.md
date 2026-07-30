@@ -367,8 +367,13 @@ vdpm libmikmod
 在`cpymo-backends/sdl2`下修改`Makefile.Emscripten`.
 
 变量`WASM`设置为1时编译到 Web Assembly 二进制文件，为0时编译到 JavaScript。
+
+设置`ENABLE_ACCESSIBILITY=1`可构建 Web 无障碍版本：游戏文本通过 ARIA live region 朗读；支持 Vibration API 的设备会提供触觉反馈。普通 Web 构建默认不启用这些输出。
+无障碍 Web 版本复用移动端操作：单指滑动移动选择、双击确认、长按返回、双指左/右滑复制或追加复制、双指下滑返回、双指双击按住跳过。音效使用`enter.wav`、`menu.wav`和`select.wav`，并被一同预加载。
 变量`BUILD_GAME_DIR`指定要集成的游戏目录，留空则不集成游戏。
 以上两个变量可通过环境传入。
+
+在 GitHub Actions 手动运行`CI`时，可选填`web_game_archive_url`（游戏 ZIP 压缩包直链）及`web_build_type`（`js`或`wasm`）。工作流支持重定向和失败重试；两项同时提供时会下载、解压并上传独立的`CPyMO Web Game`附件。
 
 默认编译出的结果将不支持视频播放，并且采用SDL2_mixer作为音频后端（只能在BGM通道播放mp3，其他通道不支持mp3），默认采用这种方式是出于编译结果大小的考虑。
 

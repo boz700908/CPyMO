@@ -2,6 +2,18 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      web_game_archive_url:
+        description: 'Optional direct URL of a game ZIP archive to package for Web'
+        required: false
+        type: string
+      web_build_type:
+        description: 'Web output type when a game archive is supplied'
+        required: false
+        type: choice
+        options:
+          - js
+          - wasm
   pull_request:
     branches: [ main, hd, dev ]
 
@@ -213,6 +225,52 @@ jobs:
         cd cpymo-backends/sdl2
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten -j
+        mkdir -p ../../artifacts/web
+        cp cpymo.js ../../artifacts/web/
+        cp cpymo.wasm cpymo.data ../../artifacts/web/ 2>/dev/null || true
+
+    - name: Build (Accessibility)
+      run: |
+        cd cpymo-backends/sdl2
+        export AUDIO_BACKEND=ffmpeg
+        make -f Makefile.Emscripten clean
+        make -f Makefile.Emscripten -j ENABLE_ACCESSIBILITY=1
+        mkdir -p ../../artifacts/web-accessibility
+        cp cpymo.js ../../artifacts/web-accessibility/
+        cp cpymo.wasm cpymo.data ../../artifacts/web-accessibility/ 2>/dev/null || true
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO for Web
+        path: ./artifacts/web/
+
+    - name: Upload (Accessibility)
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO for Web (Accessibility)
+        path: ./artifacts/web-accessibility/
+
+    - name: Build packaged game
+      if: ${{ inputs.web_game_archive_url != '' && inputs.web_build_type != '' }}
+      run: |
+        cd cpymo-backends/sdl2
+        curl --fail --location --retry 3 --output game.zip "${{ inputs.web_game_archive_url }}"
+        mkdir -p game
+        unzip -q game.zip -d game
+        export AUDIO_BACKEND=ffmpeg
+        make -f Makefile.Emscripten clean
+        make -f Makefile.Emscripten -j BUILD_GAME_DIR=game WASM=$([ "${{ inputs.web_build_type }}" = "wasm" ] && echo 1 || echo 0)
+        mkdir -p ../../artifacts/web-game
+        cp cpymo.html cpymo.js cpymo.data ../../artifacts/web-game/
+        cp cpymo.wasm ../../artifacts/web-game/ 2>/dev/null || true
+
+    - name: Upload packaged game
+      if: ${{ inputs.web_game_archive_url != '' && inputs.web_build_type != '' }}
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO Web Game (${{ inputs.web_build_type }})
+        path: ./artifacts/web-game/
 
   build-ios:
     name: 'iOS'

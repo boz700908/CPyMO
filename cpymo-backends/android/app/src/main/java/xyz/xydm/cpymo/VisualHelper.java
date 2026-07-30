@@ -2,6 +2,7 @@ package xyz.xydm.cpymo;
 
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.SoundPool;
 import android.os.Build;
 import android.os.VibrationEffect;
@@ -58,6 +59,11 @@ public class VisualHelper {
             mSoundMap.put(SOUND_ENTER, mSoundPool.load(context, R.raw.enter, 1));
             mSoundMap.put(SOUND_MENU, mSoundPool.load(context, R.raw.menu, 1));
             mSoundMap.put(SOUND_SELECT, mSoundPool.load(context, R.raw.select, 1));
+        } else {
+            mSoundPool = new SoundPool(2, AudioManager.STREAM_MUSIC, 0);
+            mSoundMap.put(SOUND_ENTER, mSoundPool.load(context, R.raw.enter, 1));
+            mSoundMap.put(SOUND_MENU, mSoundPool.load(context, R.raw.menu, 1));
+            mSoundMap.put(SOUND_SELECT, mSoundPool.load(context, R.raw.select, 1));
         }
 
         nativeSetupJNI();
@@ -109,6 +115,7 @@ public class VisualHelper {
 
     public static void vibrate(long milliseconds) {
         // Vibrate for 500 milliseconds
+        if (mVibrator == null || !mVibrator.hasVibrator()) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             mVibrator.vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE));
         } else {
@@ -119,7 +126,7 @@ public class VisualHelper {
 
     public static void playSound(int sound_type) {
         Integer soundID = mSoundMap.get(sound_type);
-        if (soundID == null) {
+        if (mSoundPool == null || soundID == null) {
             Log.e(TAG, "VisualHelper.playSound(): unknown sound type");
             return;
         }

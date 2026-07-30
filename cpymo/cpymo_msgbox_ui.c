@@ -3,6 +3,7 @@
 #include "cpymo_engine.h"
 #include "cpymo_localization.h"
 #include "cpymo_key_hold.h"
+#include "cpymo_accessibility.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -108,7 +109,8 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 	enum cpymo_key_hold_result mbs = cpymo_key_hold_update(
 		e, &ui->mouse_button, dt, e->input.mouse_button);
 	
-	if (CPYMO_INPUT_JUST_RELEASED(e, cancel) || mbs == cpymo_key_hold_result_holding) {
+	if (ui->cancel_btn && (CPYMO_INPUT_JUST_RELEASED(e, cancel) || mbs == cpymo_key_hold_result_holding)) {
+		cpymo_accessibility_play_sound(SOUND_MENU);
 		cpymo_msgbox_ui_okcancel_finish(e, false);
 		return CPYMO_ERR_SUCC;
 	}
@@ -126,6 +128,7 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 		else if (ui->selection == 1 && ui->cancel_btn) ui->selection = 0;
 
 		cpymo_engine_request_redraw(e);
+		cpymo_accessibility_play_sound(SOUND_SELECT);
 
 		cpymo_backend_text_extract(ui->selection == 0 ? l->msgbox_ok : l->msgbox_cancel);
 	}
@@ -142,11 +145,14 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 	}
 	else if (CPYMO_INPUT_JUST_RELEASED(e, ok) && ui->selection != -1) {
 		cpymo_engine_request_redraw(e);
+		cpymo_accessibility_play_sound(ui->selection == 0 ? SOUND_ENTER : SOUND_MENU);
 		return cpymo_msgbox_ui_okcancel_finish(e, !ui->selection);
 	}
 	else if (CPYMO_INPUT_JUST_RELEASED(e, mouse_button)) {
 		cpymo_engine_request_redraw(e);
 		int mouse_sel = cpymo_msgbox_ui_get_mouse_selection(e);
+		if (mouse_sel < 0) return CPYMO_ERR_SUCC;
+		cpymo_accessibility_play_sound(mouse_sel == 0 ? SOUND_ENTER : SOUND_MENU);
 		return cpymo_msgbox_ui_okcancel_finish(e, !mouse_sel);
 	}
 
@@ -337,8 +343,10 @@ error_t cpymo_msgbox_ui_enter(
 		ui->okcancel_callback = &cpymo_msgbox_ui_default_confirm;
 	}
 
+	cpymo_accessibility_play_sound(SOUND_ENTER);
 	cpymo_engine_extract_text(e, message);
-	cpymo_engine_extract_text_cstr(e, l->msgbox_cancel);
+	cpymo_engine_extract_text_cstr(e, l->msgbox_ok);
+	if (ui->cancel_btn) cpymo_engine_extract_text_cstr(e, l->msgbox_cancel);
 	cpymo_engine_extract_text_submit(e);
 
 	return err;

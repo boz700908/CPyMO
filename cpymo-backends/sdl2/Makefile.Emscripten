@@ -18,6 +18,10 @@ ifeq ($(WASM), )
 WASM := 0
 endif
 
+ifeq ($(ENABLE_ACCESSIBILITY), )
+ENABLE_ACCESSIBILITY := 0
+endif
+
 CC := emcc
 
 EM_FLAGS := -s USE_SDL=2 
@@ -28,6 +32,11 @@ CFLAGS := \
 	-DNDEBUG \
 	$(EM_FLAGS) \
 	-O3
+
+ifeq ($(ENABLE_ACCESSIBILITY), 1)
+CFLAGS += -DENABLE_TEXT_EXTRACT
+LDFLAGS += --preload-file enter.wav --preload-file menu.wav --preload-file select.wav
+endif
 
 LDFLAGS := \
 	$(EM_FLAGS) \
