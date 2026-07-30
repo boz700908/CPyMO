@@ -153,6 +153,7 @@ float cpymo_backend_text_width(cpymo_str t, float single_character_size_in_logic
  * Shared last-spoken-text buffer (aligned with Android accessibility)
  * ================================================================ */
 static char *last_spoken_text = NULL;
+static int copy_feedback_in_progress = 0;
 
 static void save_last_spoken_text(const char *text)
 {
@@ -397,10 +398,13 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
  * original game text, not "已复制") */
 static void speak_feedback(const char *msg)
 {
+    if (copy_feedback_in_progress) return;
+    copy_feedback_in_progress = 1;
     char *saved = last_spoken_text ? SDL_strdup(last_spoken_text) : NULL;
     cpymo_backend_text_extract(msg);
     if (last_spoken_text) free(last_spoken_text);
     last_spoken_text = saved;
+    copy_feedback_in_progress = 0;
 }
 
 void cpymo_backend_text_copy_last(void)
@@ -418,6 +422,10 @@ void cpymo_backend_text_append_copy_last(void)
     char *old = SDL_GetClipboardText();
     size_t old_len = old ? strlen(old) : 0;
     size_t new_len = strlen(last_spoken_text);
+    if (old_len > SIZE_MAX - new_len - 2) {
+        if (old) SDL_free(old);
+        return;
+    }
     char *combined = (char *)malloc(old_len + new_len + 2);
     if (combined) {
         if (old && old_len > 0) {
