@@ -146,7 +146,7 @@ error_t cpymo_rmenu_restart_game(cpymo_engine *e, void *data, bool confirm)
 static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 {
 	if (sel == 8)
-		cpymo_accessibility_play_sound(SOUND_MENU);
+		cpymo_accessibility_play_sound(SOUND_ENTER);
 	else if (sel != 7)
 		cpymo_accessibility_play_sound(SOUND_ENTER);
 

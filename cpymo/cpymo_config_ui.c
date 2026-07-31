@@ -688,6 +688,7 @@ error_t cpymo_config_ui_mouse_button_just_hold(cpymo_engine *e)
 				return CPYMO_ERR_SUCC;
 	}
 
+	cpymo_accessibility_play_sound(SOUND_MENU);
 	cpymo_ui_exit(e);
 
 	return CPYMO_ERR_SUCC; 

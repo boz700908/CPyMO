@@ -118,7 +118,7 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 		e, &ui->mouse_button, dt, e->input.mouse_button);
 	
 	if (ui->cancel_btn && (CPYMO_INPUT_JUST_RELEASED(e, cancel) || mbs == cpymo_key_hold_result_holding)) {
-		cpymo_accessibility_play_sound(SOUND_MENU);
+		cpymo_accessibility_play_sound(SOUND_ENTER);
 		cpymo_msgbox_ui_okcancel_finish(e, false);
 		return CPYMO_ERR_SUCC;
 	}
@@ -153,14 +153,14 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 	}
 	else if (CPYMO_INPUT_JUST_RELEASED(e, ok) && ui->selection != -1) {
 		cpymo_engine_request_redraw(e);
-		cpymo_accessibility_play_sound(ui->selection == 0 ? SOUND_ENTER : SOUND_MENU);
+		cpymo_accessibility_play_sound(SOUND_ENTER);
 		return cpymo_msgbox_ui_okcancel_finish(e, !ui->selection);
 	}
 	else if (CPYMO_INPUT_JUST_RELEASED(e, mouse_button)) {
 		cpymo_engine_request_redraw(e);
 		int mouse_sel = cpymo_msgbox_ui_get_mouse_selection(e);
 		if (mouse_sel < 0) return CPYMO_ERR_SUCC;
-		cpymo_accessibility_play_sound(mouse_sel == 0 ? SOUND_ENTER : SOUND_MENU);
+		cpymo_accessibility_play_sound(SOUND_ENTER);
 		return cpymo_msgbox_ui_okcancel_finish(e, !mouse_sel);
 	}
 

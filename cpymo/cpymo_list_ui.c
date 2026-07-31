@@ -628,8 +628,10 @@ static error_t cpymo_list_ui_selecting_no_more_content_callback_looping(cpymo_en
 void cpymo_list_ui_exit(cpymo_engine * e)
 {
 	cpymo_list_ui *ui = (cpymo_list_ui *)cpymo_ui_data(e);
-	if (ui->allow_exit_list_ui)
+	if (ui->allow_exit_list_ui) {
+		cpymo_accessibility_play_sound(SOUND_MENU);
 		cpymo_ui_exit(e);
+	}
 }
 
 void cpymo_list_ui_enable_loop(cpymo_engine *e)
