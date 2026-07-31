@@ -629,7 +629,9 @@ void cpymo_list_ui_exit(cpymo_engine * e)
 {
 	cpymo_list_ui *ui = (cpymo_list_ui *)cpymo_ui_data(e);
 	if (ui->allow_exit_list_ui) {
-		cpymo_accessibility_play_sound(SOUND_MENU);
+		/* Returning from a list is a completed action, matching the other
+		 * confirmation paths instead of the menu-opening feedback. */
+		cpymo_accessibility_play_sound(SOUND_ENTER);
 		cpymo_ui_exit(e);
 	}
 }

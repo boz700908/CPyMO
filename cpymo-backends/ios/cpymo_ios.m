@@ -327,6 +327,11 @@ void cpymo_ios_accessibility_announce(const char *text) {
     else dispatch_async(dispatch_get_main_queue(), post_announcement);
 }
 
+void cpymo_ios_accessibility_game_selector_entered(void)
+{
+    cpymo_ios_accessibility_announce("请先关闭系统读屏，然后上下滑动选择游戏");
+}
+
 void cpymo_ios_accessibility_copy_speech_text(const char *text, bool append)
 {
     if (text == NULL || text[0] == '\0') return;

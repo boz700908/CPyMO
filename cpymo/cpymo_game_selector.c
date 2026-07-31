@@ -305,6 +305,12 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 			if (first && first->gametitle_text)
 				cpymo_backend_text_extract(first->gametitle_text);
 		}
+
+		#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
+		/* Match Android's selector-entry gesture instruction without replacing
+		 * the selected title stored for copy/append-copy. */
+		cpymo_ios_accessibility_game_selector_entered();
+		#endif
 #endif
 
 		#ifndef EXIT_TO_GAME_SELECTOR

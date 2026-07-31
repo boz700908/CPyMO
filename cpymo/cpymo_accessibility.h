@@ -33,6 +33,7 @@
 /* iOS: uses cpymo_ios.m */
 extern void cpymo_ios_accessibility_play_sound(int sound_type);
 extern void cpymo_ios_accessibility_vibrate(int milliseconds);
+extern void cpymo_ios_accessibility_game_selector_entered(void);
 
 #define cpymo_accessibility_play_sound(X) cpymo_ios_accessibility_play_sound(X)
 #define cpymo_accessibility_vibrate(X)    cpymo_ios_accessibility_vibrate(X)

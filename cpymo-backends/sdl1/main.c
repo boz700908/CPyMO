@@ -273,10 +273,17 @@ cpymo_game_selector_item *get_game_list(const char *game_selector_dir)
 #ifdef ENABLE_EXIT_CONFIRM
 #include "../../cpymo/cpymo_msgbox_ui.h"
 #include "../../cpymo/cpymo_localization.h"
+typedef struct {
+    bool msgbox_opened;
+    Uint32 exit_after_ticks;
+} cpymo_exit_confirm_state;
+
 static error_t cpymo_exit_confirm(struct cpymo_engine *e, void *data, bool exit)
 {
-    *(bool *)data = false;
-	return exit ? CPYMO_ERR_NO_MORE_CONTENT : CPYMO_ERR_SUCC;
+    cpymo_exit_confirm_state *state = (cpymo_exit_confirm_state *)data;
+    state->msgbox_opened = false;
+    if (exit) state->exit_after_ticks = SDL_GetTicks() + 100;
+	return CPYMO_ERR_SUCC;
 }
 #endif
 
@@ -419,7 +426,7 @@ int main(int argc, char **argv)
     int ret = 0;
 
     #ifdef ENABLE_EXIT_CONFIRM
-    bool exit_okcancel_box_opened = false;
+    cpymo_exit_confirm_state exit_confirm_state = { false, 0 };
     #endif
 
     while (1) {
@@ -434,21 +441,21 @@ int main(int argc, char **argv)
                 if (playing_movie) goto EXIT;
                 #endif
 
-                if (!exit_okcancel_box_opened)
+                if (!exit_confirm_state.msgbox_opened && !exit_confirm_state.exit_after_ticks)
                 {
                     err = cpymo_msgbox_ui_enter(
                         &engine,
                         cpymo_str_pure(
                             cpymo_localization_get(&engine)->exit_confirm),
                         &cpymo_exit_confirm,
-                        &exit_okcancel_box_opened);
+                        &exit_confirm_state);
 
                     if (err != CPYMO_ERR_SUCC) {
                         printf("[Error] Can not show message box: %s", 
                             cpymo_error_message(err));
                     }
 
-                    exit_okcancel_box_opened = true;
+                    exit_confirm_state.msgbox_opened = true;
                 }
 				#else
 				goto EXIT;
@@ -485,6 +492,12 @@ int main(int argc, char **argv)
                 }
             };
         }
+
+        #ifdef ENABLE_EXIT_CONFIRM
+        if (exit_confirm_state.exit_after_ticks &&
+            (Sint32)(SDL_GetTicks() - exit_confirm_state.exit_after_ticks) >= 0)
+            goto EXIT;
+        #endif
 
         bool redraw = false;
         Uint32 cur_time = SDL_GetTicks();
