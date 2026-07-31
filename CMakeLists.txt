@@ -15,6 +15,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build)
 add_definitions (-D_CRT_SECURE_NO_WARNINGS)
 add_definitions (-DENABLE_EXIT_CONFIRM)
 
+if (MSVC)
+	add_compile_options(/utf-8)
+endif ()
+
 if (ENABLE_ACCESSIBILITY)
 	add_definitions (-DENABLE_TEXT_EXTRACT)
 endif ()
