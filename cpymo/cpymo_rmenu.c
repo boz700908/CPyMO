@@ -145,6 +145,11 @@ error_t cpymo_rmenu_restart_game(cpymo_engine *e, void *data, bool confirm)
 
 static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 {
+	if (sel == 8)
+		cpymo_accessibility_play_sound(SOUND_MENU);
+	else if (sel != 7)
+		cpymo_accessibility_play_sound(SOUND_ENTER);
+
 	switch (sel) {
 	case 0: cpymo_ui_exit(e); e->say.auto_mode = true; e->say.auto_mode_timer = -1; break;
 	case 1: cpymo_ui_exit(e); cpymo_save_ui_enter(e, false); break;

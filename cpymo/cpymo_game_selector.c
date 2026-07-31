@@ -3,6 +3,7 @@
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
 #include "cpymo_localization.h"
+#include "cpymo_accessibility.h"
 #include "../stb/stb_image.h"
 #include <assert.h>
 #include <string.h>
@@ -59,6 +60,7 @@ static void cpymo_game_selector_draw_node(const cpymo_engine *e, const void *nod
 static error_t cpymo_game_selector_ok(cpymo_engine *e, void *selected)
 {
 	cpymo_game_selector_item *item = (cpymo_game_selector_item *)selected;
+	cpymo_accessibility_play_sound(SOUND_ENTER);
 	char *gamedir = item->gamedir;
 	item->gamedir = NULL;
 
