@@ -393,24 +393,15 @@ static error_t create_window_and_renderer(int width, int height, SDL_Window **wi
 
 
 #ifdef ENABLE_EXIT_CONFIRM
-typedef struct {
-	bool msgbox_opened;
-	Uint32 exit_after_ticks;
-} cpymo_exit_confirm_state;
-
 static error_t cpymo_exit_confirm(struct cpymo_engine *e, void *data, bool exit)
 {
-	cpymo_exit_confirm_state *state = (cpymo_exit_confirm_state *)data;
-	state->msgbox_opened = false;
-	/* The confirmation sound is asynchronous. Keep SDL alive long enough for
-	 * its first buffer to reach the device before tearing it down. */
-	if (exit) state->exit_after_ticks = SDL_GetTicks() + 100;
-	return CPYMO_ERR_SUCC;
+	*(bool *)data = false;
+	return exit ? CPYMO_ERR_NO_MORE_CONTENT : CPYMO_ERR_SUCC;
 }
 
 static void cpymo_exit_msgbox_on_closing(bool will_call_confirm, void *userdata)
 {
-	((cpymo_exit_confirm_state *)userdata)->msgbox_opened = false;
+	*(bool *)userdata = false;
 }
 #endif
 
@@ -636,7 +627,7 @@ START:
 	}
 
 	#ifdef ENABLE_EXIT_CONFIRM
-	cpymo_exit_confirm_state exit_confirm_state = { false, 0 };
+	bool exit_msgbox_opened = false;
 	#endif
 
 	size_t redraw_by_event = 30;
@@ -705,20 +696,20 @@ START:
 				extern bool playing_movie;
 				if (playing_movie) goto EXIT;
 				#endif
-				if (!exit_confirm_state.msgbox_opened && !exit_confirm_state.exit_after_ticks) {
+				if (!exit_msgbox_opened) {
 					err = cpymo_msgbox_ui_enter(
 						&engine,
 						cpymo_str_pure(
 							cpymo_localization_get(&engine)->exit_confirm),
 						&cpymo_exit_confirm,
-						&exit_confirm_state);
+						&exit_msgbox_opened);
 
 					if (err != CPYMO_ERR_SUCC) {
 						SDL_Log("[Error] Can not show message box: %s", 
 							cpymo_error_message(err));
 					}
 
-					exit_confirm_state.msgbox_opened = true;
+					exit_msgbox_opened = true;
 				}
 
 				#else
@@ -739,12 +730,6 @@ START:
 			}
 #endif
 		}
-
-		#ifdef ENABLE_EXIT_CONFIRM
-		if (exit_confirm_state.exit_after_ticks &&
-			SDL_TICKS_PASSED(SDL_GetTicks(), exit_confirm_state.exit_after_ticks))
-			goto EXIT;
-		#endif
 
 		bool need_to_redraw = false;
 
