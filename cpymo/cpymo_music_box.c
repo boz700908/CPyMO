@@ -3,6 +3,7 @@
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
 #include "cpymo_parser.h"
+#include "cpymo_accessibility.h"
 #include "../cpymo-backends/include/cpymo_backend_text.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -72,8 +73,10 @@ static error_t cpymo_musicbox_ok(struct cpymo_engine *e, void *selected)
 	const cpymo_music_box *box = (cpymo_music_box *)cpymo_list_ui_data_const(e);
 
 	uintptr_t node_index = cpymo_list_ui_encode_uint_node_dec(selected);
-	cpymo_audio_bgm_play(e, box->music_filename[node_index], true);
-	return CPYMO_ERR_SUCC;
+	error_t err = cpymo_audio_bgm_play(e, box->music_filename[node_index], true);
+	if (err == CPYMO_ERR_SUCC)
+		cpymo_accessibility_play_sound(SOUND_ENTER);
+	return err;
 }
 
 #ifdef ENABLE_TEXT_EXTRACT

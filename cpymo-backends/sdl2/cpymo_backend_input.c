@@ -247,11 +247,6 @@ cpymo_input cpymo_input_snapshot()
 		else if (y < -30000) out.up = true;
 	}
 
-	bool fast_exit = false;
-	MAP_CONTROLLER(fast_exit, SDL_CONTROLLER_BUTTON_START);
-	if (fast_exit)
-		cpymo_engine_exit(&engine);
-
 	#undef MAP_CONTROLLER
 	
 	return out;

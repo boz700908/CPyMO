@@ -30,6 +30,8 @@ typedef struct cpymo_select_img_selection{
 
 static error_t cpymo_select_img_ok_callback_default(cpymo_engine *e, int sel, uint64_t hash, bool save_enabled)
 {
+	cpymo_accessibility_play_sound(SOUND_ENTER);
+
 	if (save_enabled)
 		cpymo_hash_flags_add(&e->flags, hash);
 

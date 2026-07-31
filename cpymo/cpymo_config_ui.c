@@ -4,6 +4,7 @@
 #include "cpymo_list_ui.h"
 #include "cpymo_save_global.h"
 #include "cpymo_localization.h"
+#include "cpymo_accessibility.h"
 #include <assert.h>
 #include <math.h>
 
@@ -514,6 +515,7 @@ JUST_REFRESH:
 	default: assert(false);
 	}
 
+	cpymo_accessibility_play_sound(SOUND_SELECT);
 	cpymo_engine_request_redraw(e);
 
 	return CPYMO_ERR_SUCC;

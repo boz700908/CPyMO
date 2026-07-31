@@ -2,6 +2,7 @@
 #include "cpymo_backlog.h"
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
+#include "cpymo_accessibility.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
@@ -186,7 +187,10 @@ static error_t cpymo_backlog_ui_ok(struct cpymo_engine *e, void *selected)
 	const cpymo_backlog_record *rec = &e->backlog.records[
 		cpymo_list_ui_encode_uint_node_dec(selected)];
 	if (rec->vo_filename[0]) {
-		return cpymo_audio_vo_play(e, cpymo_str_pure(rec->vo_filename));
+		error_t err = cpymo_audio_vo_play(e, cpymo_str_pure(rec->vo_filename));
+		if (err == CPYMO_ERR_SUCC)
+			cpymo_accessibility_play_sound(SOUND_ENTER);
+		return err;
 	}
 
 	return CPYMO_ERR_SUCC;
