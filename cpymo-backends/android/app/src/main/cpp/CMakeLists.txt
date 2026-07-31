@@ -37,6 +37,16 @@ add_definitions(
         -DEXIT_TO_GAME_SELECTOR
 )
 
+# Keep accessibility feature flags visible to both the platform backend and
+# the shared core library (cpymolib). Gradle's target-only cFlags do not
+# propagate into the nested core target.
+if (ENABLE_TEXT_EXTRACT)
+    add_definitions(-DENABLE_TEXT_EXTRACT)
+endif()
+if (ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY)
+    add_definitions(-DENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY)
+endif()
+
 include_directories(
         "./include"
         "../../../../../include"
