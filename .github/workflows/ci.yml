@@ -127,18 +127,22 @@ jobs:
         cd vdpm
         export VITASDK=~/vitasdk
         export PATH=$VITASDK/bin:$PATH
+        export VDPM_NONINTERACTIVE=1
         ./bootstrap-vitasdk.sh
-        ./vdpm sdl2
-        ./vdpm sdl2_mixer
-        ./vdpm flac
-        ./vdpm libmodplug
-        ./vdpm mpg123
-        ./vdpm libogg
-        ./vdpm libvorbis
-        ./vdpm libmikmod
-        ./vdpm opus
-        ./vdpm opusfile
-        ./vdpm libxmp
+        # Use the frontend the bootstrap installed. Current releases put the
+        # package client at libexec/vdpm/pacman, while the clone's legacy
+        # ./vdpm script still looks for bin/pacman.
+        $VITASDK/bin/vdpm install sdl2
+        $VITASDK/bin/vdpm install sdl2_mixer
+        $VITASDK/bin/vdpm install flac
+        $VITASDK/bin/vdpm install libmodplug
+        $VITASDK/bin/vdpm install mpg123
+        $VITASDK/bin/vdpm install libogg
+        $VITASDK/bin/vdpm install libvorbis
+        $VITASDK/bin/vdpm install libmikmod
+        $VITASDK/bin/vdpm install opus
+        $VITASDK/bin/vdpm install opusfile
+        $VITASDK/bin/vdpm install libxmp
         # cd ../cpymo-backends/sdl2
         # chmod +x ./build-psv-ffmpeg.sh
         # ./build-psv-ffmpeg.sh
