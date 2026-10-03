@@ -55,6 +55,10 @@ struct cpymo_select_img {
 	enum cpymo_backend_image_draw_type draw_type;
 
 	cpymo_key_hold key_mouse_button;
+
+#ifdef ENABLE_TEXT_EXTRACT
+	char *select_img_name;
+#endif
 };
 
 typedef struct cpymo_select_img cpymo_select_img;
@@ -91,6 +95,10 @@ static inline void cpymo_select_img_init(cpymo_select_img *select_img)
 	select_img->option_background = NULL;
 	select_img->show_option_background = false;
 	select_img->draw_type = cpymo_backend_image_draw_type_sel_img;
+
+#ifdef ENABLE_TEXT_EXTRACT
+	select_img->select_img_name = NULL;
+#endif
 
 	cpymo_key_pluse_init(&select_img->key_up, false);
 	cpymo_key_pluse_init(&select_img->key_down, false);

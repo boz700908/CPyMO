@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "cpymo_accessibility.h"
 
@@ -57,15 +58,29 @@ void cpymo_select_img_reset(cpymo_select_img *img)
 				cpymo_backend_image_free(img->selections[i].image); 
 			if (img->selections[i].or_text)
 				cpymo_backend_text_free(img->selections[i].or_text);
-#ifdef ENABLE_TEXT_EXTRACT
-			if (img->selections[i].original_text)
-				free(img->selections[i].original_text);
-#endif
 		}
 	}
 
+#ifdef ENABLE_TEXT_EXTRACT
+	if (img->selections) {
+		for (size_t i = 0; i < img->all_selections; ++i) {
+			if (img->selections[i].original_text) {
+				free(img->selections[i].original_text);
+				img->selections[i].original_text = NULL;
+			}
+		}
+	}
+#endif
+
 	if (img->selections)
 		free(img->selections);
+
+#ifdef ENABLE_TEXT_EXTRACT
+	if (img->select_img_name) {
+		free(img->select_img_name);
+		img->select_img_name = NULL;
+	}
+#endif
 
 	for (size_t i = 0; i < 4; ++i) {
 		if (img->hint[i]) cpymo_backend_image_free(img->hint[i]);
@@ -103,6 +118,17 @@ error_t cpymo_select_img_configuare_begin(
 		}
 	}
 
+#ifdef ENABLE_TEXT_EXTRACT
+	if (sel->select_img_name) {
+		free(sel->select_img_name);
+		sel->select_img_name = NULL;
+	}
+
+	if (image_name_or_empty_when_select_imgs.len > 0)
+		sel->select_img_name =
+			cpymo_str_copy_malloc(image_name_or_empty_when_select_imgs);
+#endif
+
 	sel->current_selection = 0;
 	sel->all_selections = selections;
 	sel->ok_callback = &cpymo_select_img_ok_callback_default;
@@ -120,7 +146,17 @@ void cpymo_select_img_configuare_select_img_selection(cpymo_engine *e, float x, 
 	sel->image = e->select_img.select_img_image;
 	sel->or_text = NULL;
 #ifdef ENABLE_TEXT_EXTRACT
-	sel->original_text = NULL;
+	{
+		const char *image_name = e->select_img.select_img_name;
+		char spoken[160];
+		if (image_name && image_name[0])
+			snprintf(spoken, sizeof(spoken), "%s %d",
+				image_name, e->select_img.current_selection);
+		else
+			snprintf(spoken, sizeof(spoken), "%d",
+				e->select_img.current_selection);
+		sel->original_text = cpymo_str_copy_malloc(cpymo_str_pure(spoken));
+	}
 #endif
 
 	sel->x = x;
@@ -164,7 +200,7 @@ error_t cpymo_select_img_configuare_select_imgs_selection(cpymo_engine *e, cpymo
 	sel->has_selected = cpymo_hash_flags_check(&e->flags, hash);
 
 #ifdef ENABLE_TEXT_EXTRACT
-	sel->original_text = NULL;
+	sel->original_text = cpymo_str_copy_malloc(image_name);
 #endif
 
 	return CPYMO_ERR_SUCC;
@@ -300,6 +336,18 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 	cpymo_wait_register(wait, &cpymo_select_img_wait);
 	cpymo_input_ignore_next_mouse_button_event(e);
 	cpymo_engine_request_redraw(e);
+
+#ifdef ENABLE_TEXT_EXTRACT
+	{
+		const char *spoken = sel->selections[sel->current_selection].original_text;
+		if (spoken && spoken[0]) {
+			cpymo_engine_extract_text_cstr(
+				e, cpymo_localization_get(e)->visual_help_selection);
+			cpymo_engine_extract_text_cstr(e, spoken);
+			cpymo_engine_extract_text_submit(e);
+		}
+	}
+#endif
 }
 
 static void cpymo_select_img_move(cpymo_select_img *o, int move) {
@@ -629,11 +677,5 @@ void cpymo_select_img_configuare_end_select_text(
 			sel->show_option_background = false;
 		}
 	}
-
-	cpymo_engine_extract_text_cstr(
-		e, cpymo_localization_get(e)->visual_help_selection);
-	cpymo_engine_extract_text_cstr(
-		e, sel->selections[sel->current_selection].original_text);
-	cpymo_engine_extract_text_submit(e);
 }
 
