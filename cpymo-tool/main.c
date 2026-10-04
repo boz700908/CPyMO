@@ -22,6 +22,11 @@
 #define STBI_NO_HDR
 #define STBI_NO_PIC
 #define STBI_NO_PNM
+/* Arm64EC keeps the x64 predefined macros, so stb_image selects its SSE2 path.
+   MSVC 14.5x only allows <emmintrin.h> to be reached through <intrin.h>. */
+#if defined(_M_ARM64EC)
+#include <intrin.h>
+#endif
 #define STB_IMAGE_IMPLEMENTATION
 #include "../stb/stb_image.h"
 
