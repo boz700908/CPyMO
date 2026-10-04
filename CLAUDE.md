@@ -174,7 +174,7 @@ make
 
 ### Accessibility Build Configuration
 - **CMAKE**: `-DENABLE_ACCESSIBILITY=ON` enables platform-specific accessibility
-  - Windows: Tolk-based TTS via screen readers (NVDA, JAWS)
+  - Windows: Tolk-based TTS via screen readers (NVDA, JAWS, ZDSR, BoyCtrl); prebuilt Tolk DLLs vendored for x86/x64/ARM64/ARM64EC
   - macOS: NSSpeechSynthesizer TTS
   - Linux: speech-dispatcher TTS
   - iOS: AVSpeechSynthesizer TTS + VoiceOver + custom gesture recognizers

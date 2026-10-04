@@ -397,7 +397,7 @@ CPyMO 为视障玩家提供了全平台统一的无障碍支持，包括语音�
 ## 功能概述
 
 **语音朗读 (TTS)**：自动朗读游戏文本、菜单选项和设置项。各平台使用系统原生 TTS 引擎：
-- Windows：通过 [Tolk](https://github.com/dkager/tolk) 调用屏幕阅读器（NVDA、JAWS 等）
+- Windows：通过 [Tolk](https://github.com/boz700908/tolk) 调用屏幕阅读器（NVDA、JAWS、争渡、保益等），预编译库覆盖 x86/x64/ARM64/ARM64EC
 - macOS：使用 NSSpeechSynthesizer 系统语音
 - Linux：使用 speech-dispatcher 语音服务
 - iOS：使用 AVSpeechSynthesizer，并自动适配 VoiceOver

@@ -566,7 +566,7 @@ jobs:
 
     strategy:
       matrix:
-        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64 ] #, win-arm ]
+        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ] #, win-arm ]
 
         include:
           - tuple: win-x64
@@ -596,6 +596,16 @@ jobs:
             arch: amd64_arm64
             package-name: "Windows ARM64"
             cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-arm64ec
+            os: windows-latest
+            # SDL2/FFmpeg have no arm64ec build. Arm64EC cannot link Arm64 libraries, but it
+            # can link x64 ones (that x64 code then runs under the built-in x64 emulation),
+            # so reuse the static x64 libraries the other Windows jobs already build.
+            triplet: x64-windows-static
+            arch: amd64_arm64
+            package-name: "Windows ARM64EC"
+            cmake-flags: "-A arm64ec -DCMAKE_GENERATOR_PLATFORM=arm64ec"
             vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: linux-x64
             os: ubuntu-latest
@@ -712,7 +722,7 @@ jobs:
 
     strategy:
       matrix:
-        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64 ]
+        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ]
 
         include:
           - tuple: win-x64
@@ -735,6 +745,16 @@ jobs:
             arch: amd64_arm64
             package-name: "Windows ARM64 (Accessibility)"
             cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-arm64ec
+            os: windows-latest
+            # SDL2/FFmpeg have no arm64ec build. Arm64EC cannot link Arm64 libraries, but it
+            # can link x64 ones (that x64 code then runs under the built-in x64 emulation),
+            # so reuse the static x64 libraries the other Windows jobs already build.
+            triplet: x64-windows-static
+            arch: amd64_arm64
+            package-name: "Windows ARM64EC (Accessibility)"
+            cmake-flags: "-A arm64ec -DCMAKE_GENERATOR_PLATFORM=arm64ec -DENABLE_ACCESSIBILITY=ON"
             vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: linux-x64
             os: ubuntu-latest

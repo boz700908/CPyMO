@@ -55,16 +55,11 @@ TOLK = ..\..\third_party\tolk
 !ifndef TOLK_ARCH
 TOLK_ARCH = x64
 !endif
-!if "$(TOLK_ARCH)" == "x64"
-CFLAGS = $(CFLAGS) /I$(TOLK)\include
-LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
-!elseif "$(TOLK_ARCH)" == "x86"
-CFLAGS = $(CFLAGS) /I$(TOLK)\include
-LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
-!elseif "$(TOLK_ARCH)" == "arm64"
-CFLAGS = $(CFLAGS) /I$(TOLK)\include
-LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
+!if !exist("$(TOLK)\$(TOLK_ARCH)\Release\Tolk.lib")
+TOLK_ARCH = x64
 !endif
+CFLAGS = $(CFLAGS) /I$(TOLK)\include
+LD_FLAGS = $(LD_FLAGS) /LIBPATH:$(TOLK)\$(TOLK_ARCH)\Release Tolk.lib
 !endif
 
 SRC = *.c ../../cpymo/*.c
