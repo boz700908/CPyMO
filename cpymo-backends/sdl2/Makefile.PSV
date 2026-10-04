@@ -47,6 +47,11 @@ $(BUILD_DIR_BACKEND)/%.o: %.c $(INC)
 $(BUILD_DIR)/%.o: ../../cpymo/%.c $(INC)
 	$(call compile,$<,$@)
 
+# Newer vitasdk binutils layouts can start the second LOAD segment right after
+# the first one. vita-elf-create appends the SCE metadata to the first segment,
+# so reserve headroom for it instead of failing with "segment 1 overlaps".
+SCE_HEADROOM := 0x10000
+
 $(BUILD_DIR)/cpymo.elf: $(OBJS_BACKEND) $(OBJS_CPYMO)
 	@echo "Linking..."
 	@$(CC) -Wl,-q $^ -o $@ \
@@ -70,7 +75,8 @@ $(BUILD_DIR)/cpymo.elf: $(OBJS_BACKEND) $(OBJS_CPYMO)
 		-lm \
 		-Xlinker "-)" \
 		-L$(VITASDK)/arm-vita-eabi/lib \
-		-Wl,-z,nocopyreloc
+		-Wl,-z,nocopyreloc \
+		-Wl,--defsym=__sce_headroom=$(SCE_HEADROOM)
 	@arm-vita-eabi-strip -g $@
 
 $(BUILD_DIR)/cpymo.velf: $(BUILD_DIR)/cpymo.elf
