@@ -50,8 +50,6 @@ jobs:
         cp build.Switch/cpymo.nro dist/
         test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
         cp startup.wav dist/
-        pacman -S --noconfirm --needed zip >/dev/null 2>&1 || true
-        ( cd dist && zip -qr ../CPyMO-switch.zip . && mv ../CPyMO-switch.zip dist/ )
         ls -R dist
 
     - name: Upload
@@ -103,8 +101,6 @@ jobs:
         cp ../../tts-assets/*.vtdb2 dist/tts/ 2>/dev/null || true
         test -f dist/tts/rtld.bin && test -f dist/tts/main.bin && test -f dist/tts/sdk.bin \
           || { echo "tts 资源不完整（需要 rtld/main/sdk）"; exit 1; }
-        pacman -S --noconfirm --needed zip >/dev/null 2>&1 || true
-        ( cd dist && zip -qr ../CPyMO-switch.zip . && mv ../CPyMO-switch.zip dist/ )
         ls -R dist
 
     - name: Upload
