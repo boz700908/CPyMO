@@ -255,6 +255,12 @@
     <Image Include="Assets\Wide310x150Logo.scale-200.png" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\sdl2\startup.wav">
+      <Link>startup.wav</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="..\..\cpymo\cpymo_album.c" />
     <ClCompile Include="..\..\cpymo\cpymo_anime.c" />
     <ClCompile Include="..\..\cpymo\cpymo_assetloader.c" />

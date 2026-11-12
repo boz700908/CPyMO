@@ -92,6 +92,7 @@ cpymo.vpk: $(BUILD_DIR)/param.sfo $(BUILD_DIR)/eboot.bin
 	@vita-pack-vpk \
 		-s $(BUILD_DIR)/param.sfo \
 		-b $(BUILD_DIR)/eboot.bin $@ \
+		-a startup.wav=startup.wav \
 		-a psv-icon0.png=sce_sys/icon0.png \
 		-a psv-pic0.png=sce_sys/pic0.png \
 		-a psv-startup.png=sce_sys/livearea/contents/startup.png \
