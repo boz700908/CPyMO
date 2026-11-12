@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "cpymo_safe_area.h"
+#include "../../cpymo/cpymo_safe_area.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
