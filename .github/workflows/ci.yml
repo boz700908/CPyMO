@@ -524,6 +524,7 @@ jobs:
 
   build-ios:
     name: 'iOS'
+    needs: [build-macos-ascii-art]
     runs-on: macos-latest
 
     steps:
@@ -580,6 +581,7 @@ jobs:
 
   build-ios-accessibility:
     name: 'iOS (Accessibility)'
+    needs: [build-ios]
     runs-on: macos-latest
 
     steps:
@@ -872,7 +874,7 @@ jobs:
 
     strategy:
       matrix:
-        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ] #, win-arm ]
+        tuple: [ linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ] #, win-arm ]
 
         include:
           - tuple: win-x64
@@ -918,6 +920,289 @@ jobs:
             triplet: x64-linux
             package-name: "Linux x64"
             vcpkg-path: "/home/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+    steps:
+    - uses: actions/checkout@v4.4.0
+      with:
+        submodules: 'recursive'
+
+    - uses: ilammy/msvc-dev-cmd@v1.13.0
+      if: ${{ runner.os == 'Windows' }}
+      with:
+        arch: ${{ matrix.arch }}
+
+    - name: Setup NASM
+      uses: ilammy/setup-nasm@v1.3.1
+      if: ${{ runner.os != 'Windows' }}
+
+    - name: Setup Dependents for MacOS
+      if: ${{ runner.os == 'macOS' }}
+      run: brew install pkg-config autoconf autoconf-archive automake libtool
+
+    - name: Setup Dependents for Ubuntu
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        sudo apt-get update
+        sudo apt install -y \
+          autoconf \
+          autoconf-archive \
+          automake \
+          libtool \
+          libltdl-dev \
+          libx11-dev \
+          libibus-1.0-dev \
+          libxft-dev \
+          libxext-dev \
+          libwayland-dev \
+          libxkbcommon-dev \
+          libegl1-mesa-dev
+
+    - name: Restore vcpkg binary cache
+      uses: actions/cache@v4
+      with:
+        # 只缓存二进制产物。vcpkg/downloads 一旦进缓存，恢复时会把 vcpkg/ 目录一并建出来，
+        # 紧接的 git clone 就撞上「目标已存在」而失败（Windows 上必现）。
+        path: |
+          ${{ github.workspace }}/.vcpkg-binary-cache
+        key: vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        restore-keys: |
+          vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+
+    - name: Download vcpkg
+      run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
+
+    - name: Bootstrap vcpkg
+      run: |
+        mkdir -p ~/.vcpkg
+        touch ~/.vcpkg/vcpkg.path.txt
+        ./vcpkg/bootstrap-vcpkg.sh
+        ./vcpkg/vcpkg integrate install
+      if: ${{ runner.os != 'Windows' }}
+
+    - name: Bootstrap vcpkg (Windows)
+      run: |
+        ./vcpkg/bootstrap-vcpkg.bat
+        ./vcpkg/vcpkg integrate install
+      if: ${{ runner.os == 'Windows' }}
+
+    - name: Install SDL2
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
+      run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
+
+    - name: Install FFMPEG
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
+      run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
+
+    - name: Configure CMake
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Strip
+      if: ${{ runner.os != 'Windows' }}
+      run: |
+        strip ./build/build/cpymo
+        strip ./build/build/cpymo-tool
+
+    - name: Package (Linux)
+      if: ${{ runner.os == 'Linux' }}
+      run: ./scripts/package-linux.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+
+    - name: Package (macOS)
+      if: ${{ runner.os == 'macOS' }}
+      run: ./scripts/package-macos.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+
+    - name: Package (Windows)
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
+        New-Item -ItemType Directory -Force -Path dist | Out-Null
+        Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
+          if (Test-Path build/build/Release/cpymo-tool.exe) { Copy-Item build/build/Release/cpymo-tool.exe dist/cpymo-tool.exe }
+        Get-ChildItem dist
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO for ${{ matrix.package-name }}
+        path: ./dist/*
+        if-no-files-found: error
+
+  build-desktop-accessibility:
+    name: 'Desktop (Accessibility)'
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        tuple: [ linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ]
+
+        include:
+          - tuple: win-x64
+            os: windows-latest
+            triplet: x64-windows-static
+            arch: x64
+            package-name: "Windows x64 (Accessibility)"
+            cmake-flags: "-A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-x86
+            os: windows-latest
+            triplet: x86-windows-static
+            arch: x86
+            package-name: "Windows x86 (Accessibility)"
+            cmake-flags: "-A Win32 -DCMAKE_GENERATOR_PLATFORM=Win32 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-arm64
+            os: windows-latest
+            triplet: arm64-windows-static
+            arch: amd64_arm64
+            package-name: "Windows ARM64 (Accessibility)"
+            cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64 -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: win-arm64ec
+            os: windows-latest
+            # SDL2/FFmpeg have no arm64ec build. Arm64EC cannot link Arm64 libraries, but it
+            # can link x64 ones (that x64 code then runs under the built-in x64 emulation),
+            # so reuse the static x64 libraries the other Windows jobs already build.
+            triplet: x64-windows-static
+            arch: amd64_arm64
+            package-name: "Windows ARM64EC (Accessibility)"
+            cmake-flags: "-A arm64ec -DCMAKE_GENERATOR_PLATFORM=arm64ec -DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          - tuple: linux-x64
+            os: ubuntu-latest
+            triplet: x64-linux
+            package-name: "Linux x64 (Accessibility)"
+            cmake-flags: "-DENABLE_ACCESSIBILITY=ON"
+            vcpkg-path: "/home/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+    steps:
+    - uses: actions/checkout@v4.4.0
+      with:
+        submodules: 'recursive'
+
+    - uses: ilammy/msvc-dev-cmd@v1.13.0
+      if: ${{ runner.os == 'Windows' }}
+      with:
+        arch: ${{ matrix.arch }}
+
+    - name: Setup NASM
+      uses: ilammy/setup-nasm@v1.3.1
+      if: ${{ runner.os != 'Windows' }}
+
+    - name: Setup Dependents for MacOS
+      if: ${{ runner.os == 'macOS' }}
+      run: brew install pkg-config autoconf autoconf-archive automake libtool
+
+    - name: Setup Dependents for Ubuntu
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+        sudo apt-get update
+        sudo apt install -y \
+          autoconf \
+          autoconf-archive \
+          automake \
+          libtool \
+          libltdl-dev \
+          libx11-dev \
+          libibus-1.0-dev \
+          libxft-dev \
+          libxext-dev \
+          libwayland-dev \
+          libxkbcommon-dev \
+          libegl1-mesa-dev
+
+    - name: Restore vcpkg binary cache
+      uses: actions/cache@v4
+      with:
+        # 只缓存二进制产物。vcpkg/downloads 一旦进缓存，恢复时会把 vcpkg/ 目录一并建出来，
+        # 紧接的 git clone 就撞上「目标已存在」而失败（Windows 上必现）。
+        path: |
+          ${{ github.workspace }}/.vcpkg-binary-cache
+        key: vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        restore-keys: |
+          vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+
+    - name: Download vcpkg
+      run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
+
+    - name: Bootstrap vcpkg
+      run: |
+        mkdir -p ~/.vcpkg
+        touch ~/.vcpkg/vcpkg.path.txt
+        ./vcpkg/bootstrap-vcpkg.sh
+        ./vcpkg/vcpkg integrate install
+      if: ${{ runner.os != 'Windows' }}
+
+    - name: Bootstrap vcpkg (Windows)
+      run: |
+        ./vcpkg/bootstrap-vcpkg.bat
+        ./vcpkg/vcpkg integrate install
+      if: ${{ runner.os == 'Windows' }}
+
+    - name: Install SDL2
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
+      run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
+
+    - name: Install FFMPEG
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
+      run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
+
+    - name: Configure CMake
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+    - name: Strip
+      if: ${{ runner.os != 'Windows' }}
+      run: |
+        strip ./build/build/cpymo
+        strip ./build/build/cpymo-tool
+
+    - name: Package (Linux)
+      if: ${{ runner.os == 'Linux' }}
+      run: ./scripts/package-linux.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+
+    - name: Package (macOS)
+      if: ${{ runner.os == 'macOS' }}
+      run: ./scripts/package-macos.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+
+    - name: Package (Windows)
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
+        New-Item -ItemType Directory -Force -Path dist | Out-Null
+        Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
+          if (Test-Path build/build/Release/cpymo-tool.exe) { Copy-Item build/build/Release/cpymo-tool.exe dist/cpymo-tool.exe }
+        Get-ChildItem dist
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO for ${{ matrix.package-name }}
+        path: ./dist/*
+        if-no-files-found: error
+
+  build-macos-desktop:
+    name: 'Desktop'
+    # 本账户的 macOS 并发只有 1：同一个 run 里第二个 mac job 会一直排队，排到
+    # 20 分钟上限就被判 cancelled（不是编译失败）。mac 组合因此单独成 job 并用
+    # max-parallel 串行，其余 mac job 用 needs 挂在这条链上，任何时刻只向
+    # GitHub 申请一台 macOS runner。
+    runs-on: ${{ matrix.os }}
+    needs: [build-ios-accessibility]
+
+    strategy:
+      max-parallel: 1
+      matrix:
+        include:
           - tuple: mac-x64
             os: macos-latest
             triplet: x64-osx
@@ -1042,52 +1327,15 @@ jobs:
         path: ./dist/*
         if-no-files-found: error
 
-  build-desktop-accessibility:
+  build-macos-desktop-accessibility:
     name: 'Desktop (Accessibility)'
     runs-on: ${{ matrix.os }}
+    needs: [build-macos-desktop]
 
     strategy:
+      max-parallel: 1
       matrix:
-        tuple: [ mac-x64, mac-arm64, linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ]
-
         include:
-          - tuple: win-x64
-            os: windows-latest
-            triplet: x64-windows-static
-            arch: x64
-            package-name: "Windows x64 (Accessibility)"
-            cmake-flags: "-A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: win-x86
-            os: windows-latest
-            triplet: x86-windows-static
-            arch: x86
-            package-name: "Windows x86 (Accessibility)"
-            cmake-flags: "-A Win32 -DCMAKE_GENERATOR_PLATFORM=Win32 -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: win-arm64
-            os: windows-latest
-            triplet: arm64-windows-static
-            arch: amd64_arm64
-            package-name: "Windows ARM64 (Accessibility)"
-            cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64 -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: win-arm64ec
-            os: windows-latest
-            # SDL2/FFmpeg have no arm64ec build. Arm64EC cannot link Arm64 libraries, but it
-            # can link x64 ones (that x64 code then runs under the built-in x64 emulation),
-            # so reuse the static x64 libraries the other Windows jobs already build.
-            triplet: x64-windows-static
-            arch: amd64_arm64
-            package-name: "Windows ARM64EC (Accessibility)"
-            cmake-flags: "-A arm64ec -DCMAKE_GENERATOR_PLATFORM=arm64ec -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: linux-x64
-            os: ubuntu-latest
-            triplet: x64-linux
-            package-name: "Linux x64 (Accessibility)"
-            cmake-flags: "-DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "/home/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
           - tuple: mac-x64
             os: macos-latest
             triplet: x64-osx
@@ -1212,13 +1460,56 @@ jobs:
         path: ./dist/*
         if-no-files-found: error
 
+  build-macos-text:
+    name: 'CPyMO Text (macOS)'
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          submodules: 'recursive'
+
+      - name: 'Build'
+        run: |
+          cd cpymo-backends/text/
+          make -j
+          strip cpymo-text
+
+      - name: 'Upload'
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: CPyMO Text for macOS
+          path: ./cpymo-backends/text/cpymo-text
+
+  build-macos-ascii-art:
+    name: 'CPyMO ASCII Art (macOS)'
+    runs-on: macos-latest
+    needs: [build-macos-text]
+
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          submodules: 'recursive'
+
+      - name: 'Build'
+        run: |
+          cd cpymo-backends/ascii-art/
+          make -j
+          strip cpymo-ascii-art
+
+      - name: 'Upload'
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: CPyMO ASCII Art for macOS
+          path: ./cpymo-backends/ascii-art/cpymo-ascii-art
+
   build-ascii-art:
     name: 'CPyMO ASCII Art'
     runs-on: ${{ matrix.os }}
 
     strategy:
       matrix:
-        os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
+        os: [ 'windows-latest', 'ubuntu-latest' ]
 
     steps:
       - uses: actions/checkout@v4.4.0
@@ -1263,7 +1554,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ 'windows-latest', 'ubuntu-latest', 'macos-latest' ]
+        os: [ 'windows-latest', 'ubuntu-latest' ]
 
     steps:
       - uses: actions/checkout@v4.4.0
