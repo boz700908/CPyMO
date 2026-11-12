@@ -50,11 +50,11 @@ static error_t cpymo_engine_version_warning(cpymo_engine *e)
 	return err;
 }
 
-/* 启动音乐（《Song of PyMO》）：整个进程只播一次。
+/* 启动音乐（《Song of PyMO》）：只在启动进入游戏选择器时播一次。
  *
- * 由 cpymo_engine_init 与 cpymo_engine_init_with_game_selector 调用，
- * 因此无论平台是直接进游戏还是先进游戏选择器，音乐都只在启动时响一次，
- * 之后重新初始化引擎不会再播。
+ * 只由 cpymo_engine_init_with_game_selector 调用，且整个进程只触发一次
+ * （退出游戏回到选择器不会再播）。直接拉起单一游戏的构建不经过选择器，
+ * 因此不播放——那种情况下开机就该直接进入游戏，不应压着游戏音乐。
  *
  * 未实现这两个符号的后端（弱符号链接后为 NULL）与自带音频图标的平台
  * （PSP 的 SND0、3DS 的 banner 音乐）什么也不做。
@@ -71,8 +71,6 @@ void cpymo_engine_play_startup_music_once(void)
 
 error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 {
-	cpymo_engine_play_startup_music_once();
-
 	// init audio system
 	cpymo_audio_init(&out->audio);
 
