@@ -71,17 +71,19 @@ public class VisualHelper {
     /**
      * This method is called by SDL using JNI.
      */
+    // 追加语义：打断由引擎裁决（R2 只在「对刚才按键的回答」时先调 textToSpeechStop），
+    // 这里用 QUEUE_ADD，避免把还在念的长句截断（R3/R5）。
     public static boolean textToSpeech(String text) {
         if (mTextToSpeech == null)
             return false;
-        mTextToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null);
+        mTextToSpeech.speak(text, TextToSpeech.QUEUE_ADD, null);
         return true;
     }
 
     public static boolean textToSpeechWithoutCopy(String text) {
         if (mTextToSpeech == null)
             return false;
-        mTextToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null);
+        mTextToSpeech.speak(text, TextToSpeech.QUEUE_ADD, null);
         return true;
     }
 

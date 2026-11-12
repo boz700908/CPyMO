@@ -317,7 +317,8 @@ void cpymo_ios_accessibility_announce(const char *text) {
         } else {
             if (speech_synthesizer == nil)
                 speech_synthesizer = [[AVSpeechSynthesizer alloc] init];
-            [speech_synthesizer stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+            /* R3/R5：AVSpeechSynthesizer 自带队列，这里只追加；
+             * R2 的替换由引擎先调用 cpymo_ios_accessibility_stop() 完成。 */
             AVSpeechUtterance *utterance = [AVSpeechUtterance speechUtteranceWithString:announcement];
             [speech_synthesizer speakUtterance:utterance];
         }

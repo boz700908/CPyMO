@@ -661,10 +661,10 @@ void cpymo_backend_text_extract(const char *text)
     if (text == NULL || text[0] == '\0') return;
     save_last_spoken_text(text);
 
-    /* 与移动端对齐（Android QUEUE_FLUSH / iOS stopSpeakingImmediate）：
-     * 新文本一到就打断正在念的，屏幕变化立刻能听到，不会落后于画面。
-     * 引擎侧已把「名称 + 值」合并成一次调用，因此不会自己打断自己。 */
-    cpymo_switch_tts_speak(text, CPYMO_SWITCH_TTS_INTERRUPT);
+    /* R3/R5：本函数只负责「把这一条送去念」，不负责打断。
+     * 打断只由引擎在 R2（这是对刚才那次按键的回答）时调用
+     * cpymo_backend_text_stop() 完成，因此这里一律追加，避免把还在念的长句截断。 */
+    cpymo_switch_tts_speak(text, CPYMO_SWITCH_TTS_APPEND);
 }
 
 /* --- Android / fallback --- */

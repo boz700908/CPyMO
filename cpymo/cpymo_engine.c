@@ -213,6 +213,10 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 
 void cpymo_engine_free(cpymo_engine *engine)
 {
+#ifdef ENABLE_TEXT_EXTRACT
+	/* R7：退出游戏时清队并停掉语音，不念任何告别内容 */
+	cpymo_a11y_speech_clear();
+#endif
 	while (engine->ui) cpymo_ui_exit(engine);
 
 	if (engine->assetloader.gamedir) {
@@ -448,10 +452,15 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 	if ((!engine->prev_input.ok && engine->input.ok) ||
 		(!engine->prev_input.cancel && engine->input.cancel) ||
 		(!engine->prev_input.down && engine->input.down) ||
+		(!engine->prev_input.up && engine->input.up) ||
 		(!engine->prev_input.left && engine->input.left) ||
+		(!engine->prev_input.right && engine->input.right) ||
 		(!engine->prev_input.mouse_button && engine->input.mouse_button) ||
 		(!engine->prev_input.hide_window && engine->input.hide_window))
 		cpymo_a11y_speech_note_input();
+	/* R7：切后台/暂停不念告别语，直接清队停机 */
+	if (!engine->prev_input.hide_window && engine->input.hide_window)
+		cpymo_a11y_speech_clear();
 	cpymo_a11y_speech_tick();
 #endif
 
