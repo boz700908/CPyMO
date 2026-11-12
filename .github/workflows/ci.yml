@@ -124,12 +124,12 @@ jobs:
         cat > /tmp/pkg/npdm.json <<'JSON'
         {
           "name": "CPyMO",
-          "title_id": "0x0100000000010000",
-          "program_id": "0x0100000000010000",
-          "title_id_range_min": "0x0100000000010000",
-          "title_id_range_max": "0x0100000000010000",
-          "program_id_range_min": "0x0100000000010000",
-          "program_id_range_max": "0x0100000000010000",
+          "title_id": "0x0100000050594d4f",
+          "program_id": "0x0100000050594d4f",
+          "title_id_range_min": "0x0100000050594d4f",
+          "title_id_range_max": "0x0100000050594d4f",
+          "program_id_range_min": "0x0100000050594d4f",
+          "program_id_range_max": "0x0100000050594d4f",
           "version": "0x0",
           "system_resource_size": "0x0",
           "main_thread_stack_size": "0x00100000",
@@ -154,7 +154,7 @@ jobs:
         }
         JSON
         npdmtool /tmp/pkg/npdm.json /tmp/pkg/exefs/main.npdm
-        nacptool --create "CPyMO" "boz700908" "1.0.0" /tmp/pkg/control/control.nacp --titleid=0x0100000000010000
+        nacptool --create "CPyMO" "boz700908" "1.0.0" /tmp/pkg/control/control.nacp --titleid=0x0100000050594d4f
         ls -l /tmp/pkg/exefs /tmp/pkg/control
 
     - name: Upload exefs
@@ -227,7 +227,7 @@ jobs:
           --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
           --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
           --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
-          --keepncadir --titleid 0100000000010000 \
+          --keepncadir --titleid 0100000050594d4f \
           --titlename CPyMO --titlepublisher boz700908 2>&1 | tail -60
         ls -l /tmp/pkg/nsp
 
