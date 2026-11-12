@@ -43,8 +43,8 @@ jobs:
       run: |
         cd ./cpymo-backends/sdl2
         mkdir -p dist
-        test -f cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
-        cp cpymo.nro dist/
+        test -f build.Switch/cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
+        cp build.Switch/cpymo.nro dist/
         test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
         cp startup.wav dist/
         pacman -S --noconfirm --needed zip >/dev/null 2>&1 || true
@@ -89,8 +89,8 @@ jobs:
       run: |
         cd ./cpymo-backends/sdl2
         mkdir -p dist
-        test -f cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
-        cp cpymo.nro dist/
+        test -f build.Switch/cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
+        cp build.Switch/cpymo.nro dist/
         cp enter.wav menu.wav select.wav dist/ 2>/dev/null || true
         test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
         cp startup.wav dist/
