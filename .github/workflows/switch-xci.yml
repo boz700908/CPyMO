@@ -87,7 +87,7 @@ jobs:
           "filesystem_access": { "permissions": "0xFFFFFFFFFFFFFFFF" },
           "service_access": ["*"],
           "kernel_capabilities": [
-            { "type": "kernel_flags", "value": { "highest_thread_priority": 63, "lowest_thread_priority": 24, "highest_cpu_id": 3 } }
+            { "type": "kernel_flags", "value": { "highest_thread_priority": 63, "lowest_thread_priority": 24, "highest_cpu_id": 3, "lowest_cpu_id": 0 } }
           ]
         }
         JSON
