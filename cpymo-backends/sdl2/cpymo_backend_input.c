@@ -2,6 +2,9 @@
 #include "../../cpymo/cpymo_engine.h"
 #include "../include/cpymo_backend_input.h"
 #include "cpymo_import_sdl2.h"
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#include "cpymo_switch_accessibility.h"
+#endif
 
 extern SDL_Renderer *renderer;
 extern SDL_Window *window;
@@ -142,6 +145,19 @@ cpymo_input cpymo_input_snapshot()
 	out.mouse_button = false;
 	out.mouse_wheel_delta = 0;
 #else
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	/* Switch 没有系统鼠标：单指触摸即探索指针（复刻 TalkBack 的 hover 语义），
+	 * 只移动位置、从不提交点击，确认由双击手势给出。 */
+	float touch_x, touch_y;
+	if (cpymo_switch_accessibility_touch_point(&touch_x, &touch_y)) {
+		out.mouse_button = false;
+		out.mouse_wheel_delta = mouse_wheel;
+		out.mouse_position_useable = true;
+		out.mouse_x = touch_x * engine.gameconfig.imagesize_w;
+		out.mouse_y = touch_y * engine.gameconfig.imagesize_h;
+	} else
+#endif
+	{
 	float scale_x, scale_y;
 	SDL_RenderGetScale(renderer, &scale_x, &scale_y);
 
@@ -189,6 +205,7 @@ cpymo_input cpymo_input_snapshot()
 
 	out.mouse_x *= engine.gameconfig.imagesize_w;
 	out.mouse_y *= engine.gameconfig.imagesize_h;
+	}
 
 #endif
 

@@ -258,6 +258,7 @@ void cpymo_switch_accessibility_tts_item_set(int item, int val)
 /*                                                                     */
 /*   单指上下左右滑动     方向键                                        */
 /*   单指轻点             移动指针但不点击（本平台不提交动作）           */
+/*   单指按住并移动       持续移动指针但不点击（探索模式）               */
 /*   单指双击             确认                                          */
 /*   单指按住 0.5s        取消                                          */
 /*   双指双击             快进（SKIP_HOLD_START … END）                 */
@@ -289,6 +290,11 @@ static Uint32 g_last_two_tap_ms;
 static bool g_moved;
 static bool g_hold_fired;
 static bool g_two_double;
+
+/* 探索模式的指针位置：单指触摸期间跟随，抬指后停留。 */
+static bool g_explore_valid;
+static float g_explore_x;
+static float g_explore_y;
 
 static void sw_reset_gesture(void)
 {
@@ -362,6 +368,9 @@ static void sw_finger_down(const SDL_Event *event)
         g_start_y = f->y;
         g_cur_x = f->x;
         g_cur_y = f->y;
+        g_explore_x = f->x;
+        g_explore_y = f->y;
+        g_explore_valid = true;
     } else if (g_active == 2) {
         g_two_double = (g_last_two_tap_ms != 0) &&
                        (now - g_last_two_tap_ms) < SW_TAP_MS;
@@ -383,6 +392,12 @@ static void sw_finger_motion(const SDL_Event *event)
     f->x = event->tfinger.x;
     f->y = event->tfinger.y;
     sw_update_centroid();
+
+    if (g_max_active == 1) {
+        g_explore_x = f->x;
+        g_explore_y = f->y;
+        g_explore_valid = true;
+    }
 
     dx = g_cur_x - g_start_x;
     dy = g_cur_y - g_start_y;
@@ -446,6 +461,14 @@ static void sw_finger_up(const SDL_Event *event)
     sw_reset_gesture();
 }
 
+bool cpymo_switch_accessibility_touch_point(float *x, float *y)
+{
+    if (!g_explore_valid) return false;
+    if (x) *x = g_explore_x;
+    if (y) *y = g_explore_y;
+    return true;
+}
+
 void cpymo_switch_accessibility_handle_event(const union SDL_Event *event)
 {
     if (!event) return;
@@ -488,6 +511,8 @@ bool cpymo_switch_accessibility_tts_start(void) { return false; }
 void cpymo_switch_accessibility_tts_stop(void) {}
 void cpymo_switch_accessibility_handle_event(const union SDL_Event *event) { (void)event; }
 void cpymo_switch_accessibility_tick(void) {}
+bool cpymo_switch_accessibility_touch_point(float *x, float *y)
+{ (void)x; (void)y; return false; }
 const char *cpymo_switch_accessibility_assets_dir(void) { return ""; }
 bool cpymo_switch_accessibility_ready(void) { return false; }
 const char *cpymo_switch_accessibility_last_error(void) { return ""; }

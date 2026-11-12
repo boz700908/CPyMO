@@ -31,6 +31,15 @@ void cpymo_switch_accessibility_handle_event(const union SDL_Event *event);
 /* 每帧调用一次，处理需要计时的长按手势。 */
 void cpymo_switch_accessibility_tick(void);
 
+/*
+ * 探索模式的指针位置（复刻 Android/iOS/Web 的「移动指针但不点击」）。
+ *
+ * 单指按下与移动时把手指位置记为指针位置，抬指后指针停留在原处，
+ * 直到下一次触摸。返回 false 表示还没有触摸过（此时沿用后端原生鼠标）。
+ * x / y 为归一化坐标（0..1，相对游戏画面）。
+ */
+bool cpymo_switch_accessibility_touch_point(float *x, float *y);
+
 /* 当前实际使用的资产目录（未启动时为空串），供诊断与设置页显示。 */
 const char *cpymo_switch_accessibility_assets_dir(void);
 
