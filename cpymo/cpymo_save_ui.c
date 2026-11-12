@@ -140,7 +140,7 @@ static error_t cpymo_save_ui_visual_impaired_selection_changed(cpymo_engine *e, 
 	if (cur) {
 		uintptr_t i = cpymo_list_ui_encode_uint_node_dec(cur);
 		const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data(e);
-		cpymo_backend_text_extract(ui->items[i].orginal_text);
+		cpymo_a11y_speak(ui->items[i].orginal_text);
 	}
 	return CPYMO_ERR_SUCC;
 }
@@ -297,7 +297,7 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 
 #ifdef ENABLE_TEXT_EXTRACT
 	if (ui->items[first].orginal_text)
-		cpymo_backend_text_extract(ui->items[first].orginal_text);
+		cpymo_a11y_speak(ui->items[first].orginal_text);
 #endif
 
 	return CPYMO_ERR_SUCC;

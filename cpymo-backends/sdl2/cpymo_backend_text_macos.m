@@ -14,3 +14,11 @@ void cpymo_macos_accessibility_announce(const char *text)
         [speaker startSpeakingString:announcement];
     });
 }
+
+void cpymo_macos_accessibility_stop(void)
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        static NSSpeechSynthesizer *speaker;
+        if (speaker != nil) [speaker stopSpeaking];
+    });
+}

@@ -280,6 +280,160 @@ void cpymo_engine_exit(cpymo_engine *e)
 		&cpymo_ui_empty_deleter);
 }
 
+
+/* ===================== 朗读队列（R1–R7） =====================
+ * 规则见 /memories/tts-interrupt-rules.md：
+ *   R1 按键只记录时刻与次数，本身不打断；
+ *   R2 按键之后的第一条文本替换正在念的（并清空队列），从这条开头念；
+ *   R3 其余文本排队，不打断；
+ *   R4 玩家正在操作时（宽限窗口 700ms 内）队列只留最新一条；
+ *   R5 自己持队列，引擎永远只有一条；
+ *   R6 同一段文字不重复入队；
+ *   R7 暂停/退出用 clear()，不念告别语。
+ * 平台只管"念一条"和"停下"（cpymo_backend_text_extract / _stop），
+ * 排队与打断判断全在这里，所有后端共用同一套规则。 */
+#ifdef ENABLE_TEXT_EXTRACT
+#define CPYMO_A11Y_QUEUE_MAX 8
+#define CPYMO_A11Y_GRACE_SEC 0.7
+
+typedef struct {
+	double now;
+	double last_input;
+	int presses;
+	char *speaking;
+	char *queue[CPYMO_A11Y_QUEUE_MAX];
+	int q_head;
+	int q_count;
+	double deadline;
+} cpymo_a11y_speech_state;
+
+static cpymo_a11y_speech_state cpymo_a11y_speech;
+
+static char *cpymo_a11y_strdup(const char *s)
+{
+	size_t n = strlen(s) + 1;
+	char *p = (char *)malloc(n);
+	if (p) memcpy(p, s, n);
+	return p;
+}
+
+static bool cpymo_a11y_is_cjk(const unsigned char *p)
+{
+	return (p[0] >= 0xE0);
+}
+
+/* 只用于兜底定时器，不是打断判据 */
+static double cpymo_a11y_estimate_sec(const char *text)
+{
+	double ms = 500.0;
+	const unsigned char *p = (const unsigned char *)text;
+	while (*p) {
+		if (cpymo_a11y_is_cjk(p)) { ms += 145.0; while ((*p & 0xC0) == 0x80) p++; }
+		else ms += 70.0;
+		p++;
+	}
+	double sec = ms / 1000.0;
+	if (sec < 0.7) sec = 0.7;
+	if (sec > 20.0) sec = 20.0;
+	return sec;
+}
+
+static void cpymo_a11y_start(const char *text)
+{
+	free(cpymo_a11y_speech.speaking);
+	cpymo_a11y_speech.speaking = cpymo_a11y_strdup(text);
+	cpymo_a11y_speech.deadline =
+		cpymo_a11y_speech.now + cpymo_a11y_estimate_sec(text) * 1.2 + 1.0;
+	cpymo_backend_text_extract(text);
+}
+
+static void cpymo_a11y_queue_pop_head(void)
+{
+	if (cpymo_a11y_speech.q_count <= 0) return;
+	free(cpymo_a11y_speech.queue[cpymo_a11y_speech.q_head]);
+	cpymo_a11y_speech.queue[cpymo_a11y_speech.q_head] = NULL;
+	cpymo_a11y_speech.q_head =
+		(cpymo_a11y_speech.q_head + 1) % CPYMO_A11Y_QUEUE_MAX;
+	cpymo_a11y_speech.q_count--;
+}
+
+static void cpymo_a11y_speech_done(void)
+{
+	free(cpymo_a11y_speech.speaking);
+	cpymo_a11y_speech.speaking = NULL;
+	if (cpymo_a11y_speech.q_count > 0) {
+		char *next = cpymo_a11y_speech.queue[cpymo_a11y_speech.q_head];
+		cpymo_a11y_speech.queue[cpymo_a11y_speech.q_head] = NULL;
+		cpymo_a11y_speech.q_head =
+			(cpymo_a11y_speech.q_head + 1) % CPYMO_A11Y_QUEUE_MAX;
+		cpymo_a11y_speech.q_count--;
+		cpymo_a11y_start(next);
+		free(next);
+	}
+}
+
+void cpymo_a11y_speech_clear(void)
+{
+	while (cpymo_a11y_speech.q_count > 0) cpymo_a11y_queue_pop_head();
+	free(cpymo_a11y_speech.speaking);
+	cpymo_a11y_speech.speaking = NULL;
+	cpymo_backend_text_stop();
+}
+
+void cpymo_a11y_speech_note_input(void)
+{
+	cpymo_a11y_speech.presses++;
+	cpymo_a11y_speech.last_input = cpymo_a11y_speech.now;
+}
+
+void cpymo_a11y_speak(const char *text)
+{
+	if (!text || text[0] == '\0') return;
+
+	if (cpymo_a11y_speech.speaking &&
+		strcmp(cpymo_a11y_speech.speaking, text) == 0) return;      /* R6 */
+	for (int i = 0; i < cpymo_a11y_speech.q_count; i++) {
+		int idx = (cpymo_a11y_speech.q_head + i) % CPYMO_A11Y_QUEUE_MAX;
+		if (strcmp(cpymo_a11y_speech.queue[idx], text) == 0) return;
+	}
+
+	bool flush = cpymo_a11y_speech.presses > 0;                     /* R2 */
+	cpymo_a11y_speech.presses = 0;
+
+	if (flush) {
+		while (cpymo_a11y_speech.q_count > 0) cpymo_a11y_queue_pop_head();
+		cpymo_backend_text_stop();
+		free(cpymo_a11y_speech.speaking);
+		cpymo_a11y_speech.speaking = NULL;
+		cpymo_a11y_start(text);
+		return;
+	}
+
+	if (cpymo_a11y_speech.speaking || cpymo_a11y_speech.q_count > 0) {  /* R3/R4 */
+		bool interacting =
+			(cpymo_a11y_speech.now - cpymo_a11y_speech.last_input)
+			<= CPYMO_A11Y_GRACE_SEC;
+		int limit = interacting ? 1 : CPYMO_A11Y_QUEUE_MAX;
+		while (cpymo_a11y_speech.q_count >= limit) cpymo_a11y_queue_pop_head();
+		int tail = (cpymo_a11y_speech.q_head + cpymo_a11y_speech.q_count)
+			% CPYMO_A11Y_QUEUE_MAX;
+		cpymo_a11y_speech.queue[tail] = cpymo_a11y_strdup(text);
+		if (cpymo_a11y_speech.queue[tail]) cpymo_a11y_speech.q_count++;
+		return;
+	}
+
+	cpymo_a11y_start(text);
+}
+
+void cpymo_a11y_speech_tick(void)
+{
+	/* 兜底：平台不回报"念完了"时，靠估算时间推进队列（宁可晚，不可早） */
+	if (cpymo_a11y_speech.speaking &&
+		cpymo_a11y_speech.now >= cpymo_a11y_speech.deadline)
+		cpymo_a11y_speech_done();
+}
+#endif /* ENABLE_TEXT_EXTRACT */
+
 error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * redraw)
 {
 	error_t err = CPYMO_ERR_SUCC;
@@ -287,6 +441,19 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 
 	engine->prev_input = engine->input;
 	engine->input = cpymo_input_snapshot();
+
+#ifdef ENABLE_TEXT_EXTRACT
+	/* 朗读队列的时基与 R1：只在"有新按下"时记一次输入 */
+	cpymo_a11y_speech.now += (double)delta_time_sec;
+	if ((!engine->prev_input.ok && engine->input.ok) ||
+		(!engine->prev_input.cancel && engine->input.cancel) ||
+		(!engine->prev_input.down && engine->input.down) ||
+		(!engine->prev_input.left && engine->input.left) ||
+		(!engine->prev_input.mouse_button && engine->input.mouse_button) ||
+		(!engine->prev_input.hide_window && engine->input.hide_window))
+		cpymo_a11y_speech_note_input();
+	cpymo_a11y_speech_tick();
+#endif
 
 	if (!engine->prev_input.mouse_button && !engine->input.mouse_button)
 		engine->ignore_next_mouse_button_flag = false;
@@ -430,7 +597,7 @@ void cpymo_engine_extract_text(cpymo_engine *e, cpymo_str str)
 void cpymo_engine_extract_text_submit(cpymo_engine *e)
 {
 	e->text_extract_buffer[e->text_extract_buffer_size] = '\0';
-	cpymo_backend_text_extract(e->text_extract_buffer);
+	cpymo_a11y_speak(e->text_extract_buffer);
 	e->text_extract_buffer_size = 0;
 }
 

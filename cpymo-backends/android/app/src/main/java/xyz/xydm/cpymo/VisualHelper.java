@@ -85,6 +85,13 @@ public class VisualHelper {
         return true;
     }
 
+    public static boolean textToSpeechStop() {
+        if (mTextToSpeech == null)
+            return false;
+        mTextToSpeech.stop();
+        return true;
+    }
+
     public static void copySpeechText(String speechText, boolean append) {
         if (speechText == null || speechText.isEmpty()) return;
         String text = SDLActivity.clipboardGetText();

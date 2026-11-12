@@ -8,6 +8,7 @@
 
 static jclass mVisualHelperClass;
 static jmethodID midTextToSpeech;
+static jmethodID midTextToSpeechStop;
 static jmethodID midPlayAccessibilityFeedback;
 static jmethodID midCopySpeechText;
 static jclass mControllerManagerClass;
@@ -47,6 +48,7 @@ Java_xyz_xydm_cpymo_VisualHelper_nativeSetupJNI(JNIEnv *env, jclass clazz)
 {
     mVisualHelperClass = (jclass)((*env)->NewGlobalRef(env, clazz));
     midTextToSpeech = (*env)->GetStaticMethodID(env, clazz, "textToSpeech", "(Ljava/lang/String;)Z");
+    midTextToSpeechStop = (*env)->GetStaticMethodID(env, clazz, "textToSpeechStop", "()Z");
     midPlayAccessibilityFeedback = (*env)->GetStaticMethodID(env, clazz,
         "playAccessibilityFeedback", "(I)V");
     midCopySpeechText = (*env)->GetStaticMethodID(env, clazz, "copySpeechText", "(Ljava/lang/String;Z)V");
@@ -60,6 +62,13 @@ void cpymo_android_text_to_speech(const char* text)
     if (jtext == NULL) return;
     (*env)->CallStaticBooleanMethod(env, mVisualHelperClass, midTextToSpeech, jtext);
     (*env)->DeleteLocalRef(env, jtext);
+}
+
+void cpymo_android_text_to_speech_stop(void)
+{
+    JNIEnv *env = SDL_AndroidGetJNIEnv();
+    if (env == NULL || mVisualHelperClass == NULL || midTextToSpeechStop == NULL) return;
+    (*env)->CallStaticBooleanMethod(env, mVisualHelperClass, midTextToSpeechStop);
 }
 
 void cpymo_android_play_sound(int sound_type)

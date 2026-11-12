@@ -384,7 +384,7 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_engine_request_redraw(e);
 
 			CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
-			cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
+			cpymo_a11y_speak(o->selections[o->current_selection].original_text);
 		}
 
 		if (cpymo_key_pluse_output(&o->key_up)) {
@@ -392,7 +392,7 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_engine_request_redraw(e);
 
 			CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
-			cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
+			cpymo_a11y_speak(o->selections[o->current_selection].original_text);
 		}
 
 		if (cpymo_input_mouse_moved(e) && e->input.mouse_position_useable) {
@@ -403,7 +403,7 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 						cpymo_engine_request_redraw(e);
 
 						CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
-						cpymo_backend_text_extract(o->selections[o->current_selection].original_text);
+						cpymo_a11y_speak(o->selections[o->current_selection].original_text);
 					}
 				}
 			}

@@ -519,7 +519,7 @@ static error_t cpymo_album_next_page(cpymo_engine *e, cpymo_album *a)
 #ifdef ENABLE_TEXT_EXTRACT
 		cpymo_accessibility_play_sound(SOUND_MENU);
 		if (err == CPYMO_ERR_SUCC && a->cg_count > 0 && a->cg_infos[0].title_text)
-			cpymo_backend_text_extract(a->cg_infos[0].title_text);
+			cpymo_a11y_speak(a->cg_infos[0].title_text);
 #endif
 		return err;
 	}
@@ -541,7 +541,7 @@ static error_t cpymo_album_prev_page(cpymo_engine *e, cpymo_album *a)
 #ifdef ENABLE_TEXT_EXTRACT
 		cpymo_accessibility_play_sound(SOUND_MENU);
 		if (err == CPYMO_ERR_SUCC && a->cg_count > 0 && a->cg_infos[0].title_text)
-			cpymo_backend_text_extract(a->cg_infos[0].title_text);
+			cpymo_a11y_speak(a->cg_infos[0].title_text);
 #endif
 		return err;
 	}
@@ -578,7 +578,7 @@ static void cpymo_album_exit_showing_cg(cpymo_engine *e, cpymo_album *a) {
 	cpymo_album_load_page(e, a);
 #ifdef ENABLE_TEXT_EXTRACT
 	if (a->cg_count > 0 && a->cg_infos[0].title_text)
-		cpymo_backend_text_extract(a->cg_infos[0].title_text);
+		cpymo_a11y_speak(a->cg_infos[0].title_text);
 #endif
 	cpymo_input_ignore_next_mouse_button_event(e);
 }
@@ -671,7 +671,7 @@ static error_t cpymo_album_select_ok(cpymo_engine *e, cpymo_album *a)
 #ifdef ENABLE_TEXT_EXTRACT
 	cpymo_accessibility_play_sound(SOUND_ENTER);
 	if (cg_info->title_text)
-		cpymo_backend_text_extract(cg_info->title_text);
+		cpymo_a11y_speak(cg_info->title_text);
 #endif
 	cpymo_album_showing_cg_next(e, a);
 	cpymo_input_ignore_next_mouse_button_event(e);
@@ -774,7 +774,7 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 #ifdef ENABLE_TEXT_EXTRACT
 		cpymo_accessibility_play_sound(SOUND_SELECT);
 		if (album->cg_infos[album->current_cg_selection].title_text)
-			cpymo_backend_text_extract(album->cg_infos[album->current_cg_selection].title_text);
+			cpymo_a11y_speak(album->cg_infos[album->current_cg_selection].title_text);
 #endif
 		return CPYMO_ERR_SUCC;
 	}
@@ -790,7 +790,7 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 #ifdef ENABLE_TEXT_EXTRACT
 		cpymo_accessibility_play_sound(SOUND_SELECT);
 		if (album->cg_infos[album->current_cg_selection].title_text)
-			cpymo_backend_text_extract(album->cg_infos[album->current_cg_selection].title_text);
+			cpymo_a11y_speak(album->cg_infos[album->current_cg_selection].title_text);
 #endif
 		return CPYMO_ERR_SUCC;
 	}
@@ -818,7 +818,7 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 #ifdef ENABLE_TEXT_EXTRACT
 						cpymo_accessibility_play_sound(SOUND_SELECT);
 						if (album->cg_infos[i].title_text)
-							cpymo_backend_text_extract(album->cg_infos[i].title_text);
+							cpymo_a11y_speak(album->cg_infos[i].title_text);
 #endif
 					}
 					break;
@@ -1077,7 +1077,7 @@ error_t cpymo_album_enter(
 	err = cpymo_album_load_page(e, album);
 #ifdef ENABLE_TEXT_EXTRACT
 	if (err == CPYMO_ERR_SUCC && album->cg_count > 0 && album->cg_infos[0].title_text)
-		cpymo_backend_text_extract(album->cg_infos[0].title_text);
+		cpymo_a11y_speak(album->cg_infos[0].title_text);
 #endif
 	return err;
 }

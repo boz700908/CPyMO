@@ -709,4 +709,44 @@ void cpymo_backend_text_append_copy_last(void) {
 
 #endif
 
+
+/* --- 全平台：立即打断当前朗读（朗读队列 R2/R7 用） --- */
+void cpymo_backend_text_stop(void)
+{
+#if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
+    Tolk_Silence();
+#elif defined(__IOS__)
+    {
+        extern void cpymo_ios_accessibility_stop(void);
+        cpymo_ios_accessibility_stop();
+    }
+#elif defined(__EMSCRIPTEN__)
+    EM_ASM({
+        if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+    });
+#elif defined(__APPLE__) && !defined(__IOS__)
+    {
+        extern void cpymo_macos_accessibility_stop(void);
+        cpymo_macos_accessibility_stop();
+    }
+#elif defined(__linux__) && defined(ENABLE_TEXT_EXTRACT_LINUX_ACCESSIBILITY)
+    {
+        pid_t stopper = fork();
+        if (stopper == 0) {
+            execlp("spd-say", "spd-say", "-S", (char *)NULL);
+            _exit(127);
+        }
+    }
+#elif defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+    cpymo_switch_tts_stop();
+#elif defined(ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY)
+    {
+        extern void cpymo_android_text_to_speech_stop(void);
+        cpymo_android_text_to_speech_stop();
+    }
+#else
+    /* 其它后端一次只持有一条，没有可打断的内容 */
+#endif
+}
+
 #endif /* ENABLE_TEXT_EXTRACT */

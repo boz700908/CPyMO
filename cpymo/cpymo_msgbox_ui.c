@@ -138,7 +138,7 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 		cpymo_engine_request_redraw(e);
 		cpymo_accessibility_play_sound(SOUND_SELECT);
 
-		cpymo_backend_text_extract(ui->selection == 0 ? l->msgbox_ok : l->msgbox_cancel);
+		cpymo_a11y_speak(ui->selection == 0 ? l->msgbox_ok : l->msgbox_cancel);
 	}
 	else if (CPYMO_INPUT_JUST_PRESSED(e, ok)) {
 		if (ui->cancel_btn == NULL) {
@@ -171,7 +171,7 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 			cpymo_engine_request_redraw(e);
 
 			if (ui->selection >= 0)
-				cpymo_backend_text_extract(
+				cpymo_a11y_speak(
 					ui->selection == 0 ? l->msgbox_ok : l->msgbox_cancel);
 		}
 	}

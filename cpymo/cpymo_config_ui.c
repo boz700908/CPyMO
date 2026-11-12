@@ -402,7 +402,7 @@ static void cpymo_config_ui_extract_setting_name(cpymo_engine *e, int item_id)
 	default: assert(false);
 	}
 
-	cpymo_backend_text_extract(p);
+	cpymo_a11y_speak(p);
 }
 
 static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_index, int val)
@@ -440,7 +440,7 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_inde
 		break;
 #endif
 	}
-	cpymo_backend_text_extract(val_str);
+	cpymo_a11y_speak(val_str);
 }
 
 static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int item_index, int val)
@@ -500,7 +500,7 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 	/* Concatenate name and value into a single TTS call to avoid interruption */
 	char combined[256];
 	snprintf(combined, sizeof(combined), "%s %s", name, val_str);
-	cpymo_backend_text_extract(combined);
+	cpymo_a11y_speak(combined);
 }
 #endif
 

@@ -8,6 +8,7 @@
 #define SOUND_SELECT 3
 
 void cpymo_android_text_to_speech(const char* text);
+void cpymo_android_text_to_speech_stop(void);
 void cpymo_android_play_sound(int sound_type);
 void cpymo_android_refresh_input_devices(void);
 void cpymo_android_copy_speech_text(const char *text, bool append);

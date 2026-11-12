@@ -87,7 +87,7 @@ static error_t cpymo_musicbox_visual_help_selection_change(cpymo_engine *e, void
 	if (box->music_title_text) {
 		uintptr_t node_index = cpymo_list_ui_encode_uint_node_dec(selected);
 		if (box->music_title_text[node_index])
-			cpymo_backend_text_extract(box->music_title_text[node_index]);
+			cpymo_a11y_speak(box->music_title_text[node_index]);
 	}
 
 	return CPYMO_ERR_SUCC;
@@ -210,7 +210,7 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 
 #ifdef ENABLE_TEXT_EXTRACT
 	if (box->music_title_text && box->music_title_text[0])
-		cpymo_backend_text_extract(box->music_title_text[0]);
+		cpymo_a11y_speak(box->music_title_text[0]);
 #endif
 
 	return CPYMO_ERR_SUCC;

@@ -19,7 +19,7 @@ static error_t cpymo_game_selector_visual_im_help_selection_changed_callback(cpy
 {
 	if (sel) {
 		cpymo_game_selector_item *item = (cpymo_game_selector_item *)sel;
-		cpymo_backend_text_extract(item->gametitle_text);
+		cpymo_a11y_speak(item->gametitle_text);
 	}
 	return CPYMO_ERR_SUCC;
 }
@@ -303,7 +303,7 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 		{
 			cpymo_game_selector_item *first = (cpymo_game_selector_item *)cpymo_list_ui_get_current_selected_const(e);
 			if (first && first->gametitle_text)
-				cpymo_backend_text_extract(first->gametitle_text);
+				cpymo_a11y_speak(first->gametitle_text);
 		}
 
 		#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY

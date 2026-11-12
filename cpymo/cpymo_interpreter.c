@@ -290,7 +290,7 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		if (strlen(engine->title) <= 0)
 			CONT_NEXTLINE;
 
-		cpymo_backend_text_extract(engine->title);
+		cpymo_a11y_speak(engine->title);
 
 		return cpymo_floating_hint_start(
 			engine,

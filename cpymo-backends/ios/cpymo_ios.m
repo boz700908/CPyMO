@@ -327,6 +327,16 @@ void cpymo_ios_accessibility_announce(const char *text) {
     else dispatch_async(dispatch_get_main_queue(), post_announcement);
 }
 
+void cpymo_ios_accessibility_stop(void)
+{
+    void (^do_stop)(void) = ^{
+        if (speech_synthesizer != nil)
+            [speech_synthesizer stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+    };
+    if ([NSThread isMainThread]) do_stop();
+    else dispatch_async(dispatch_get_main_queue(), do_stop);
+}
+
 void cpymo_ios_accessibility_game_selector_entered(void)
 {
     cpymo_ios_accessibility_announce("请先关闭系统读屏，然后上下滑动选择游戏");
