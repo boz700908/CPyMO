@@ -1,10 +1,11 @@
-﻿#include "cpymo_prelude.h"
+#include "cpymo_prelude.h"
 #include "cpymo_config_ui.h"
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
 #include "cpymo_save_global.h"
 #include "cpymo_localization.h"
 #include "cpymo_accessibility.h"
+#include "cpymo_safe_area.h"
 #include <assert.h>
 #include <math.h>
 
@@ -65,6 +66,38 @@ static void *cpymo_config_ui_get_prev_item(const cpymo_engine *e, const void *ui
 	else return cpymo_list_ui_encode_uint_node_enc((x - 1));
 }
 
+/* 安全区（issue #57）：设置页按屏高均分整屏，刘海与手势条会盖住首末项，
+ * 因此行高与起点都收缩到安全区内。 */
+static inline void cpymo_config_ui_safe_insets(
+	const cpymo_engine *e, float *out_top, float *out_usable_h)
+{
+	cpymo_safe_area area;
+	cpymo_safe_area_get(&area,
+		(int)e->gameconfig.imagesize_w,
+		(int)e->gameconfig.imagesize_h);
+
+	float usable_h = (float)e->gameconfig.imagesize_h - area.top - area.bottom;
+	if (usable_h < (float)CONFIG_ITEMS) usable_h = (float)CONFIG_ITEMS;
+
+	*out_top = area.top;
+	*out_usable_h = usable_h;
+}
+
+static inline float cpymo_config_ui_row_height(const cpymo_engine *e)
+{
+	float top, usable_h;
+	cpymo_config_ui_safe_insets(e, &top, &usable_h);
+	(void)top;
+	return usable_h / (float)CONFIG_ITEMS;
+}
+
+static inline float cpymo_config_ui_row_y(const cpymo_engine *e, float i)
+{
+	float top, usable_h;
+	cpymo_config_ui_safe_insets(e, &top, &usable_h);
+	return top + usable_h / (float)CONFIG_ITEMS * i;
+}
+
 static inline void cpymo_config_ui_calc_layout(
 	const cpymo_engine *e,
 	const cpymo_config_ui *ui,
@@ -82,7 +115,7 @@ static inline void cpymo_config_ui_calc_layout(
 		&ui->items[item_id];
 	*out_item = item;
 
-	float height = (float)e->gameconfig.imagesize_h / (float)CONFIG_ITEMS;
+	float height = cpymo_config_ui_row_height(e);
 
 	float text_y = y + height / 2 + ui->font_size / 4;
 	*out_text_y = text_y;
@@ -664,7 +697,7 @@ static error_t cpymo_config_ui_update(cpymo_engine *e, float dt, void *sel)
 		float symbol_y;
 		cpymo_config_ui_calc_layout(
 			e, ui, i, 
-			((float)e->gameconfig.imagesize_h / CONFIG_ITEMS) * i,
+			cpymo_config_ui_row_y(e, (float)i),
 			&item,
 			&y,
 			&x,
@@ -760,7 +793,7 @@ error_t cpymo_config_ui_mouse_button_just_hold(cpymo_engine *e)
 		float symbol_y;
 		cpymo_config_ui_calc_layout(
 			e, ui, i, 
-			((float)e->gameconfig.imagesize_h / CONFIG_ITEMS) * i,
+			cpymo_config_ui_row_y(e, (float)i),
 			&item,
 			&y,
 			&x,

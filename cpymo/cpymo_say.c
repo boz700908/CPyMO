@@ -1,4 +1,5 @@
-﻿#include "cpymo_prelude.h"
+﻿#include "cpymo_safe_area.h"
+#include "cpymo_prelude.h"
 #include "cpymo_say.h"
 #include "cpymo_rmenu.h"
 #include "cpymo_engine.h"
@@ -498,6 +499,19 @@ error_t cpymo_say_start(cpymo_engine *e, cpymo_str name, cpymo_str text)
 
 	float y = (float)e->gameconfig.imagesize_h - msg_h + msgtb_t;
 	float h = msg_h - msgtb_t - msgtb_b;
+
+	/* Safe Area（issue #57）：刘海、圆角与系统手势条会遮住贴边的文字，
+	 * 把文本区从这些区域里缩回来；没有安全区的平台 insets 全为 0。 */
+	{
+		cpymo_safe_area safe_area;
+		cpymo_safe_area_get(&safe_area, 
+			e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+		x += safe_area.left;
+		w -= safe_area.left + safe_area.right;
+		h -= safe_area.bottom;
+		if (w < 1.0f) w = 1.0f;
+		if (h < 1.0f) h = 1.0f;
+	}
 
 	const float text_alpha = 
 		e->say.current_say_is_already_read ? 

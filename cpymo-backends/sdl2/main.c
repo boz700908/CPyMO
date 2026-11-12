@@ -122,6 +122,7 @@ extern error_t cpymo_backend_font_init(const char *gamedir);
 extern void cpymo_backend_font_free();
 
 extern void cpymo_backend_audio_init();
+extern void cpymo_backend_safe_area_init();
 extern void cpymo_backend_audio_free();
 
 static void set_window_icon(const char *gamedir) 
@@ -486,6 +487,7 @@ START:
 	}
 
 	cpymo_backend_audio_init();
+	cpymo_backend_safe_area_init();
 
 #ifndef USE_GAME_SELECTOR
 	error_t err = cpymo_engine_init(&engine, gamedir);

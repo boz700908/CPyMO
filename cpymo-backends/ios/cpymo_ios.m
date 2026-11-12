@@ -412,3 +412,29 @@ void cpymo_ios_accessibility_vibrate(int milliseconds) {
     }
 }
 #endif
+
+/* 安全区（issue #57）：刘海、圆角与 Home Indicator 占掉的边距，按视图尺寸的
+ * 比例上报，由 cpymo-backend 换算成逻辑画布像素。与无障碍无关，恒编译。 */
+void cpymo_ios_safe_area_ratios(
+    float *left, float *top, float *right, float *bottom)
+{
+    if (left == NULL || top == NULL || right == NULL || bottom == NULL) return;
+
+    UIWindow *window = UIApplication.sharedApplication.keyWindow;
+    if (window == nil) window = UIApplication.sharedApplication.windows.firstObject;
+    if (window == nil) return;
+
+    UIView *view = window.rootViewController.view;
+    if (view == nil) return;
+
+    CGRect bounds = view.bounds;
+    if (bounds.size.width <= 0 || bounds.size.height <= 0) return;
+
+    if (@available(iOS 11.0, *)) {
+        UIEdgeInsets insets = view.safeAreaInsets;
+        *left = (float)(insets.left / bounds.size.width);
+        *top = (float)(insets.top / bounds.size.height);
+        *right = (float)(insets.right / bounds.size.width);
+        *bottom = (float)(insets.bottom / bounds.size.height);
+    }
+}
