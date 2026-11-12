@@ -66,6 +66,12 @@ CFLAGS	+=	$(INCLUDE) -D__SWITCH__ \
 			-DGAME_SELECTOR_DIR=" \"sdmc:/pymogames/\" " \
 			-DDONT_PASS_PATH_TO_FFMPEG
 
+# 无障碍版本：ENABLE_TEXT_EXTRACT=1（NS 原生 ReadSpeaker TTS + 手势 + 音效震动）
+ifeq ($(strip $(ENABLE_TEXT_EXTRACT)),1)
+CFLAGS	+=	-DENABLE_TEXT_EXTRACT \
+			-DENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY
+endif
+
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS	:=	-g $(ARCH)
@@ -175,6 +181,10 @@ all: $(BUILD)
 
 run: all
 	@yuzu $(TARGET).nro
+
+# 无障碍版本跑 Eden Nightly（需最新固件）
+run-eden: all
+	@$(if $(EDEN),$(EDEN),eden) $(TARGET).nro
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@

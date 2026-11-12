@@ -29,7 +29,15 @@ typedef struct {
 		*config_skip_mode,
 
 		*config_sayspeeds[6],
-		*config_skip_modes[2];
+		*config_skip_modes[2],
+
+		/* Nintendo Switch 无障碍：ReadSpeaker TTS 参数项（其它平台不显示） */
+		*config_tts_rate,
+		*config_tts_pitch,
+		*config_tts_volume,
+		*config_tts_voice,
+		*config_tts_emotion,
+		*config_tts_emotions[6];
 
 	error_t (*save_already_save_to)(char **out_str, int save_id);
 	error_t (*save_failed)(char **out_str, error_t);

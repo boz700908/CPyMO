@@ -8,7 +8,13 @@
 #include <assert.h>
 #include <math.h>
 
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#define CPYMO_SW_TTS_SETTINGS 1
+#include "../cpymo-backends/sdl2/cpymo_switch_accessibility.h"
+#define CONFIG_ITEMS 11
+#else
 #define CONFIG_ITEMS 6
+#endif
 
 typedef struct {
 	cpymo_backend_text show_name;
@@ -33,6 +39,14 @@ typedef struct {
 #define ITEM_TEXT_SPEED 3
 #define ITEM_FONT_SIZE 4
 #define ITEM_SKIP_ALREADY_READ_ONLY 5
+
+#if CPYMO_SW_TTS_SETTINGS
+#define ITEM_TTS_RATE 6
+#define ITEM_TTS_PITCH 7
+#define ITEM_TTS_VOLUME 8
+#define ITEM_TTS_VOICE 9
+#define ITEM_TTS_EMOTION 10
+#endif
 
 const static float side_padding = 16;
 
@@ -340,6 +354,28 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 		1, 
 		(int)e->config_skip_already_read_only,
 		false);
+
+#if CPYMO_SW_TTS_SETTINGS
+	INIT_ITEM(
+		ITEM_TTS_RATE, l->config_tts_rate, 50, 400,
+		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_RATE), true);
+
+	INIT_ITEM(
+		ITEM_TTS_PITCH, l->config_tts_pitch, 50, 400,
+		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_PITCH), true);
+
+	INIT_ITEM(
+		ITEM_TTS_VOLUME, l->config_tts_volume, 0, 100,
+		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_VOLUME), true);
+
+	INIT_ITEM(
+		ITEM_TTS_VOICE, l->config_tts_voice, 1, 20,
+		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_VOICE), true);
+
+	INIT_ITEM(
+		ITEM_TTS_EMOTION, l->config_tts_emotion, 0, CPYMO_SW_TTS_EMOTION_MAX,
+		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_EMOTION), true);
+#endif
 	
 	#undef INIT_ITEM
 }
@@ -356,6 +392,13 @@ static void cpymo_config_ui_extract_setting_name(cpymo_engine *e, int item_id)
 	case ITEM_FONT_SIZE: p = l->config_fontsize; break;
 	case ITEM_TEXT_SPEED: p = l->config_sayspeed; break;
 	case ITEM_SKIP_ALREADY_READ_ONLY: p = l->config_skip_mode; break;
+#if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_RATE: p = l->config_tts_rate; break;
+	case ITEM_TTS_PITCH: p = l->config_tts_pitch; break;
+	case ITEM_TTS_VOLUME: p = l->config_tts_volume; break;
+	case ITEM_TTS_VOICE: p = l->config_tts_voice; break;
+	case ITEM_TTS_EMOTION: p = l->config_tts_emotion; break;
+#endif
 	default: assert(false);
 	}
 
@@ -385,6 +428,17 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_inde
 		assert(val == 0 || val == 1);
 		val_str = l->config_skip_modes[val];
 		break;
+#if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_RATE:
+	case ITEM_TTS_PITCH:
+	case ITEM_TTS_VOLUME:
+	case ITEM_TTS_VOICE:
+		sprintf(val_str_buf, "%d", val);
+		break;
+	case ITEM_TTS_EMOTION:
+		val_str = l->config_tts_emotions[val];
+		break;
+#endif
 	}
 	cpymo_backend_text_extract(val_str);
 }
@@ -400,6 +454,13 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 	case ITEM_FONT_SIZE: name = l->config_fontsize; break;
 	case ITEM_TEXT_SPEED: name = l->config_sayspeed; break;
 	case ITEM_SKIP_ALREADY_READ_ONLY: name = l->config_skip_mode; break;
+#if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_RATE: name = l->config_tts_rate; break;
+	case ITEM_TTS_PITCH: name = l->config_tts_pitch; break;
+	case ITEM_TTS_VOLUME: name = l->config_tts_volume; break;
+	case ITEM_TTS_VOICE: name = l->config_tts_voice; break;
+	case ITEM_TTS_EMOTION: name = l->config_tts_emotion; break;
+#endif
 	default: assert(false);
 	}
 
@@ -423,6 +484,17 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 		assert(val == 0 || val == 1);
 		val_str = l->config_skip_modes[val];
 		break;
+#if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_RATE:
+	case ITEM_TTS_PITCH:
+	case ITEM_TTS_VOLUME:
+	case ITEM_TTS_VOICE:
+		sprintf(val_str_buf, "%d", val);
+		break;
+	case ITEM_TTS_EMOTION:
+		val_str = l->config_tts_emotions[val];
+		break;
+#endif
 	}
 
 	/* Concatenate name and value into a single TTS call to avoid interruption */
@@ -469,6 +541,17 @@ static error_t cpymo_config_ui_set_value(
 		assert(val == 0 || val == 1);
 		val_str = l->config_skip_modes[val];
 		break;
+#if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_RATE:
+	case ITEM_TTS_PITCH:
+	case ITEM_TTS_VOLUME:
+	case ITEM_TTS_VOICE:
+		sprintf(val_str_buf, "%d", val);
+		break;
+	case ITEM_TTS_EMOTION:
+		val_str = l->config_tts_emotions[val];
+		break;
+#endif
 	}
 
 #ifdef ENABLE_TEXT_EXTRACT
@@ -512,6 +595,15 @@ JUST_REFRESH:
 	case ITEM_SKIP_ALREADY_READ_ONLY:
 		e->config_skip_already_read_only = val > 0;
 		break;
+#if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_RATE:
+	case ITEM_TTS_PITCH:
+	case ITEM_TTS_VOLUME:
+	case ITEM_TTS_VOICE:
+	case ITEM_TTS_EMOTION:
+		cpymo_switch_accessibility_tts_item_set(item_index - ITEM_TTS_RATE, val);
+		break;
+#endif
 	default: assert(false);
 	}
 

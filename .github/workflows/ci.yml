@@ -44,6 +44,27 @@ jobs:
         name: CPyMO for Nintendo Switch
         path: ./cpymo-backends/sdl2/cpymo.nro
 
+  build-switch-a11y:
+    name: 'Nintendo Switch (无障碍 / ReadSpeaker TTS)'
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:20230507
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Build
+      run: |
+        cd ./cpymo-backends/sdl2
+        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO for Nintendo Switch (Accessibility)
+        path: ./cpymo-backends/sdl2/cpymo.nro
+
   build-3ds:
     name: 'Nintendo 3DS'
     runs-on: ubuntu-latest

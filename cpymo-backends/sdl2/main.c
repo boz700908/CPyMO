@@ -50,6 +50,10 @@
 #define SDL_Delay emscripten_sleep
 #endif
 
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#include "cpymo_switch_accessibility.h"
+#endif
+
 #if _WIN32 && DEBUG
 #include <crtdbg.h>
 #endif
@@ -633,7 +637,7 @@ START:
 	size_t redraw_by_event = 30;
 	while (
 		1
-#ifdef __SWITCH
+#if defined(__SWITCH__)
 		&& appletMainLoop()
 #endif
 		) {
@@ -648,6 +652,9 @@ START:
 		while (SDL_PollEvent(&event)) {
 			#ifdef ENABLE_TEXT_EXTRACT
 			cpymo_sdl2_enqueue_copy_action(&event);
+			#endif
+			#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+			cpymo_switch_accessibility_handle_event(&event);
 			#endif
 			if (event.type == SDL_WINDOWEVENT || event.type == SDL_RENDER_TARGETS_RESET)
 				redraw_by_event++;
@@ -757,6 +764,10 @@ START:
 			fps_counter = 0;
 		}*/
 		prev_ticks = ticks;
+
+		#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+		cpymo_switch_accessibility_tick();
+		#endif
 
 		if (need_to_redraw || redraw_by_event) {
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);

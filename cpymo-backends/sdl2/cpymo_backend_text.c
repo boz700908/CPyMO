@@ -392,12 +392,24 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
      * (10ms is perceptible). Game controller rumble motors have rotational inertia
      * and need ~50ms minimum to spin up and be felt. We scale durations up by 6x
      * so the perceived intensity matches Android. */
+#if defined(__SWITCH__)
+    /* Switch 的 Joy-Con 是线性马达（HD 震动），与手机一样对短脉冲敏感，
+     * 因此不做桌面那套 6 倍放大，直接对齐 Android：
+     * VisualHelper.playAccessibilityFeedback() = vibrate(SOUND_MENU ? 50 : 10)。 */
+    switch (sound_type) {
+        case SOUND_ENTER:  cpymo_sdl2_accessibility_vibrate(10); break;
+        case SOUND_MENU:   cpymo_sdl2_accessibility_vibrate(50); break;
+        case SOUND_SELECT: cpymo_sdl2_accessibility_vibrate(10); break;
+        default: break;
+    }
+#else
     switch (sound_type) {
         case SOUND_ENTER:  cpymo_sdl2_accessibility_vibrate(60); break;
         case SOUND_MENU:   cpymo_sdl2_accessibility_vibrate(150); break;
         case SOUND_SELECT: cpymo_sdl2_accessibility_vibrate(60); break;
         default: break;
     }
+#endif
 }
 
 /* === Copy / append-copy last spoken text (aligned with Android) ===
@@ -624,6 +636,35 @@ void cpymo_backend_text_extract(const char *text)
     }
     if (launcher > 0)
         while (waitpid(launcher, NULL, 0) < 0 && errno == EINTR) {}
+}
+
+/* --- Nintendo Switch: ReadSpeaker 引擎（switch_tts.c） --- */
+#elif defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#include "switch_tts.h"
+#include "cpymo_switch_accessibility.h"
+
+void cpymo_backend_text_extract_init(void)
+{
+    cpymo_sdl2_accessibility_sound_init();
+    cpymo_switch_accessibility_tts_start();
+}
+
+void cpymo_backend_text_extract_free(void)
+{
+    cpymo_switch_accessibility_tts_stop();
+    cpymo_sdl2_accessibility_sound_free();
+    if (last_spoken_text) { free(last_spoken_text); last_spoken_text = NULL; }
+}
+
+void cpymo_backend_text_extract(const char *text)
+{
+    if (text == NULL || text[0] == '\0') return;
+    save_last_spoken_text(text);
+
+    /* 与移动端对齐（Android QUEUE_FLUSH / iOS stopSpeakingImmediate）：
+     * 新文本一到就打断正在念的，屏幕变化立刻能听到，不会落后于画面。
+     * 引擎侧已把「名称 + 值」合并成一次调用，因此不会自己打断自己。 */
+    cpymo_switch_tts_speak(text, CPYMO_SWITCH_TTS_INTERRUPT);
 }
 
 /* --- Android / fallback --- */

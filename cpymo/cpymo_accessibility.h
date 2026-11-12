@@ -38,6 +38,14 @@ extern void cpymo_ios_accessibility_game_selector_entered(void);
 #define cpymo_accessibility_play_sound(X) cpymo_ios_accessibility_play_sound(X)
 #define cpymo_accessibility_vibrate(X)    cpymo_ios_accessibility_vibrate(X)
 
+#elif defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+/* Nintendo Switch: SDL2 共享音效通路 + 线性马达震动（对齐 Android：10/50/10ms） */
+extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
+extern void cpymo_sdl2_accessibility_vibrate(int milliseconds);
+
+#define cpymo_accessibility_play_sound(X) cpymo_sdl2_accessibility_play_sound(X)
+#define cpymo_accessibility_vibrate(X)    cpymo_sdl2_accessibility_vibrate(X)
+
 #else
 /* Desktop (SDL2) / Emscripten / Console: uses SDL2 backend */
 extern void cpymo_sdl2_accessibility_play_sound(int sound_type);
