@@ -55,15 +55,33 @@ jobs:
         submodules: true
 
     - name: Build
+      shell: bash
+      run: |
+        set -o pipefail
+        cd ./cpymo-backends/sdl2
+        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1 2>&1 | tail -160
+
+    - name: Package
+      shell: bash
       run: |
         cd ./cpymo-backends/sdl2
-        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1
+        mkdir -p dist
+        test -f cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
+        cp cpymo.nro dist/
+        cp enter.wav menu.wav select.wav dist/ 2>/dev/null || true
+        test -d ../../tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
+        mkdir -p dist/tts
+        cp ../../tts-assets/*.bin dist/tts/ 2>/dev/null || true
+        cp ../../tts-assets/*.vtdb2 dist/tts/ 2>/dev/null || true
+        test -f dist/tts/rtld.bin && test -f dist/tts/main.bin && test -f dist/tts/sdk.bin \
+          || { echo "tts 资源不完整（需要 rtld/main/sdk）"; exit 1; }
+        ls -R dist
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
       with:
-        name: CPyMO for Nintendo Switch (Accessibility)
-        path: ./cpymo-backends/sdl2/cpymo.nro
+        name: CPyMO-Switch-Accessibility
+        path: ./cpymo-backends/sdl2/dist
 
   build-3ds:
     name: 'Nintendo 3DS'
