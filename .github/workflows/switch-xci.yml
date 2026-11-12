@@ -114,6 +114,7 @@ jobs:
         sudo apt-get install -y -qq build-essential
         git clone --depth 1 https://github.com/rlaphoenix/hacBrewPack /tmp/hbp
         cd /tmp/hbp
+        if [ -f config.mk.template ]; then cp config.mk.template config.mk; fi
         make -j"$(nproc)" 2>&1 | tail -25
 
     - name: Pack NSP
