@@ -636,9 +636,9 @@ jobs:
         msystem: MINGW32
         update: true
         cache: true
-        # SDL 1.2 的构建命令是 mingw32-make，这个别名由 mingw-w64-i686-make 提供，
-        # 不在 mingw-w64-i686-toolchain 组里（此前 exit 127 就是这个原因）。
-        install: mingw-w64-i686-toolchain mingw-w64-i686-make unzip
+        # mingw-w64-i686-make 已从 MSYS2 仓库移除（pacman 报 target not found），
+        # 改用 MSYS2 自带的 make；MINGW32 环境的 gcc 仍在 PATH 里，产物同样是 32 位 exe。
+        install: mingw-w64-i686-toolchain make unzip
 
     - name: 'Build'
       run: |
@@ -655,7 +655,7 @@ jobs:
         cd ./cpymo-backends/sdl1
         export SDL=../../SDL-1.2.15
         export USE_SDL_MIXER=1
-        mingw32-make -j
+        make -j
         strip cpymo.exe
 
         wget https://raw.githubusercontent.com/libsdl-org/SDL_mixer/SDL-1.2/COPYING
