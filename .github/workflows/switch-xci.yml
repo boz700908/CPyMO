@@ -66,9 +66,13 @@ jobs:
         {
           "name": "CPyMO",
           "title_id": "0x0100000000010000",
+          "program_id": "0x0100000000010000",
           "title_id_range_min": "0x0100000000010000",
           "title_id_range_max": "0x01ffffffffffffff",
-          "version": 0,
+          "program_id_range_min": "0x0100000000010000",
+          "program_id_range_max": "0x01ffffffffffffff",
+          "version": "0x0",
+          "system_resource_size": "0x0",
           "main_thread_stack_size": "0x00100000",
           "main_thread_priority": 44,
           "default_cpu_id": 0,
@@ -77,11 +81,10 @@ jobs:
           "pool_partition": 0,
           "is_64_bit": true,
           "address_space_type": 3,
-          "system_resource_size": 0,
           "optimize_memory_allocation": false,
           "disable_device_address_space_merge": false,
           "signature_key_generation": 0,
-          "program_id_range_min": 0,
+          "filesystem_access": { "permissions": "0xFFFFFFFFFFFFFFFF" },
           "service_access": ["*"],
           "kernel_capabilities": [
             { "type": "kernel_flags", "value": { "highest_thread_priority": 63, "lowest_thread_priority": 24, "highest_cpu_id": 3 } }
