@@ -224,7 +224,9 @@ jobs:
         test "$CPYMO_TITLE_ID" = "0100000050594d4f" || { echo "NSP 的 title id 必须固定为 0100000050594d4f，不允许随构建变化"; exit 1; }
         cd /tmp/hbp
         if [ ! -x ./hacbrewpack ]; then echo "没找到 hacbrewpack"; ls -l; exit 1; fi
-        ./hacbrewpack -k /tmp/prod.keys --nologo --romfsdir /tmp/pkg/romfs \
+        # hacBrewPack 不生成 .tik/.cert：若 NCA 用 title key 加密，模拟器拿不到 title key
+        # 会在 Core 初始化阶段崩掉。--plaintext 让 section 不加密，yuzu/Eden 按 homebrew 直接加载。
+        ./hacbrewpack -k /tmp/prod.keys --nologo --plaintext --romfsdir /tmp/pkg/romfs \
           --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
           --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
           --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
