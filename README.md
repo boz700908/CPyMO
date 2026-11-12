@@ -260,9 +260,11 @@ cd到`cpymo-backends/sdl2`，执行`make -j -f Makefile.Switch`即可编译到�
 make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1
 ```
 
-### 语音资源（不随 `.nro` 分发，需自行准备）
+### 语音资源（构建产物已附带，可自行替换）
 
-`.nro` 里不打包语音引擎和音库。需要你自己准备下面四个文件，并且放在**同一个目录**里：
+`.nro` 本身不内嵌语音引擎与音库，构建会把它们放在与 `.nro` 同级的 `tts/` 目录里一起打包（源文件在仓库的 `tts-assets/`），整包拷贝到 SD 卡即可直接朗读，不需要再自己提取。
+
+如果你要换用自己的固件导出，或换上另一语言的音库，需要准备下面四个文件，并且放在**同一个目录**里：
 
 ```text
 rtld.bin          语音引擎加载器（NSO 模块）
@@ -273,7 +275,7 @@ D32-YAFANG.vtdb2  中文音库（ReadSpeaker 自带普通话女声）
 
 * 前三个文件是 Switch 系统自带的 ReadSpeaker 语音引擎的三个 NSO 模块，请从**你自己合法持有的固件**中导出；本程序只把它们映射进内存并执行，不会修改它们，也不需要额外的导出表或转译层。
 * `D32-YAFANG.vtdb2` 是随 ReadSpeaker 分发的音库。程序只认这一个文件名（以及旧式 `.vtdb`），不会自动改名，请保持上表写法。
-* 构建产物里已经带好一份（见下面的 `tts-assets/`），从 Actions 附件或 Release 下载时直接拷到 SD 卡即可，不需要自己再提取。
+* 这四个文件不参与编译、不嵌入 `.nro`，只是随 Actions 附件/Release 一起分发；只想要裸 `.nro` 时可以不下载它们。
 
 放置位置按以下顺序查找，第一个凑齐三件 `.bin` 的目录生效（空目录会被跳过）：
 
@@ -455,23 +457,26 @@ CPyMO 为视障玩家提供了全平台统一的无障碍支持，包括语音�
 
 ## 功能概述
 
-**语音朗读 (TTS)**：自动朗读游戏文本、菜单选项和设置项。各平台使用系统原生 TTS 引擎：
+**语音朗读 (TTS)**：自动朗读游戏文本、菜单选项和设置项。各平台使用各自的语音输出通道：
 - Windows：通过 [Tolk](https://github.com/boz700908/tolk) 调用屏幕阅读器（NVDA、JAWS、争渡、保益等），预编译库覆盖 x86/x64/ARM64/ARM64EC
 - macOS：使用 NSSpeechSynthesizer 系统语音
 - Linux：使用 speech-dispatcher 语音服务
 - iOS：使用 AVSpeechSynthesizer，并自动适配 VoiceOver
 - Android：使用 Android TextToSpeech API
+- Switch：在进程内运行主机自带的 ReadSpeaker 语音引擎（`vtdb2` 音库），不经系统 TTS，也不依赖任何外部语音服务
+
+Android 的触摸手势依赖 TalkBack 提供的探索事件，iOS 会自动适配 VoiceOver；Switch 没有面向应用的屏幕阅读器开关，因此不做“系统朗读是否开启”的判断——带无障碍的构建一律朗读，不需要朗读就不启用该构建开关。
 
 **音效反馈**：在操作时播放短促音效，帮助确认操作已被识别：
 - 确认/进入
 - 取消/菜单
 - 选择/切换
-- 桌面端/iOS 使用 WAV 格式（enter.wav、menu.wav、select.wav）
+- 桌面端/iOS/Switch 使用 WAV 格式（enter.wav、menu.wav、select.wav）
 - Android 使用 OGG 格式（enter.ogg、menu.ogg、select.ogg）
 - 桌面端 SDL2 输出原始 PCM 时会对 WAV 做 2 倍增益（+6dB），以匹配 Android SoundPool 在系统音频通路中的感知音量
 
 **震动反馈**：
-- Android / iOS（线性马达）：
+- Android / iOS / Switch（线性马达）：
   - 轻震 10ms：选择/切换项
   - 中震 20ms：快进保持
   - 重震 50ms：取消/长按
@@ -485,6 +490,8 @@ CPyMO 为视障玩家提供了全平台统一的无障碍支持，包括语音�
 **图片选项朗读**：`select_img` / `select_imgs` 图片选项菜单在进入和切换选项时也会朗读。由于图片本身没有文字，朗读内容取自图片名：`select_imgs` 朗读各项的图片名；`select_img` 是同一张图切片，朗读“图片名 + 序号”（不念总数）。
 
 **设置页面特殊行为**：浏览设置项时朗读"名称+值"，更改设置值时仅朗读"值"。
+
+**朗读打断与排队**：所有平台共用引擎层的一条规则——按键与手势本身从不打断正在朗读的内容；只有当某次操作会产生“对它自己的回答”（切换选项、进入新页面、文本推进）时，才用新内容替换正在朗读的那一句；连续操作只保留最新的回答、不排队累积，避免朗读越走越落后。退出或隐藏窗口会立刻停止并清空队列，不念告别语。
 
 **复制朗读内容**：可将上次朗读的文字复制到剪贴板，与 Android 无障碍手势对齐：
 - **键盘**：Shift+C 复制，Shift+D 追加复制（换行分隔）
