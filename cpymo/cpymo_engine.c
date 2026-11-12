@@ -71,6 +71,11 @@ void cpymo_engine_play_startup_music_once(void)
 
 error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 {
+	/* 启动音乐只属于游戏选择器阶段：真正进入游戏就收掉，
+	 * 免得和游戏自己的开场 BGM 叠在一起。直接进游戏的构建没播过，这里是空操作。 */
+	if (cpymo_backend_startup_music_stop != NULL)
+		cpymo_backend_startup_music_stop();
+
 	// init audio system
 	cpymo_audio_init(&out->audio);
 

@@ -310,7 +310,7 @@ sdmc:/switch/tts/D32-YAFANG.vtdb2
 
 音效文件 `enter.wav`、`menu.wav`、`select.wav` 与普通版本一致，放在 `.nro` 同级目录。
 
-`sdmc:/switch/startup.wav` 是启动音乐（《Song of PyMO》），同样放在 `.nro` 同级目录：应用启动进入游戏选择器后从头播放一次，播完即止（不循环）；直接拉起单一游戏的构建不播放。缺这个文件时只是没有启动音乐，不影响其他功能。
+`sdmc:/switch/startup.wav` 是启动音乐（《Song of PyMO》），同样放在 `.nro` 同级目录：应用启动进入游戏选择器后从头播放一次、不循环；选中游戏进入后立即停止，避免压住游戏开场音乐；直接拉起单一游戏的构建不播放。缺这个文件时只是没有启动音乐，不影响其他功能。
 
 语音参数保存在 `sdmc:/pymogames/tts.conf`，设置页新增 5 项：语速、音高、音量、音色、情感。只有切换到新值时才写入，浏览时朗读“名称 + 值”，修改时只朗读“值”。
 
@@ -1008,7 +1008,7 @@ CPyMO ASCII ART仅支持键盘操作：
 
 * **PSP**：音乐以 `SND0` 区段打进 `EBOOT.PBP`（`cpymo-backends/sdl2/psp-snd0.at3`），由系统在 XMB 中播放。
 * **Nintendo 3DS**：由 HOME 菜单播放 banner 内的音乐，程序内不重复播放。
-* **SDL2 后端（桌面端 / Switch / iOS）**：启动进入游戏选择器后从头播放一次、不循环，播完即止；直接拉起单一游戏的构建不播放。音频取随包分发的 `startup.wav`（由 `psp-snd0.at3` 转码而来，22050Hz 单声道）。
+* **SDL2 后端（桌面端 / Switch / iOS）**：启动进入游戏选择器后从头播放一次、不循环；选中游戏进入后立即停止，避免压住游戏开场音乐；直接拉起单一游戏的构建不播放。音频取随包分发的 `startup.wav`（由 `psp-snd0.at3` 转码而来，22050Hz 单声道）。
 
 作曲：许兴逸
 
