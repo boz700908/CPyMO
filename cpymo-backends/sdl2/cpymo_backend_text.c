@@ -2,6 +2,7 @@
 #include "../include/cpymo_backend_text.h"
 #include "cpymo_import_sdl2.h"
 #include "cpymo_embedded_assets.h"
+#include "cpymo_tolk_runtime.h"
 
 #ifndef DISABLE_STB_TRUETYPE
 
@@ -490,13 +491,13 @@ void cpymo_sdl2_accessibility_sound_reset(void) {}
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
 void cpymo_backend_text_extract_init(void)
 {
-    Tolk_Load();
+    cpymo_tolk_load();
     cpymo_sdl2_accessibility_sound_init();
 }
 
 void cpymo_backend_text_extract_free(void)
 {
-    Tolk_Unload();
+    cpymo_tolk_unload();
     cpymo_sdl2_accessibility_sound_free();
 }
 
@@ -512,7 +513,7 @@ void cpymo_backend_text_extract(const char *text)
     if (wide_text == NULL) return;
 
     if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide_text, wide_len) != 0)
-        Tolk_Output(wide_text, true);
+        cpymo_tolk_output(wide_text);
 
     free(wide_text);
 }
@@ -722,7 +723,7 @@ void cpymo_backend_text_append_copy_last(void) {
 void cpymo_backend_text_stop(void)
 {
 #if defined(_WIN32) && defined(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)
-    Tolk_Silence();
+    cpymo_tolk_silence();
 #elif defined(__IOS__)
     {
         extern void cpymo_ios_accessibility_stop(void);
