@@ -5,7 +5,6 @@
 #include "cpymo_localization.h"
 #include "cpymo_safe_area.h"
 #include "cpymo_accessibility.h"
-#include "../cpymo-backends/include/cpymo_backend_startup_music.h"
 #include "../stb/stb_image.h"
 #include <assert.h>
 #include <string.h>
@@ -15,21 +14,6 @@ typedef struct {
 	cpymo_game_selector_callback before_init, after_init;
 	size_t draw_times;
 } cpymo_game_selector;
-
-/* 启动音乐（《Song of PyMO》）：进入选择器播放、离开即停。
- * 后端可以不实现（弱符号 ⇒ 链接后地址为 NULL），此时什么也不做；
- * PSP 由 EBOOT.PBP 的 SND0 区段负责，不走这里。 */
-static void cpymo_game_selector_startup_music_play(void)
-{
-	if (cpymo_backend_startup_music_play != NULL)
-		cpymo_backend_startup_music_play();
-}
-
-static void cpymo_game_selector_startup_music_stop(void)
-{
-	if (cpymo_backend_startup_music_stop != NULL)
-		cpymo_backend_startup_music_stop();
-}
 
 #ifdef ENABLE_TEXT_EXTRACT
 static error_t cpymo_game_selector_visual_im_help_selection_changed_callback(cpymo_engine *e, void *sel)
@@ -110,8 +94,6 @@ static error_t cpymo_game_selector_ok(cpymo_engine *e, void *selected)
 static void cpymo_game_selector_delete(cpymo_engine *e, void *ui_data)
 {
 	cpymo_game_selector *ui = (cpymo_game_selector *)ui_data;
-	/* 选中游戏（引擎重新初始化）与退出选择器都会走到这里。 */
-	cpymo_game_selector_startup_music_stop();
 	cpymo_game_selector_item_free_all(ui->items);
 }
 
@@ -341,8 +323,6 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 
 		ui->items = items;
 
-		cpymo_game_selector_startup_music_play();
-
 #ifdef ENABLE_TEXT_EXTRACT
 		{
 			cpymo_game_selector_item *first = (cpymo_game_selector_item *)cpymo_list_ui_get_current_selected_const(e);
@@ -422,6 +402,8 @@ error_t cpymo_engine_init_with_game_selector(
 	cpymo_game_selector_callback after_reinit,
 	char **last_selected_game_dir_movein)
 {
+	cpymo_engine_play_startup_music_once();
+
 	cpymo_audio_init(&e->audio);
 
 	error_t err = cpymo_gameconfig_parse(&e->gameconfig, "", 0);

@@ -9,6 +9,7 @@
 #include "cpymo_save_global.h"
 #include "cpymo_localization.h"
 #include "../cpymo-backends/include/cpymo_backend_text.h"
+#include "../cpymo-backends/include/cpymo_backend_startup_music.h"
 
 static void cpymo_logo() {
 	static bool logo_printed = false;
@@ -49,8 +50,29 @@ static error_t cpymo_engine_version_warning(cpymo_engine *e)
 	return err;
 }
 
+/* 启动音乐（《Song of PyMO》）：整个进程只播一次。
+ *
+ * 由 cpymo_engine_init 与 cpymo_engine_init_with_game_selector 调用，
+ * 因此无论平台是直接进游戏还是先进游戏选择器，音乐都只在启动时响一次，
+ * 之后重新初始化引擎不会再播。
+ *
+ * 未实现这两个符号的后端（弱符号链接后为 NULL）与自带音频图标的平台
+ * （PSP 的 SND0、3DS 的 banner 音乐）什么也不做。
+ */
+void cpymo_engine_play_startup_music_once(void)
+{
+	static bool played = false;
+	if (played) return;
+	played = true;
+
+	if (cpymo_backend_startup_music_play != NULL)
+		cpymo_backend_startup_music_play();
+}
+
 error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 {
+	cpymo_engine_play_startup_music_once();
+
 	// init audio system
 	cpymo_audio_init(&out->audio);
 

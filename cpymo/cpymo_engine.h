@@ -63,6 +63,7 @@ struct cpymo_engine {
 typedef struct cpymo_engine cpymo_engine;
 
 error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir);
+void cpymo_engine_play_startup_music_once(void);
 void cpymo_engine_free(cpymo_engine *engine);
 error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool *redraw);
 void cpymo_engine_draw(const cpymo_engine *engine);

@@ -3,15 +3,17 @@
 #include "cpymo_import_sdl2.h"
 #include <stdio.h>
 
-/* 《Song of PyMO》启动音乐（SDL2 后端，PSP 除外）。
+/* 《Song of PyMO》启动音乐（SDL2 后端）。
  *
- * 进入游戏选择器时由引擎调用 play，选中游戏或退出选择器时调用 stop。
- * 用一个独立的 SDL 音频设备循环播放 startup.wav，与无障碍音效设备、
- * 引擎 BGM 设备互不干扰（SDL2 允许多个播放设备并存）。
+ * 应用启动时由引擎调用一次 play：从头播到尾，不循环，播完设备静音。
+ * 用独立的 SDL 音频设备，与无障碍音效设备、引擎 BGM 设备互不干扰
+ * （SDL2 允许多个播放设备并存）。
  *
- * PSP 的启动音乐走 EBOOT.PBP 的 SND0 区段（pack-pbp 打包），
- * 由系统在 XMB 中播放，因此 __PSP__ 下这里不编译播放逻辑，
- * 避免与系统启动音乐重复。
+ * 自带音频图标的平台不经过这里：
+ * - PSP：音乐作为 SND0 区段打进 EBOOT.PBP（pack-pbp 打包），系统在 XMB 播放；
+ * - Nintendo 3DS：HOME 菜单播放 banner 内的音乐。
+ * PSP 下编译空实现；3DS 后端不实现这两个符号，链接后弱符号为 NULL，
+ * 引擎侧（cpymo_engine_play_startup_music_once）直接跳过。
  */
 
 #if defined(__PSP__) || defined(DISABLE_AUDIO)
@@ -29,7 +31,6 @@ static Uint8 *startup_music_pcm = NULL;
 static Uint32 startup_music_len = 0;
 static Uint32 startup_music_pos = 0;
 static SDL_AudioFormat startup_music_format = 0;
-static int startup_music_looping = 0;
 
 static void cpymo_backend_startup_music_callback(void *userdata, Uint8 *stream, int len)
 {
@@ -38,16 +39,12 @@ static void cpymo_backend_startup_music_callback(void *userdata, Uint8 *stream, 
 	SDL_memset(stream, 0, (size_t)len);
 
 	if (startup_music_pcm == NULL || startup_music_len == 0) return;
+	if (startup_music_pos >= startup_music_len) return;
 
 	Uint32 remain = (Uint32)len;
 	Uint32 written = 0;
 
 	while (remain > 0) {
-		if (startup_music_pos >= startup_music_len) {
-			if (!startup_music_looping) return;
-			startup_music_pos = 0;
-		}
-
 		Uint32 chunk = startup_music_len - startup_music_pos;
 		if (chunk > remain) chunk = remain;
 
@@ -61,6 +58,9 @@ static void cpymo_backend_startup_music_callback(void *userdata, Uint8 *stream, 
 		startup_music_pos += chunk;
 		written += chunk;
 		remain -= chunk;
+
+		/* 播放一次，到末尾就静音（不循环、不重头开始）。 */
+		if (startup_music_pos >= startup_music_len) break;
 	}
 }
 
@@ -105,7 +105,6 @@ void cpymo_backend_startup_music_play(void)
 
 	startup_music_format = wav_spec.format;
 	startup_music_pos = 0;
-	startup_music_looping = 1;
 
 	wav_spec.callback = &cpymo_backend_startup_music_callback;
 	wav_spec.userdata = NULL;
@@ -117,13 +116,13 @@ void cpymo_backend_startup_music_play(void)
 		SDL_FreeWAV(startup_music_pcm);
 		startup_music_pcm = NULL;
 		startup_music_len = 0;
-		startup_music_looping = 0;
 		return;
 	}
 
 	SDL_PauseAudioDevice(startup_music_dev, 0);
 }
 
+/* 引擎当前不调用：音乐播完自然静音。保留给需要中途打断的场合。 */
 void cpymo_backend_startup_music_stop(void)
 {
 	/* SDL_CloseAudioDevice 会等回调线程退出，之后才能释放 PCM。 */
@@ -132,7 +131,6 @@ void cpymo_backend_startup_music_stop(void)
 		startup_music_dev = 0;
 	}
 
-	startup_music_looping = 0;
 	startup_music_pos = 0;
 
 	if (startup_music_pcm) {
