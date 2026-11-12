@@ -6,6 +6,7 @@
 #include <math.h>
 
 #include "cpymo_accessibility.h"
+#include "cpymo_safe_area.h"
 
 #ifdef __3DS__
 extern bool fill_screen_enabled;
@@ -53,13 +54,33 @@ void cpymo_list_ui_ignore_key_hold_exit_onetime(struct cpymo_engine *e)
 	cpymo_key_hold_init(&ui->key_mouse_button, true);
 }
 
+/* 列表视口：扣掉安全区后的可用竖向范围；未注册 provider 时就是整屏。 */
+static inline void cpymo_list_ui_viewport(
+	const cpymo_engine *e, float *out_top, float *out_height)
+{
+	cpymo_safe_area sa;
+	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+
+	float h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
+	if (h < (float)e->gameconfig.imagesize_h * 0.5f) {
+		sa.top = 0;
+		h = (float)e->gameconfig.imagesize_h;
+	}
+
+	if (out_top) *out_top = sa.top;
+	if (out_height) *out_height = h;
+}
+
 static inline float cpymo_list_ui_get_y(const cpymo_engine *e, int relative_to_current)
 {
 	const cpymo_list_ui *ui = (cpymo_list_ui *)cpymo_ui_data_const(e);
 
+	float top, height;
+	cpymo_list_ui_viewport(e, &top, &height);
+
 	return ui->from_bottom_to_top ?
-		(float)e->gameconfig.imagesize_h - (1 + relative_to_current) * ui->node_height - ui->current_y :
-		ui->current_y + relative_to_current * ui->node_height;
+		top + height - (1 + relative_to_current) * ui->node_height - ui->current_y :
+		top + ui->current_y + relative_to_current * ui->node_height;
 }
 
 static int cpymo_list_ui_get_selection_relative_to_cur_by_mouse(const cpymo_engine *e)
@@ -75,9 +96,12 @@ static int cpymo_list_ui_get_selection_relative_to_cur_by_mouse(const cpymo_engi
 
 	const cpymo_list_ui *ui = (cpymo_list_ui *)cpymo_ui_data_const(e);
 
+	float vtop, vheight;
+	cpymo_list_ui_viewport(e, &vtop, &vheight);
+
 	float y = ui->from_bottom_to_top ?
-		(float)e->gameconfig.imagesize_h - ui->node_height - ui->current_y :
-		ui->current_y;
+		vtop + vheight - ui->node_height - ui->current_y :
+		vtop + ui->current_y;
 
 	void *prev = ui->get_prev(e, cpymo_list_ui_data_const(e), ui->current_node);
 	if (prev) {
@@ -91,8 +115,8 @@ static int cpymo_list_ui_get_selection_relative_to_cur_by_mouse(const cpymo_engi
 
 	void *node = ui->current_node;
 	while (ui->from_bottom_to_top ?
-		y > -ui->node_height :
-		y < (float)e->gameconfig.imagesize_h) {
+		y > vtop - ui->node_height :
+		y < vtop + vheight) {
 
 		float bottom = y + ui->node_height;
 		if (mouse_y >= y && mouse_y < bottom) return cur;
@@ -132,8 +156,11 @@ static void cpymo_list_ui_fix_key_scroll(cpymo_engine *e)
 
 	float y = cpymo_list_ui_get_y(e, ui->selection_relative_to_cur);
 
-	bool a = y < 0;
-	bool b = y > e->gameconfig.imagesize_h - ui->node_height;
+	float vtop, vheight;
+	cpymo_list_ui_viewport(e, &vtop, &vheight);
+
+	bool a = y < vtop;
+	bool b = y > vtop + vheight - ui->node_height;
 
 	if (ui->from_bottom_to_top) {
 		bool t = a;
@@ -504,9 +531,12 @@ static void cpymo_list_ui_draw(const cpymo_engine *e, const void *ui_data)
 	xywh[3] = ui->node_height;
 	cpymo_backend_image_fill_rects(xywh, 1, red, 0.5f, cpymo_backend_image_draw_type_bg);*/
 
+	float vtop, vheight;
+	cpymo_list_ui_viewport(e, &vtop, &vheight);
+
 	float y = ui->from_bottom_to_top ? 
-		(float)e->gameconfig.imagesize_h - ui->node_height - ui->current_y : 
-		ui->current_y;
+		vtop + vheight - ui->node_height - ui->current_y : 
+		vtop + ui->current_y;
 
 	void *prev = ui->get_prev(e, cpymo_list_ui_data_const(e), ui->current_node);
 	if (prev) {
@@ -515,8 +545,8 @@ static void cpymo_list_ui_draw(const cpymo_engine *e, const void *ui_data)
 
 	void *node = ui->current_node;
 	while (ui->from_bottom_to_top ? 
-			y > -ui->node_height : 
-			y < (float)e->gameconfig.imagesize_h) {
+			y > vtop - ui->node_height : 
+			y < vtop + vheight) {
 		ui->draw_node(e, node, y);
 
 		y += ui->from_bottom_to_top ? -ui->node_height : ui->node_height;
@@ -562,7 +592,10 @@ error_t cpymo_list_ui_enter(
 	data->get_next = get_next;
 	data->get_prev = get_prev;
 	data->from_bottom_to_top = from_bottom_to_top;
-	data->node_height = (float)e->gameconfig.imagesize_h / nodes_per_screen;
+	float list_vtop, list_vheight;
+	cpymo_list_ui_viewport(e, &list_vtop, &list_vheight);
+	(void)list_vtop;
+	data->node_height = list_vheight / (float)nodes_per_screen;
 	data->current_y = 0;
 	data->selection_relative_to_cur = 0;
 	data->ok = ok;
@@ -609,7 +642,10 @@ static error_t cpymo_list_ui_selecting_no_more_content_callback_looping(cpymo_en
 			ui->current_node = next;
 		}
 
-		int nodes_per_screen = (size_t)((float)e->gameconfig.imagesize_h / ui->node_height);
+		float list_vtop, list_vheight;
+		cpymo_list_ui_viewport(e, &list_vtop, &list_vheight);
+		(void)list_vtop;
+		int nodes_per_screen = (size_t)(list_vheight / ui->node_height);
 		while (ui->selection_relative_to_cur < nodes_per_screen - 1) {
 			void *prev = ui->get_prev(e, ui + 1, ui->current_node);
 			if (prev == NULL) break;
