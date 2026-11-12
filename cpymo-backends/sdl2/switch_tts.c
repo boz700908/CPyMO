@@ -1283,8 +1283,8 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     if (R_FAILED(threadStart(&g_thread))) return tt_fail0("threadStart 失败");
     g_thread_started = true;
 
-    if (!eventWait(&g_boot_event, 30000000000ull))
-        return tt_fail0("引擎初始化超时（30s）");
+    if (R_FAILED(eventWait(&g_boot_event, 30000000000ull)))
+        return tt_fail0("等待引擎初始化事件失败或超时（30s）");
     if (!g_boot_done || !g_engine_ok) {
         char buf[96];
         snprintf(buf, sizeof(buf), "引擎 init 返回 0x%llx",
