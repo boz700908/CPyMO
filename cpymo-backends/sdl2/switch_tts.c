@@ -1041,13 +1041,104 @@ static bool tt_load_vtdb(const char *dir)
     return true;
 }
 
+typedef struct {
+    uint32_t off;
+    size_t size;
+    bool executable;
+    Handle handle;
+    bool mapped;
+} tt_code_piece;
+
+/* CodeMemory gives each text range RX and each remaining range RW. */
+static bool tt_map_code_memory(void)
+{
+    tt_code_piece pieces[TT_IMAGE_MAX * 3 + 1] = {0};
+    size_t count = 0, j;
+    uint32_t i;
+    Result rc = 0;
+    char buf[112];
+    uint8_t *backing, *temp;
+    VirtmemReservation *temp_rv;
+    bool temp_mapped = false;
+
+    for (i = 0; i < TT_IMAGE_MAX; i++) {
+        uint32_t start = g_text_off[i];
+        uint32_t end = tt_align_up(start + g_text_size[i], 0x1000);
+        if ((start & 0xfff) || end > g_img_size[i] || end <= start)
+            return tt_fail0("CodeMemory text 段范围无效");
+        if (start)
+            pieces[count++] = (tt_code_piece){g_img_off[i], start, false, INVALID_HANDLE, false};
+        pieces[count++] = (tt_code_piece){g_img_off[i] + start, end - start, true, INVALID_HANDLE, false};
+        if (end < g_img_size[i])
+            pieces[count++] = (tt_code_piece){g_img_off[i] + end, g_img_size[i] - end, false, INVALID_HANDLE, false};
+    }
+    pieces[count++] = (tt_code_piece){g_tramp_off, g_window_size - g_tramp_off, true, INVALID_HANDLE, false};
+    backing = (uint8_t *)tt_alloc(g_window_size);
+    if (!backing) return tt_fail0("CodeMemory 后备内存分配失败");
+    virtmemLock();
+    temp = (uint8_t *)virtmemFindCodeMemory(g_window_size, 0x1000);
+    temp_rv = temp ? virtmemAddReservation(temp, g_window_size) : NULL;
+    virtmemUnlock();
+    if (!temp_rv) return tt_fail0("CodeMemory 临时地址保留失败");
+
+    for (j = 0; j < count; j++) {
+        tt_code_piece *p = &pieces[j];
+        uint8_t *write_addr = p->executable ? temp : g_rx + p->off;
+        rc = svcCreateCodeMemory(&p->handle, backing + p->off, p->size);
+        if (R_FAILED(rc)) break;
+        rc = svcControlCodeMemory(p->handle, CodeMapOperation_MapOwner,
+                                  write_addr, p->size, Perm_Rw);
+        if (R_FAILED(rc)) break;
+        if (p->executable) temp_mapped = true;
+        else p->mapped = true;
+        memcpy(write_addr, g_rw + p->off, p->size);
+        if (p->executable) {
+            armDCacheFlush(write_addr, p->size);
+            rc = svcControlCodeMemory(p->handle, CodeMapOperation_UnmapOwner,
+                                      write_addr, p->size, Perm_None);
+            if (R_FAILED(rc)) break;
+            temp_mapped = false;
+            rc = svcControlCodeMemory(p->handle, CodeMapOperation_MapSlave,
+                                      g_rx + p->off, p->size, Perm_Rx);
+            if (R_FAILED(rc)) break;
+            p->mapped = true;
+        }
+    }
+    if (R_FAILED(rc)) {
+        snprintf(buf, sizeof(buf), "CodeMemory 第 %u 段失败：0x%08x", (unsigned)j, (unsigned)rc);
+        if (temp_mapped)
+            svcControlCodeMemory(pieces[j].handle, CodeMapOperation_UnmapOwner,
+                                 temp, pieces[j].size, Perm_None);
+        for (j = count; j > 0; j--) {
+            tt_code_piece *p = &pieces[j - 1];
+            if (p->handle == INVALID_HANDLE) continue;
+            if (p->mapped)
+                svcControlCodeMemory(p->handle,
+                                     p->executable ? CodeMapOperation_UnmapSlave : CodeMapOperation_UnmapOwner,
+                                     g_rx + p->off, p->size, Perm_None);
+            svcCloseHandle(p->handle);
+        }
+        virtmemLock();
+        virtmemRemoveReservation(temp_rv);
+        virtmemUnlock();
+        return tt_fail0(buf);
+    }
+
+    virtmemLock();
+    virtmemRemoveReservation(temp_rv);
+    virtmemUnlock();
+    /* Keep mappings and handles alive while the guest thread can execute. */
+    armICacheInvalidate(g_rx, g_window_size);
+    return true;
+}
+
 static bool tt_map_memory(void)
 {
     Handle own = envGetOwnProcessHandle();
     Result rc;
     int i;
 
-    if (own == INVALID_HANDLE) return tt_fail0("拿不到自身进程句柄");
+    if (own == INVALID_HANDLE) return tt_map_code_memory();
 
     armDCacheFlush(g_rw, g_window_size);
     rc = svcMapProcessCodeMemory(own, (u64)(uintptr_t)g_rx,
