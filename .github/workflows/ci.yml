@@ -21,6 +21,9 @@ env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
   HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
+  # 安装包（NSP）的 title id：固定常量，不随机、不随构建变化。
+  # 末尾 0594d4f = "PyMO" 的 ASCII（50 79 4d 4f），因此不会与别家 homebrew 撞车。
+  CPYMO_TITLE_ID: '0100000050594d4f'
 
 jobs:
   build-switch:
@@ -114,6 +117,7 @@ jobs:
       shell: bash
       run: |
         set -euxo pipefail
+        test "$CPYMO_TITLE_ID" = "0100000050594d4f" || { echo "NSP 的 title id 必须固定为 0100000050594d4f，不允许随构建变化"; exit 1; }
         cd ./cpymo-backends/sdl2
         mkdir -p /tmp/pkg/exefs /tmp/pkg/control
         cp build.Switch/cpymo.elf /tmp/pkg/
@@ -121,15 +125,15 @@ jobs:
         # NPDM 字段取值依据：title id 范围收窄到本程序自身；权限位与内核能力取
         # devkitPro/libnx homebrew 的常规值；service_access 只列 CPyMO(SDL2) 实际会用到的
         # 服务名（均在 libnx 源码中出现，长度 1..8，符合 NPDM 的 SACP 编码限制）。
-        cat > /tmp/pkg/npdm.json <<'JSON'
+        cat > /tmp/pkg/npdm.json <<JSON
         {
           "name": "CPyMO",
-          "title_id": "0x0100000050594d4f",
-          "program_id": "0x0100000050594d4f",
-          "title_id_range_min": "0x0100000050594d4f",
-          "title_id_range_max": "0x0100000050594d4f",
-          "program_id_range_min": "0x0100000050594d4f",
-          "program_id_range_max": "0x0100000050594d4f",
+          "title_id": "0x$CPYMO_TITLE_ID",
+          "program_id": "0x$CPYMO_TITLE_ID",
+          "title_id_range_min": "0x$CPYMO_TITLE_ID",
+          "title_id_range_max": "0x$CPYMO_TITLE_ID",
+          "program_id_range_min": "0x$CPYMO_TITLE_ID",
+          "program_id_range_max": "0x$CPYMO_TITLE_ID",
           "version": "0x0",
           "system_resource_size": "0x0",
           "main_thread_stack_size": "0x00100000",
@@ -154,7 +158,7 @@ jobs:
         }
         JSON
         npdmtool /tmp/pkg/npdm.json /tmp/pkg/exefs/main.npdm
-        nacptool --create "CPyMO" "boz700908" "1.0.0" /tmp/pkg/control/control.nacp --titleid=0x0100000050594d4f
+        nacptool --create "CPyMO" "boz700908" "1.0.0" /tmp/pkg/control/control.nacp --titleid=0x$CPYMO_TITLE_ID
         ls -l /tmp/pkg/exefs /tmp/pkg/control
 
     - name: Upload exefs
@@ -221,13 +225,14 @@ jobs:
     - name: Pack NSP
       run: |
         set -euxo pipefail
+        test "$CPYMO_TITLE_ID" = "0100000050594d4f" || { echo "NSP 的 title id 必须固定为 0100000050594d4f，不允许随构建变化"; exit 1; }
         cd /tmp/hbp
         if [ ! -x ./hacbrewpack ]; then echo "没找到 hacbrewpack"; ls -l; exit 1; fi
         ./hacbrewpack -k /tmp/prod.keys --nologo --romfsdir /tmp/pkg/romfs \
           --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
           --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
           --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
-          --keepncadir --titleid 0100000050594d4f \
+          --keepncadir --titleid $CPYMO_TITLE_ID \
           --titlename CPyMO --titlepublisher boz700908 2>&1 | tail -60
         ls -l /tmp/pkg/nsp
 
