@@ -1,4 +1,5 @@
 #include "cpymo_switch_accessibility.h"
+#include "cpymo_switch_diag.h"
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 
@@ -111,22 +112,22 @@ bool cpymo_switch_accessibility_tts_start(void)
     g_tts_attempted = true;
 
     if (!sw_locate_assets()) {
-        printf("[a11y] 找不到 TTS 资产目录（rtld.bin / main.bin / sdk.bin）\n");
-        printf("[a11y] 已尝试：$CPYMO_SWITCH_TTS_DIR / <nro>/tts / "
+        CPYMO_DIAG("[a11y] 找不到 TTS 资产目录（rtld.bin / main.bin / sdk.bin）\n");
+        CPYMO_DIAG("[a11y] 已尝试：$CPYMO_SWITCH_TTS_DIR / <nro>/tts / "
                "sdmc:/pymogames/tts / sdmc:/switch/tts / romfs:/tts\n");
         return false;
     }
 
-    printf("[a11y] TTS 资产目录：%s\n", g_assets_dir);
+    CPYMO_DIAG("[a11y] TTS 资产目录：%s\n", g_assets_dir);
 
     sw_items_load();
 
     if (!cpymo_switch_tts_init(g_assets_dir)) {
-        printf("[a11y] TTS 初始化失败：%s\n", cpymo_switch_tts_last_error());
+        CPYMO_DIAG("[a11y] TTS 初始化失败：%s\n", cpymo_switch_tts_last_error());
         return false;
     }
 
-    printf("[a11y] TTS 引擎就绪\n");
+    CPYMO_DIAG("[a11y] TTS 引擎就绪\n");
     sw_items_apply();
     return true;
 }
@@ -215,7 +216,7 @@ static void sw_items_apply(void)
     }
 
     cpymo_switch_tts_set_params(&p);
-    printf("[a11y] TTS 参数：rate=%d pitch=%d volume=%d voice=%d emotion=%d\n",
+    CPYMO_DIAG("[a11y] TTS 参数：rate=%d pitch=%d volume=%d voice=%d emotion=%d\n",
            p.rate, p.pitch, p.volume, p.voice,
            g_items[CPYMO_SW_TTS_ITEM_EMOTION]);
 }
@@ -254,7 +255,7 @@ static void sw_items_save(void)
 {
     FILE *f = fopen(SW_TTS_CONF_PATH, "w");
     if (!f) {
-        printf("[a11y] 无法写入 %s\n", SW_TTS_CONF_PATH);
+        CPYMO_DIAG("[a11y] 无法写入 %s\n", SW_TTS_CONF_PATH);
         return;
     }
     fprintf(f, "rate=%d\npitch=%d\nvolume=%d\nvoice=%d\nemotion=%d\n",

@@ -2,6 +2,7 @@
 #include "../include/cpymo_backend_startup_music.h"
 #include "cpymo_import_sdl2.h"
 #include "cpymo_embedded_assets.h"
+#include "cpymo_switch_diag.h"
 #include <stdio.h>
 
 /* 《Song of PyMO》启动音乐（SDL2 后端）。
@@ -146,6 +147,9 @@ void cpymo_backend_startup_music_play(void)
 
 	/* 不允许 SDL 改格式：回调里按 WAV 原始格式混音。 */
 	startup_music_dev = SDL_OpenAudioDevice(NULL, 0, &wav_spec, &have_spec, 0);
+	CPYMO_DIAG("[diag] 启动音乐：freq=%d fmt=0x%x ch=%d samples=%d -> dev=%u err=%s\n",
+		wav_spec.freq, wav_spec.format, wav_spec.channels, wav_spec.samples,
+		(unsigned)startup_music_dev, SDL_GetError());
 	if (startup_music_dev == 0) {
 		SDL_Log("[startup] can not open audio device: %s", SDL_GetError());
 		SDL_FreeWAV(startup_music_pcm);

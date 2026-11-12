@@ -20,6 +20,7 @@
  */
 
 #include "switch_tts.h"
+#include "cpymo_switch_diag.h"
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 
@@ -261,7 +262,7 @@ static bool tt_fail(const char *fmt, const char *arg)
 {
     snprintf(g_error, sizeof(g_error), fmt, arg ? arg : "");
     g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
-    printf("[tts] FAIL: %s\n", g_error);
+    CPYMO_DIAG("[tts] FAIL: %s\n", g_error);
     return false;
 }
 
@@ -427,7 +428,7 @@ static bool tt_load_nso(const char *path, uint8_t *dst, uint32_t dst_cap,
     *text_off = h.text_mem_off;
     *text_size = h.text_size;
     *need_size = need;
-    printf("[tts] NSO %s: size=0x%x text=0x%x+0x%x bss=0x%x\n",
+    CPYMO_DIAG("[tts] NSO %s: size=0x%x text=0x%x+0x%x bss=0x%x\n",
            path, need, h.text_mem_off, h.text_size, h.bss_size);
     return true;
 }
@@ -477,12 +478,12 @@ static void shim_set_heap_size(tt_regs *r)
         }
         if (g_heap_mem) {
             g_heap_va = (uintptr_t)g_heap_mem;
-            printf("[tts] SetHeapSize 请求 0x%llx -> 给 0x%zx @0x%llx\n",
+            CPYMO_DIAG("[tts] SetHeapSize 请求 0x%llx -> 给 0x%zx @0x%llx\n",
                    (unsigned long long)want, g_heap_size,
                    (unsigned long long)g_heap_va);
         }
     } else if (want > (uint64_t)g_heap_size) {
-        printf("[tts] 警告：再次请求 0x%llx > 已有 0x%zx\n",
+        CPYMO_DIAG("[tts] 警告：再次请求 0x%llx > 已有 0x%zx\n",
                (unsigned long long)want, g_heap_size);
     }
     r->x[0] = 0;
@@ -612,7 +613,7 @@ static uint32_t tt_add_tramp(void (*fn)(tt_regs *))
     memcpy(slot, cpymo_sw_tts_tramp_start, len);
     memcpy(slot + len - 8, &addr, 8);
     g_tramp_slot++;
-    printf("[tts] tramp #%u for %p\n", g_tramp_slot - 1, (void *)fn);
+    CPYMO_DIAG("[tts] tramp #%u for %p\n", g_tramp_slot - 1, (void *)fn);
     return off;
 }
 
@@ -634,7 +635,7 @@ static bool tt_patch_branch(const char *what, int img, uint32_t off,
         char buf[96];
         snprintf(buf, sizeof(buf), "%s 校验失败：0x%08x != 0x%08x",
                  what, actual, expect);
-        printf("[tts] %s (img=%d off=0x%x)\n", buf, img, off);
+        CPYMO_DIAG("[tts] %s (img=%d off=0x%x)\n", buf, img, off);
         return tt_fail0(buf);
     }
     if ((delta & 3) != 0) return tt_fail("分支目标未对齐：%s", what);
@@ -644,7 +645,7 @@ static bool tt_patch_branch(const char *what, int img, uint32_t off,
 
     insn = (link ? 0x94000000u : 0x14000000u) | ((uint32_t)delta & 0x03FFFFFFu);
     *(uint32_t *)(void *)(g_rw + g_img_off[img] + off) = insn;
-    printf("[tts] patch %s: img=%d off=0x%x -> 0x%x (%s)\n",
+    CPYMO_DIAG("[tts] patch %s: img=%d off=0x%x -> 0x%x (%s)\n",
            what, img, off, target_off, link ? "bl" : "b");
     return true;
 }
@@ -657,11 +658,11 @@ static bool tt_patch_word(const char *what, int img, uint32_t off,
         char buf[96];
         snprintf(buf, sizeof(buf), "%s 校验失败：0x%08x != 0x%08x",
                  what, actual, expect);
-        printf("[tts] %s (img=%d off=0x%x)\n", buf, img, off);
+        CPYMO_DIAG("[tts] %s (img=%d off=0x%x)\n", buf, img, off);
         return tt_fail0(buf);
     }
     *(uint32_t *)(void *)(g_rw + g_img_off[img] + off) = new_word;
-    printf("[tts] patch %s: img=%d off=0x%x = 0x%08x\n", what, img, off, new_word);
+    CPYMO_DIAG("[tts] patch %s: img=%d off=0x%x = 0x%08x\n", what, img, off, new_word);
     return true;
 }
 
@@ -669,12 +670,18 @@ static bool tt_patch_word(const char *what, int img, uint32_t off,
 /* PCM 环形缓冲（引擎线程写，SDL 音频回调读，全程无锁）                  */
 /* ------------------------------------------------------------------ */
 
+static unsigned g_cb_count;
+
 static void tt_audio_cb(void *ud, Uint8 *stream, int len)
 {
     uint32_t flush, r, w;
     int n = 0;
 
     (void)ud;
+
+    ++g_cb_count;
+    if (g_cb_count == 1 || (g_cb_count % 1000u) == 0u)
+        CPYMO_DIAG("[tts] SDL 音频回调第 %u 次，请求 %d 字节\n", g_cb_count, len);
 
     flush = __atomic_load_n(&g_flush_gen, __ATOMIC_ACQUIRE);
     if (flush != g_flush_seen) {
@@ -810,7 +817,7 @@ static bool tt_synth(const char *text)
 
         rc = (int64_t)c.result;
         if (rc < 0) {
-            printf("[tts] synth 返回 %lld\n", (long long)rc);
+            CPYMO_DIAG("[tts] synth 返回 %lld\n", (long long)rc);
             return false;
         }
 
@@ -874,12 +881,12 @@ static void tt_boot_hook(tt_regs *r)
     tt_call c;
 
     (void)r;
-    printf("[tts] nnMain 入口钩子命中\n");
+    CPYMO_DIAG("[tts] nnMain 入口钩子命中\n");
 
     {
         uint64_t v = *(uint64_t *)(void *)(m + OFF_MAIN_HEAP_GLOBAL);
         *(uint64_t *)(void *)(m + OFF_MAIN_HEAP_SLOT) = v;
-        printf("[tts] 全局堆指针 = 0x%llx\n", (unsigned long long)v);
+        CPYMO_DIAG("[tts] 全局堆指针 = 0x%llx\n", (unsigned long long)v);
     }
 
     memset(&c, 0, sizeof(c));
@@ -897,7 +904,7 @@ static void tt_boot_hook(tt_regs *r)
     g_engine_ok = (g_boot_result >= 0);
     g_boot_done = true;
     if (!g_engine_ok) g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
-    printf("[tts] 引擎 init -> %lld\n", (long long)g_boot_result);
+    CPYMO_DIAG("[tts] 引擎 init -> %lld\n", (long long)g_boot_result);
     eventFire(&g_boot_event);
 
     if (!g_engine_ok) {
@@ -923,7 +930,7 @@ static void tt_guest_thread_main(void *arg)
 
 void cpymo_sw_tts_guest_returned(void)
 {
-    printf("[tts] guest 从 rtld 返回了（异常）\n");
+    CPYMO_DIAG("[tts] guest 从 rtld 返回了（异常）\n");
     if (g_state != CPYMO_SWITCH_TTS_STATE_FAILED)
         tt_fail0("guest 意外返回");
     if (!g_boot_done) {
@@ -997,7 +1004,7 @@ static bool tt_load_vtdb(const char *dir)
         if (g_vtdb) { found = true; break; }
     }
     if (!found) return tt_fail("找不到音库（需 D32-YAFANG.vtdb2）：%s", dir);
-    printf("[tts] 音库 %s, %zu 字节\n", path, g_vtdb_len);
+    CPYMO_DIAG("[tts] 音库 %s, %zu 字节\n", path, g_vtdb_len);
     return true;
 }
 
@@ -1040,7 +1047,7 @@ static bool tt_map_memory(void)
                      i, (unsigned)rc);
             return tt_fail0(buf);
         }
-        printf("[tts] img %d text Rx: +0x%x 0x%x\n", i, g_text_off[i], g_text_size[i]);
+        CPYMO_DIAG("[tts] img %d text Rx: +0x%x 0x%x\n", i, g_text_off[i], g_text_size[i]);
     }
     /* trampoline 池在镜像之后，同样要可执行（含 .quad 常量，读没问题） */
     rc = svcSetProcessMemoryPermission(
@@ -1136,7 +1143,7 @@ static bool tt_prepare(const char *dir)
     }
     g_tramp_off = off;
     g_window_size = (size_t)(off + 0x1000 + 0xFFF) & ~(size_t)0xFFF;
-    printf("[tts] 窗口: rtld=0x%x main=0x%x sdk=0x%x tramp=0x%x total=0x%zx\n",
+    CPYMO_DIAG("[tts] 窗口: rtld=0x%x main=0x%x sdk=0x%x tramp=0x%x total=0x%zx\n",
            g_img_off[0], g_img_off[1], g_img_off[2], g_tramp_off, g_window_size);
 
     virtmemLock();
@@ -1146,7 +1153,7 @@ static bool tt_prepare(const char *dir)
     if (!resv || !g_code_rv) return tt_fail0("没有可用的代码内存");
     g_code_resv = resv;
     g_rx = (uint8_t *)resv;
-    printf("[tts] 代码区 rx=0x%llx\n", (unsigned long long)(uintptr_t)g_rx);
+    CPYMO_DIAG("[tts] 代码区 rx=0x%llx\n", (unsigned long long)(uintptr_t)g_rx);
 
     g_rw = (uint8_t *)tt_alloc(g_window_size);
     if (!g_rw) return tt_fail0("窗口分配失败");
@@ -1159,7 +1166,7 @@ static bool tt_prepare(const char *dir)
                          &t_off, &t_sz, &need))
             return false;
         g_img_va[i] = (uintptr_t)(g_rx + g_img_off[i]);
-        printf("[tts] %s 铺到 0x%llx\n", names[i], (unsigned long long)g_img_va[i]);
+        CPYMO_DIAG("[tts] %s 铺到 0x%llx\n", names[i], (unsigned long long)g_img_va[i]);
     }
 
     if (!tt_alloc_regions()) return false;
@@ -1167,7 +1174,7 @@ static bool tt_prepare(const char *dir)
 
     /* 顺序要求：rtld → main → sdk → vtdb（vtdb 在 heap，不参与相对寻址） */
     for (n = 0, i = 0; i < TT_IMAGE_MAX; i++) n += (int)g_img_size[i];
-    printf("[tts] 镜像合计 0x%x 字节\n", n);
+    CPYMO_DIAG("[tts] 镜像合计 0x%x 字节\n", n);
 
     if (!tt_apply_patches()) return false;
     if (!tt_map_memory()) return false;
@@ -1196,10 +1203,10 @@ static bool tt_audio_init(void)
     g_adev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (!g_adev) return tt_fail("打开 TTS 音频设备失败：%s", SDL_GetError());
     if (have.freq != TT_SAMPLE_RATE)
-        printf("[tts] 注意：实际采样率 %d（期望 %d）\n", have.freq, TT_SAMPLE_RATE);
+        CPYMO_DIAG("[tts] 注意：实际采样率 %d（期望 %d）\n", have.freq, TT_SAMPLE_RATE);
     g_audio_open = true;
     SDL_PauseAudioDevice(g_adev, 0);
-    printf("[tts] 音频设备已开：%d Hz %d ch\n", have.freq, have.channels);
+    CPYMO_DIAG("[tts] 音频设备已开：%d Hz %d ch\n", have.freq, have.channels);
     return true;
 }
 
@@ -1286,7 +1293,7 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     }
 
     g_state = CPYMO_SWITCH_TTS_STATE_READY;
-    printf("[tts] 引擎就绪\n");
+    CPYMO_DIAG("[tts] 引擎就绪\n");
     return true;
 }
 

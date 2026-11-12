@@ -3,6 +3,7 @@
 #include "cpymo_import_sdl2.h"
 #include "cpymo_embedded_assets.h"
 #include "cpymo_tolk_runtime.h"
+#include "cpymo_switch_diag.h"
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 #include "cpymo_switch_accessibility.h"
@@ -313,6 +314,7 @@ void cpymo_sdl2_accessibility_sound_init(void)
         }
 
         if (loaded) {
+            CPYMO_DIAG("[diag] 音效 %s 已加载\n", sound_files[i]);
             /* Boost volume to match Android SoundPool perceived loudness */
             amplify_wav_buffer(accessibility_wav_bufs[i], accessibility_wav_lens[i],
                                spec.format, 2.0f);
@@ -328,6 +330,9 @@ void cpymo_sdl2_accessibility_sound_init(void)
     if (have_spec) {
         accessibility_audio_spec = wav_spec;
         accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
+        CPYMO_DIAG("[diag] 无障碍音效：freq=%d fmt=0x%x ch=%d samples=%d -> dev=%u err=%s\n",
+            wav_spec.freq, wav_spec.format, wav_spec.channels, wav_spec.samples,
+            (unsigned)accessibility_audio_dev, SDL_GetError());
         if (accessibility_audio_dev) {
             /* Prime the audio pipeline: queue a tiny silence buffer and unpause
              * so Windows WASAPI starts its audio thread now, not on first play.

@@ -13,6 +13,7 @@
 #include "../include/cpymo_backend_input.h"
 #include "../include/cpymo_backend_text.h"
 #include "cpymo_import_sdl2.h"
+#include "cpymo_switch_diag.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -485,6 +486,19 @@ START:
 		SDL_Log("[Error] Unable to initialize SDL: %s", SDL_GetError());
 		return -1;
 	}
+
+#if defined(__SWITCH__)
+	{
+		int ndev = SDL_GetNumAudioDevices(0);
+		const char *drv = SDL_GetCurrentAudioDriver();
+		CPYMO_DIAG("[diag] SDL_Init 完成：音频驱动=%s 设备数=%d\n",
+			drv ? drv : "(无)", ndev);
+		for (int i = 0; i < ndev; ++i) {
+			const char *nm = SDL_GetAudioDeviceName(i, 0);
+			CPYMO_DIAG("[diag] 输出设备 #%d：%s\n", i, nm ? nm : "(无名)");
+		}
+	}
+#endif
 
 	cpymo_backend_audio_init();
 	cpymo_backend_safe_area_init();
