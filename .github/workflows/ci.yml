@@ -874,40 +874,29 @@ jobs:
         strip ./build/build/cpymo
         strip ./build/build/cpymo-tool
 
-    - name: Package
-      if: ${{ runner.os != 'Windows' }}
-      run: |
-        set -e
-        name="CPyMO-$(printf '%s' "${{ matrix.package-name }}" | tr ' ()' '___')"
-        mkdir -p "dist/$name"
-        cp ./build/build/cpymo ./build/build/cpymo-tool "dist/$name/"
-        for f in ./build/build/*.wav ./build/build/Release/*.wav; do
-          [ -f "$f" ] && cp "$f" "dist/$name/" || true
-        done
-        cd dist
-        if [ "$(uname -s)" = "Linux" ]; then tar -czf "$name.tar.gz" "$name"; else zip -qr "$name.zip" "$name"; fi
-        ls -l
+    - name: Package (Linux)
+      if: ${{ runner.os == 'Linux' }}
+      run: ./scripts/package-linux.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
 
-    - name: Package
+    - name: Package (macOS)
+      if: ${{ runner.os == 'macOS' }}
+      run: ./scripts/package-macos.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+
+    - name: Package (Windows)
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        $name = "CPyMO-" + ("${{ matrix.package-name }}" -replace '[ \(\)]', '_')
-        New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
-        Copy-Item "build/build/Release/cpymo.exe","build/build/Release/cpymo-tool.exe" "dist/$name/"
-        foreach ($pat in @("*.dll","*.wav","*.ini","*.conf")) {
-          Copy-Item "build/build/Release/$pat" "dist/$name/" -ErrorAction SilentlyContinue
-        }
-        Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip" -Force
-        Get-ChildItem "dist"
+        # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
+        New-Item -ItemType Directory -Force -Path dist | Out-Null
+        Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
+        Get-ChildItem dist
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for ${{ matrix.package-name }}
-        path: |
-            ./dist/*.zip
-            ./dist/*.tar.gz
+        path: ./dist/*
+        if-no-files-found: error
 
   build-desktop-accessibility:
     name: 'Desktop (Accessibility)'
@@ -1054,40 +1043,29 @@ jobs:
         strip ./build/build/cpymo
         strip ./build/build/cpymo-tool
 
-    - name: Package
-      if: ${{ runner.os != 'Windows' }}
-      run: |
-        set -e
-        name="CPyMO-$(printf '%s' "${{ matrix.package-name }}" | tr ' ()' '___')"
-        mkdir -p "dist/$name"
-        cp ./build/build/cpymo ./build/build/cpymo-tool "dist/$name/"
-        for f in ./build/build/*.wav ./build/build/Release/*.wav; do
-          [ -f "$f" ] && cp "$f" "dist/$name/" || true
-        done
-        cd dist
-        if [ "$(uname -s)" = "Linux" ]; then tar -czf "$name.tar.gz" "$name"; else zip -qr "$name.zip" "$name"; fi
-        ls -l
+    - name: Package (Linux)
+      if: ${{ runner.os == 'Linux' }}
+      run: ./scripts/package-linux.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
 
-    - name: Package
+    - name: Package (macOS)
+      if: ${{ runner.os == 'macOS' }}
+      run: ./scripts/package-macos.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+
+    - name: Package (Windows)
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        $name = "CPyMO-" + ("${{ matrix.package-name }}" -replace '[ \(\)]', '_')
-        New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
-        Copy-Item "build/build/Release/cpymo.exe","build/build/Release/cpymo-tool.exe" "dist/$name/"
-        foreach ($pat in @("*.dll","*.wav","*.ini","*.conf")) {
-          Copy-Item "build/build/Release/$pat" "dist/$name/" -ErrorAction SilentlyContinue
-        }
-        Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip" -Force
-        Get-ChildItem "dist"
+        # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
+        New-Item -ItemType Directory -Force -Path dist | Out-Null
+        Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
+        Get-ChildItem dist
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for ${{ matrix.package-name }}
-        path: |
-            ./dist/*.zip
-            ./dist/*.tar.gz
+        path: ./dist/*
+        if-no-files-found: error
 
   build-ascii-art:
     name: 'CPyMO ASCII Art'
