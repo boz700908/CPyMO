@@ -4,6 +4,7 @@
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 
 #include "cpymo_import_sdl2.h"
+#include <switch.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,10 +18,6 @@
 
 static char g_assets_dir[512];
 static bool g_tts_attempted;
-
-/* 只发一个 nro 也能出声：TTS 资产会被打进 nro 的 romfs。
- * 老 libnx 没有这个符号时地址为空，静默跳过（外置文件仍然可用）。 */
-extern int romfsMountFromCurrentProcess(const char *) __attribute__((weak));
 
 static void sw_items_load(void);
 static void sw_items_apply(void);
@@ -46,6 +43,10 @@ static bool sw_has_engine(const char *dir)
     snprintf(path, sizeof(path), "%s/main.bin", dir);
     if (!sw_file_exists(path)) return false;
     snprintf(path, sizeof(path), "%s/sdk.bin", dir);
+    if (!sw_file_exists(path)) return false;
+    snprintf(path, sizeof(path), "%s/D32-YAFANG.vtdb2", dir);
+    if (sw_file_exists(path)) return true;
+    snprintf(path, sizeof(path), "%s/D32-YAFANG.vtdb", dir);
     return sw_file_exists(path);
 }
 
@@ -65,11 +66,7 @@ bool cpymo_switch_accessibility_romfs_ready(void)
 
     if (state == 2) return false;
     if (state == 0) {
-        if (!romfsMountFromCurrentProcess) {
-            state = 2;
-            return false;
-        }
-        state = (romfsMountFromCurrentProcess("romfs") == 0) ? 1 : 2;
+        state = (romfsMountSelf("romfs") == 0) ? 1 : 2;
     }
 
     return state == 1;
