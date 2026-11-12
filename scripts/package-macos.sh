@@ -46,7 +46,18 @@ done
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1 \
   || echo "ad-hoc 签名跳过（不影响产物）"
 
-hdiutil create -volname "CPyMO" -srcfolder "$APP" -ov -format UDZO \
+# dmg 里除了 app 再放一份打包工具（只发 app 也能玩）。
+DMGSTAGE="$WORK/dmg"
+mkdir -p "$DMGSTAGE"
+cp -R "$APP" "$DMGSTAGE/CPyMO.app"
+TOOL_BIN="$(cd "$(dirname "$BIN")" && pwd)/cpymo-tool"
+if [ -f "$TOOL_BIN" ]; then
+  install -m 755 "$TOOL_BIN" "$DMGSTAGE/cpymo-tool"
+else
+  echo "-- 没找到 cpymo-tool，dmg 里只放 CPyMO.app"
+fi
+
+hdiutil create -volname "CPyMO" -srcfolder "$DMGSTAGE" -ov -format UDZO \
   "$OUT/CPyMO-$VERSION-$SLUG.dmg"
 
 echo "=== 产物（$LABEL）==="

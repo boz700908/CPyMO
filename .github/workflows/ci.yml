@@ -898,6 +898,7 @@ jobs:
         # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
         New-Item -ItemType Directory -Force -Path dist | Out-Null
         Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
+          if (Test-Path build/build/Release/cpymo-tool.exe) { Copy-Item build/build/Release/cpymo-tool.exe dist/cpymo-tool.exe }
         Get-ChildItem dist
 
     - name: Upload
@@ -1067,6 +1068,7 @@ jobs:
         # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
         New-Item -ItemType Directory -Force -Path dist | Out-Null
         Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
+          if (Test-Path build/build/Release/cpymo-tool.exe) { Copy-Item build/build/Release/cpymo-tool.exe dist/cpymo-tool.exe }
         Get-ChildItem dist
 
     - name: Upload

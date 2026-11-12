@@ -23,6 +23,14 @@ trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/usr/bin" "$STAGE/usr/share/applications" "$OUT"
 install -m 755 "$BIN" "$STAGE/usr/bin/cpymo"
 
+# 游戏打包工具跟主程序放同一个包里（它是独立命令，不影响「单程序」）。
+TOOL_BIN="$(cd "$(dirname "$BIN")" && pwd)/cpymo-tool"
+if [ -f "$TOOL_BIN" ]; then
+  install -m 755 "$TOOL_BIN" "$STAGE/usr/bin/cpymo-tool"
+else
+  echo "-- 没找到 cpymo-tool，包里只放 cpymo"
+fi
+
 cat > "$STAGE/usr/share/applications/cpymo.desktop" <<EOF
 [Desktop Entry]
 Type=Application
@@ -68,10 +76,17 @@ if [ "$(uname -m)" = "x86_64" ]; then
   APPDIR="$STAGE/AppDir"
   mkdir -p "$APPDIR/usr/bin"
   install -m 755 "$BIN" "$APPDIR/usr/bin/cpymo"
+  if [ -f "$TOOL_BIN" ]; then
+    install -m 755 "$TOOL_BIN" "$APPDIR/usr/bin/cpymo-tool"
+  fi
   cp "$STAGE/usr/share/applications/cpymo.desktop" "$APPDIR/cpymo.desktop"
   cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/sh
 HERE=$(dirname "$(readlink -f "$0")")
+# 只有 cpymo 会去玩游戏，其它参数交给同名的 cpymo-tool。
+case "$(basename "$0")" in
+  cpymo-tool*) exec "$HERE/usr/bin/cpymo-tool" "$@" ;;
+esac
 exec "$HERE/usr/bin/cpymo" "$@"
 EOF
   chmod +x "$APPDIR/AppRun"
