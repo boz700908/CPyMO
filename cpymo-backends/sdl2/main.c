@@ -658,8 +658,12 @@ START:
 			#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 			cpymo_switch_accessibility_handle_event(&event);
 			#endif
-			if (event.type == SDL_WINDOWEVENT || event.type == SDL_RENDER_TARGETS_RESET)
+			if (event.type == SDL_WINDOWEVENT || event.type == SDL_RENDER_TARGETS_RESET) {
+				/* Issue #57: 窗口或渲染目标变了，鼠标坐标的归一化几何需要重算 */
+				extern void cpymo_input_invalidate_geometry(void);
+				cpymo_input_invalidate_geometry();
 				redraw_by_event++;
+			}
 			else if (event.type == SDL_MOUSEWHEEL) {
 				#if SDL_VERSION_ATLEAST(2,0,18)
 					mouse_wheel = (float)event.wheel.preciseY;

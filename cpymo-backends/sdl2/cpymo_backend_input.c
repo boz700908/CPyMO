@@ -12,6 +12,71 @@ extern cpymo_engine engine;
 
 float mouse_wheel;
 
+/* Issue #57: 鼠标坐标的归一化几何（renderer 缩放、窗口与输出尺寸比、视口）只在窗口或渲染
+	 * 目标变化时才变。原先每帧都重查一遍 SDL，静止画面下纯属白做。改为失效后重查，
+	 * 由主循环在 SDL_WINDOWEVENT / SDL_RENDER_TARGETS_RESET 时调用
+	 * cpymo_input_invalidate_geometry()。 */
+typedef struct {
+	bool valid;
+	float scale_x, scale_y;
+	SDL_Rect viewport;
+} cpymo_sdl2_input_geometry;
+
+static cpymo_sdl2_input_geometry sdl2_input_geometry = {
+	false, 1.0f, 1.0f, { 0, 0, 0, 0 }
+};
+
+void cpymo_input_invalidate_geometry(void)
+{
+	sdl2_input_geometry.valid = false;
+}
+
+static const cpymo_sdl2_input_geometry *cpymo_input_geometry(void)
+{
+	cpymo_sdl2_input_geometry *g = &sdl2_input_geometry;
+	if (g->valid) return g;
+
+	float scale_x = 1.0f, scale_y = 1.0f;
+	SDL_RenderGetScale(renderer, &scale_x, &scale_y);
+
+	int point_w = 0, point_h = 0, pixel_w = 0, pixel_h = 0;
+	SDL_GetWindowSize(window, &point_w, &point_h);
+	SDL_GetRendererOutputSize(renderer, &pixel_w, &pixel_h);
+	if (pixel_w > 0 && pixel_h > 0) {
+		scale_x *= (float)point_w / (float)pixel_w;
+		scale_y *= (float)point_h / (float)pixel_h;
+	}
+	if (scale_x <= 0.0f) scale_x = 1.0f;
+	if (scale_y <= 0.0f) scale_y = 1.0f;
+
+#ifndef ENABLE_SCREEN_FORCE_CENTERED
+	SDL_RenderGetViewport(renderer, &g->viewport);
+#else
+	float game_w = engine.gameconfig.imagesize_w;
+	float game_h = engine.gameconfig.imagesize_h;
+	cpymo_utils_match_rect(
+		SCREEN_WIDTH, SCREEN_HEIGHT,
+		&game_w, &game_h);
+	float x = 0, y = 0;
+	cpymo_utils_center(SCREEN_WIDTH, SCREEN_HEIGHT, game_w, game_h, &x, &y);
+	g->viewport.x = (int)x;
+	g->viewport.y = (int)y;
+	g->viewport.w = (int)game_w;
+	g->viewport.h = (int)game_h;
+#endif
+	if (g->viewport.w <= 0 || g->viewport.h <= 0) {
+		g->viewport.x = 0;
+		g->viewport.y = 0;
+		g->viewport.w = (int)engine.gameconfig.imagesize_w;
+		g->viewport.h = (int)engine.gameconfig.imagesize_h;
+	}
+
+	g->scale_x = scale_x;
+	g->scale_y = scale_y;
+	g->valid = true;
+	return g;
+}
+
 SDL_GameController **gamecontrollers = NULL;
 size_t gamecontrollers_count = 0;
 
@@ -158,14 +223,8 @@ cpymo_input cpymo_input_snapshot()
 	} else
 #endif
 	{
-	float scale_x, scale_y;
-	SDL_RenderGetScale(renderer, &scale_x, &scale_y);
-
-    int point_w, point_h, pixel_w, pixel_h;
-    SDL_GetWindowSize(window, &point_w, &point_h);
-    SDL_GetRendererOutputSize(renderer, &pixel_w, &pixel_h);
-    scale_x *= (float) point_w / pixel_w;
-    scale_y *= (float) point_h / pixel_h;
+	cpymo_sdl2_input_geometry g = *cpymo_input_geometry();
+	float scale_x = g.scale_x, scale_y = g.scale_y;
 
 	int mx, my;
 	Uint32 mouse_state = SDL_GetMouseState(&mx, &my);
@@ -174,22 +233,7 @@ cpymo_input cpymo_input_snapshot()
 	out.cancel |= (mouse_state & SDL_BUTTON_RMASK) != 0;
 	out.mouse_position_useable = true;
 
-	SDL_Rect viewport;
-#ifndef ENABLE_SCREEN_FORCE_CENTERED
-	SDL_RenderGetViewport(renderer, &viewport);
-#else
-	float game_w = engine.gameconfig.imagesize_w;
-	float game_h = engine.gameconfig.imagesize_h;
-	cpymo_utils_match_rect(
-		SCREEN_WIDTH, SCREEN_HEIGHT,
-		&game_w, &game_h);
-	float x = 0, y = 0;
-	cpymo_utils_center(SCREEN_WIDTH, SCREEN_HEIGHT, game_w, game_h, &x, &y);
-	viewport.x = (int)x;
-	viewport.y = (int)y;
-	viewport.w = (int)game_w;
-	viewport.h = (int)game_h;
-#endif
+	SDL_Rect viewport = g.viewport;
 
 	out.mouse_x = ((float)mx / scale_x - viewport.x) / (float)viewport.w;
 	out.mouse_y = ((float)my / scale_y - viewport.y) / (float)viewport.h;
