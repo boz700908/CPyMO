@@ -184,7 +184,7 @@ enum cpymo_key_hold_result cpymo_key_hold_update(
 	}
 	else if (pressed && prev_pressed) {
 		float mouse_speed = 0;
-		if (e->input.mouse_position_useable && e->input.mouse_position_useable) {
+		if (e->input.mouse_position_useable && e->prev_input.mouse_position_useable) {
 			float 
 				mouse_distance_x = fabsf(e->input.mouse_x - e->prev_input.mouse_x),
 				mouse_distance_y = fabsf(e->input.mouse_y - e->prev_input.mouse_y);
