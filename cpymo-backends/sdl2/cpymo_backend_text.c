@@ -4,6 +4,10 @@
 #include "cpymo_embedded_assets.h"
 #include "cpymo_tolk_runtime.h"
 
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#include "cpymo_switch_accessibility.h"
+#endif
+
 #ifndef DISABLE_STB_TRUETYPE
 
 #include "../../cpymo/cpymo_utils.h"
@@ -290,6 +294,16 @@ void cpymo_sdl2_accessibility_sound_init(void)
                 loaded = 1;
             }
         }
+
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+        /* Switch 单文件分发：音效在 nro / NSP 自带 romfs 的根目录 */
+        if (!loaded && cpymo_switch_accessibility_romfs_ready()) {
+            snprintf(full_path, sizeof(full_path), "romfs:/%s", sound_files[i]);
+            if (SDL_LoadWAV(full_path, &spec,
+                    &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) != NULL)
+                loaded = 1;
+        }
+#endif
 
         /* 单文件分发：资源已编进可执行文件，没有外置 wav 时也能出声 */
         if (!loaded) {

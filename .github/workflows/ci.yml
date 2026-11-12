@@ -74,6 +74,7 @@ jobs:
         test -d tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
         mkdir -p cpymo-backends/sdl2/romfs/tts
         cp tts-assets/*.bin tts-assets/*.vtdb2 cpymo-backends/sdl2/romfs/tts/
+        cp cpymo-backends/sdl2/*.wav cpymo-backends/sdl2/romfs/
         ls -l cpymo-backends/sdl2/romfs/tts
 
     - name: Build

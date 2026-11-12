@@ -58,7 +58,7 @@ static bool sw_try_dir(const char *dir)
 
 /* 候选目录：环境变量 > nro 同级的 tts/ > sdmc:/pymogames/tts > sdmc:/switch/tts */
 /* romfs 内嵌的资产兜底：单独一个 nro 也能用，外置文件优先（音库可更新）。 */
-static bool sw_try_romfs(void)
+bool cpymo_switch_accessibility_romfs_ready(void)
 {
     static int state; /* 0 没试过，1 已挂载，2 不可用 */
 
@@ -69,9 +69,15 @@ static bool sw_try_romfs(void)
             return false;
         }
         state = (romfsMountFromCurrentProcess("romfs") == 0) ? 1 : 2;
-        if (state != 1) return false;
     }
 
+    return state == 1;
+}
+
+/* romfs 根目录下的音效与启动音乐（单文件分发）。 */
+static bool sw_try_romfs(void)
+{
+    if (!cpymo_switch_accessibility_romfs_ready()) return false;
     return sw_try_dir("romfs:/tts");
 }
 

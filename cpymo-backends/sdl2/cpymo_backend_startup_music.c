@@ -76,6 +76,10 @@ static void cpymo_backend_startup_music_callback(void *userdata, Uint8 *stream, 
 	}
 }
 
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#include "cpymo_switch_accessibility.h"
+#endif
+
 static int cpymo_backend_startup_music_load(SDL_AudioSpec *out_spec)
 {
 	char *base_path = SDL_GetBasePath();
@@ -101,6 +105,17 @@ static int cpymo_backend_startup_music_load(SDL_AudioSpec *out_spec)
 
 	startup_music_pcm = NULL;
 	startup_music_len = 0;
+
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	/* Switch 单文件分发：启动音乐在 nro / NSP 自带 romfs 的根目录 */
+	if (cpymo_switch_accessibility_romfs_ready()
+			&& SDL_LoadWAV("romfs:/startup.wav", out_spec,
+				&startup_music_pcm, &startup_music_len) != NULL)
+		return 1;
+
+	startup_music_pcm = NULL;
+	startup_music_len = 0;
+#endif
 
 	/* 单文件分发：资源已编进可执行文件，没有外置 startup.wav 时也能响。 */
 	if (cpymo_embedded_load_wav("startup.wav", out_spec,

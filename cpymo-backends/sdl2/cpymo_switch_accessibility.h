@@ -22,6 +22,9 @@ union SDL_Event;
 /* 启动 TTS 引擎：按候选目录找资产，失败时返回 false 并打印原因。 */
 bool cpymo_switch_accessibility_tts_start(void);
 
+/* 确保进程自带的 romfs 已挂载（单文件 nro / NSP 用）；返回是否可用。 */
+bool cpymo_switch_accessibility_romfs_ready(void);
+
 /* 关闭 TTS 引擎（进程退出前调用；不释放 guest 代码内存）。 */
 void cpymo_switch_accessibility_tts_stop(void);
 
