@@ -21,6 +21,17 @@
 void cpymo_backend_startup_music_play(void) {}
 void cpymo_backend_startup_music_stop(void) {}
 
+#elif defined(__ANDROID__)
+
+/* Android 的声音资源走 Java 侧通道（res/raw + SoundPool/MediaPlayer）：
+ * APK 里没有 assets/，而 SDL_GetBasePath() 在 Android 上返回 "/"，
+ * 用 SDL_LoadWAV 找 startup.wav 必然失败（音效同理，它们本就走 Java）。
+ * 这里转给 VisualHelper.startupMusic / stopStartupMusic。 */
+#include "../android/app/src/main/cpp/include/cpymo_android.h"
+
+void cpymo_backend_startup_music_play(void) { cpymo_android_startup_music_play(); }
+void cpymo_backend_startup_music_stop(void) { cpymo_android_startup_music_stop(); }
+
 #else
 
 /* 与 Android/桌面无障碍音效对齐后的观感音量：满量程的 3/4。 */

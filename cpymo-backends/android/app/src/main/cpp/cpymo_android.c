@@ -11,6 +11,8 @@ static jmethodID midTextToSpeech;
 static jmethodID midTextToSpeechStop;
 static jmethodID midPlayAccessibilityFeedback;
 static jmethodID midCopySpeechText;
+static jmethodID midStartupMusic;
+static jmethodID midStopStartupMusic;
 static jclass mControllerManagerClass;
 static jmethodID midPollInputDevices;
 static SDL_atomic_t input_device_changed;
@@ -52,6 +54,8 @@ Java_xyz_xydm_cpymo_VisualHelper_nativeSetupJNI(JNIEnv *env, jclass clazz)
     midPlayAccessibilityFeedback = (*env)->GetStaticMethodID(env, clazz,
         "playAccessibilityFeedback", "(I)V");
     midCopySpeechText = (*env)->GetStaticMethodID(env, clazz, "copySpeechText", "(Ljava/lang/String;Z)V");
+    midStartupMusic = (*env)->GetStaticMethodID(env, clazz, "startupMusic", "()V");
+    midStopStartupMusic = (*env)->GetStaticMethodID(env, clazz, "stopStartupMusic", "()V");
 }
 
 void cpymo_android_text_to_speech(const char* text)
@@ -87,6 +91,20 @@ void cpymo_android_copy_speech_text(const char *text, bool append)
     (*env)->CallStaticVoidMethod(env, mVisualHelperClass, midCopySpeechText, jtext,
         append ? JNI_TRUE : JNI_FALSE);
     (*env)->DeleteLocalRef(env, jtext);
+}
+
+void cpymo_android_startup_music_play(void)
+{
+    JNIEnv *env = SDL_AndroidGetJNIEnv();
+    if (env == NULL || mVisualHelperClass == NULL || midStartupMusic == NULL) return;
+    (*env)->CallStaticVoidMethod(env, mVisualHelperClass, midStartupMusic);
+}
+
+void cpymo_android_startup_music_stop(void)
+{
+    JNIEnv *env = SDL_AndroidGetJNIEnv();
+    if (env == NULL || mVisualHelperClass == NULL || midStopStartupMusic == NULL) return;
+    (*env)->CallStaticVoidMethod(env, mVisualHelperClass, midStopStartupMusic);
 }
 
 void cpymo_android_refresh_input_devices(void)

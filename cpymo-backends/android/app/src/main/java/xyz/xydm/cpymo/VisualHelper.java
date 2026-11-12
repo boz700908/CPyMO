@@ -3,6 +3,7 @@ package xyz.xydm.cpymo;
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.SoundPool;
 import android.os.Build;
 import android.os.VibrationEffect;
@@ -25,12 +26,19 @@ public class VisualHelper {
     private static TextToSpeech mTextToSpeech;
     private static Vibrator mVibrator;
     private static SoundPool mSoundPool;
+    private static Context mAppContext;
+    private static MediaPlayer mStartupMusic;
 
     private static HashMap<Integer, Integer> mSoundMap = new HashMap<>();
 
     public static native void nativeSetupJNI();
 
     public static void setup(Context context) {
+        // 启动音乐与 JNI 注册不依赖无障碍开关：C 侧进游戏选择器时要能叫到这两个方法，
+        // 关闭无障碍的构建同样要响一次。这里只做注册，不产生任何可感知行为。
+        mAppContext = context.getApplicationContext();
+        nativeSetupJNI();
+
         // Set up text speech
         if (!Config.needAccessibility()) return;
 
@@ -64,8 +72,6 @@ public class VisualHelper {
             mSoundMap.put(SOUND_MENU, mSoundPool.load(context, R.raw.menu, 1));
             mSoundMap.put(SOUND_SELECT, mSoundPool.load(context, R.raw.select, 1));
         }
-
-        nativeSetupJNI();
     }
 
     /**
@@ -121,6 +127,39 @@ public class VisualHelper {
             return;
         }
         mSoundPool.play(soundID, 1, 1, 0, 0, 1);
+    }
+
+    /**
+     * 《Song of PyMO》启动音乐：进入游戏选择器时播一次，不循环。
+     * 进入游戏后由 C 侧（cpymo_engine_init）调 stopStartupMusic 收掉，不与开场 BGM 叠。
+     * 音量 3/4 与桌面 / Switch 的 SDL 实现对齐。
+     */
+    public static void startupMusic() {
+        if (mAppContext == null || mStartupMusic != null) return;
+        try {
+            mStartupMusic = MediaPlayer.create(mAppContext, R.raw.startup);
+            if (mStartupMusic == null) {
+                Log.e(TAG, "startupMusic(): R.raw.startup missing");
+                return;
+            }
+            mStartupMusic.setLooping(false);
+            mStartupMusic.setVolume(0.75f, 0.75f);
+            mStartupMusic.start();
+        } catch (Exception e) {
+            Log.e(TAG, "startupMusic() failed: " + e);
+            stopStartupMusic();
+        }
+    }
+
+    public static void stopStartupMusic() {
+        if (mStartupMusic == null) return;
+        try {
+            mStartupMusic.stop();
+        } catch (Exception ignored) {
+            // 已经播完或未进入播放状态，直接释放
+        }
+        mStartupMusic.release();
+        mStartupMusic = null;
     }
 
     public static void playAccessibilityFeedback(int soundType) {
