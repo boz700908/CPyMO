@@ -44,7 +44,7 @@ jobs:
         name: CPyMO for Nintendo Switch
         path: ./cpymo-backends/sdl2/cpymo.nro
 
-  build-switch-a11y:
+  build-switch-accessibility:
     name: 'Nintendo Switch (Accessibility)'
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20230507
