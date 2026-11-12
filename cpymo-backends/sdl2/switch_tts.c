@@ -241,10 +241,20 @@ static bool g_audio_open;
 
 static void *tt_alloc(size_t size)
 {
-    void *p = NULL;
+    size_t pages;
+    uint8_t *base, *aligned;
+
     if (size == 0) return NULL;
-    if (posix_memalign(&p, 0x1000, (size + 0xFFF) & ~(size_t)0xFFF) != 0) return NULL;
-    return p;
+    pages = (size + 0xFFF) & ~(size_t)0xFFF;
+
+    /* newlib（Switch）没有 posix_memalign：多要一页自己对齐。
+       这些区域有意不释放（见 cpymo_switch_tts_free），所以不必记住基址；
+       多花的一页会留到进程退出，代价可以忽略。 */
+    base = (uint8_t *)malloc(pages + 0x1000);
+    if (!base) return NULL;
+    aligned = (uint8_t *)(((uintptr_t)base + 0xFFF) & ~(uintptr_t)0xFFF);
+    memset(aligned, 0, pages);
+    return aligned;
 }
 
 static bool tt_fail(const char *fmt, const char *arg)
