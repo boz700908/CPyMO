@@ -3,6 +3,10 @@ name: Switch XCI (experimental)
 on:
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash
+
 env:
   BUILD_TYPE: Release
 
@@ -22,7 +26,7 @@ jobs:
         cd ./cpymo-backends/sdl2
         make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1 > /tmp/build.log 2>&1 || {
           echo "=== 构建失败 ==="
-          grep -n "error:\|Error [0-9]\|undefined reference" /tmp/build.log | head -40
+          grep -nE "error:|Error [0-9]|undefined reference" /tmp/build.log | head -40
           echo "=== 末尾 60 行 ==="
           tail -60 /tmp/build.log
           exit 1
