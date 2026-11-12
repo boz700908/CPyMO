@@ -121,7 +121,9 @@ jobs:
       run: |
         set -euxo pipefail
         cd /tmp/hbp
-        ./hacBrewPack -k /tmp/prod.keys --nologo --noromfs \
+        HBP=$(ls hacbrewpack hacBrewPack 2>/dev/null | head -1)
+        if [ -z "$HBP" ]; then echo "没找到 hacBrewPack 可执行文件"; ls; exit 1; fi
+        ./"$HBP" -k /tmp/prod.keys --nologo --noromfs \
           --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
           --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
           --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
