@@ -32,6 +32,16 @@ error_t cpymo_textbox_init(
     o->max_lines = (size_t)(height / character_size);
     if (o->max_lines < 1) o->max_lines = 1;
 
+    o->owned_text = NULL;
+    if (text.len > 0) {
+        char *copy = (char *)malloc(text.len + 1);
+        if (copy == NULL) return CPYMO_ERR_OUT_OF_MEM;
+        memcpy(copy, text.begin, text.len);
+        copy[text.len] = '\0';
+        o->owned_text = copy;
+        text = cpymo_str_pure(copy);
+    }
+
     o->chars_pool_max_size = text.len;
     o->chars_pool_size = 0;
 
@@ -42,12 +52,16 @@ error_t cpymo_textbox_init(
     if (backlog) {
         o->backlog_buf_max_size = text.len + o->max_lines + 1;
         o->backlog_buf = (char *)malloc(o->backlog_buf_max_size);
-        if (o->backlog_buf == NULL) return CPYMO_ERR_OUT_OF_MEM;
+        if (o->backlog_buf == NULL) {
+            if (o->owned_text) { free(o->owned_text); o->owned_text = NULL; }
+            return CPYMO_ERR_OUT_OF_MEM;
+        }
     }
 
     if (o->chars_pool_max_size > SIZE_MAX /
         (sizeof(cpymo_backend_text) + sizeof(float))) {
         if (o->backlog_buf) free(o->backlog_buf);
+        if (o->owned_text) { free(o->owned_text); o->owned_text = NULL; }
         return CPYMO_ERR_OUT_OF_MEM;
     }
 
@@ -58,6 +72,7 @@ error_t cpymo_textbox_init(
         o->max_lines > (SIZE_MAX - pools_size - (alignment - 1)) /
             sizeof(cpymo_textbox_line)) {
         if (o->backlog_buf) free(o->backlog_buf);
+        if (o->owned_text) { free(o->owned_text); o->owned_text = NULL; }
         return CPYMO_ERR_OUT_OF_MEM;
     }
     size_t lines_offset = ((pools_size + alignment - 1) / alignment) * alignment;
@@ -65,6 +80,7 @@ error_t cpymo_textbox_init(
         lines_offset + o->max_lines * sizeof(cpymo_textbox_line));
     if (mem == NULL) {
         if (o->backlog_buf) free(o->backlog_buf);
+        if (o->owned_text) { free(o->owned_text); o->owned_text = NULL; }
         return CPYMO_ERR_OUT_OF_MEM;
     }
 
@@ -131,6 +147,8 @@ void cpymo_textbox_free(cpymo_textbox *tb, cpymo_backlog *write_to_backlog)
     if (tb->chars_pool) free((void *)tb->chars_pool);
     if (tb->backlog_buf) free(tb->backlog_buf);
     tb->backlog_buf = NULL;
+    if (tb->owned_text) free(tb->owned_text);
+    tb->owned_text = NULL;
     tb->lines = NULL;
     tb->chars_pool = NULL;
     tb->chars_x_pool = NULL;

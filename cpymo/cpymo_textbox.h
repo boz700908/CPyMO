@@ -21,6 +21,10 @@ typedef struct {
 	cpymo_color col;
 	cpymo_str remain_text;
 
+	/* issue #57：文本副本。textbox 只保存切片指针，调用方传入栈或短命缓冲
+	 * 时会在逐字显示过程中悬垂，故由 textbox 自持一份拷贝。 */
+	char *owned_text;
+
 	char *backlog_buf;
 	size_t backlog_buf_size, backlog_buf_max_size;
 
