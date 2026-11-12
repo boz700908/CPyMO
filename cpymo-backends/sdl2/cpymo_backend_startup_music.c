@@ -122,7 +122,8 @@ void cpymo_backend_startup_music_play(void)
 	SDL_PauseAudioDevice(startup_music_dev, 0);
 }
 
-/* 引擎当前不调用：音乐播完自然静音。保留给需要中途打断的场合。 */
+/* 进入游戏时由 cpymo_engine_init 调用：收掉启动音乐，避免压住游戏开场 BGM；
+	 * 直接进游戏的构建从未 play 过，这里是空操作。 */
 void cpymo_backend_startup_music_stop(void)
 {
 	/* SDL_CloseAudioDevice 会等回调线程退出，之后才能释放 PCM。 */
