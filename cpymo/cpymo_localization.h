@@ -57,6 +57,9 @@ typedef struct {
 	const char *visual_help_selection;
 	error_t (*pymo_version_not_compatible_message)(char **, cpymo_pymo_version);
 	const char *exit_confirm;
+
+	/* 无障碍：进入游戏选择器时的手势提示（所有有选择器的平台共用） */
+	const char *a11y_game_selector_tip;
 } cpymo_localization;
 
 struct cpymo_engine;

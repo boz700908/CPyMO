@@ -301,16 +301,16 @@ static error_t cpymo_game_selector_lazy_init_update(cpymo_engine *e, void *ui_, 
 
 #ifdef ENABLE_TEXT_EXTRACT
 		{
+			/* 只要平台有游戏选择器，进入时就报一次手势提示（先提示、后书名，
+			 * 两者都进朗读队列：第一条替换，第二条按 R3/R4 排队）。 */
+			const cpymo_localization *l10n = cpymo_localization_get(e);
+			if (l10n && l10n->a11y_game_selector_tip)
+				cpymo_a11y_speak(l10n->a11y_game_selector_tip);
+
 			cpymo_game_selector_item *first = (cpymo_game_selector_item *)cpymo_list_ui_get_current_selected_const(e);
 			if (first && first->gametitle_text)
 				cpymo_a11y_speak(first->gametitle_text);
 		}
-
-		#ifdef ENABLE_TEXT_EXTRACT_IOS_ACCESSIBILITY
-		/* Match Android's selector-entry gesture instruction without replacing
-		 * the selected title stored for copy/append-copy. */
-		cpymo_ios_accessibility_game_selector_entered();
-		#endif
 #endif
 
 		#ifndef EXIT_TO_GAME_SELECTOR

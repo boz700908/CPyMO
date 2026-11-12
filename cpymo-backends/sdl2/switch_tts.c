@@ -1250,8 +1250,9 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     g_error[0] = 0;
     if (g_params.voice == 0) cpymo_switch_tts_params_default(&g_params);
 
-    eventCreate(&g_cmd_event);
-    eventCreate(&g_boot_event);
+    /* autoclear：等待即清除，与下面只用 eventWait 的用法配套 */
+    eventCreate(&g_cmd_event, true);
+    eventCreate(&g_boot_event, true);
 
     if (!tt_prepare(assets_dir)) return false;
     if (!tt_audio_init()) return false;
@@ -1260,7 +1261,7 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     g_thread_stack = (uint8_t *)tt_alloc(g_thread_stack_size);
     if (!g_thread_stack) return tt_fail0("线程栈分配失败");
     if (R_FAILED(threadCreate(&g_thread, tt_guest_thread_main, NULL,
-                              g_thread_stack, g_thread_stack_size, 0x30)))
+                              g_thread_stack, g_thread_stack_size, 0x30, -2)))
         return tt_fail0("threadCreate 失败");
     if (R_FAILED(threadStart(&g_thread))) return tt_fail0("threadStart 失败");
     g_thread_started = true;

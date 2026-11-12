@@ -119,7 +119,8 @@ const cpymo_localization chs = {
 	"需为此游戏安装mo2pymo补丁才可以正常进行游戏",
 	"选项：",
 	&chs_version,
-	"确定要退出游戏吗？"
+	"确定要退出游戏吗？",
+	"请先关闭系统读屏，然后上下滑动选择游戏"
 };
 
 
@@ -188,7 +189,8 @@ const cpymo_localization cht = {
 	"需為此遊戲安裝mo2pymo補丁才可以正常進行遊戲",
 	"選項：",
 	&cht_version,
-	"確定要退出遊戲嗎？"
+	"確定要退出遊戲嗎？",
+	"請先關閉系統讀屏，然後上下滑動選擇遊戲"
 };
 
 STR_I(enu, save_already_save_to, 32, "Already save to slot %d.");
@@ -255,7 +257,8 @@ const cpymo_localization enu = {
 	"You need to install mo2pymo patch for this game to play",
 	"Selection: ",
 	&enu_version,
-	"Are you sure you want to quit the game?"
+	"Are you sure you want to quit the game?",
+	"Turn off your screen reader first, then swipe up or down to choose a game"
 };
 
 #ifndef CPYMO_LANG
