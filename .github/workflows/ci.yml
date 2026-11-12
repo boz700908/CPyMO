@@ -38,11 +38,22 @@ jobs:
         cd ./cpymo-backends/sdl2
         make -j -f Makefile.Switch
 
+    - name: Package
+      shell: bash
+      run: |
+        cd ./cpymo-backends/sdl2
+        mkdir -p dist
+        test -f cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
+        cp cpymo.nro dist/
+        test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
+        cp startup.wav dist/
+        ls -R dist
+
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for Nintendo Switch
-        path: ./cpymo-backends/sdl2/cpymo.nro
+        path: ./cpymo-backends/sdl2/dist
 
   build-switch-accessibility:
     name: 'Nintendo Switch (Accessibility)'
@@ -69,6 +80,8 @@ jobs:
         test -f cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
         cp cpymo.nro dist/
         cp enter.wav menu.wav select.wav dist/ 2>/dev/null || true
+        test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
+        cp startup.wav dist/
         test -d ../../tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
         mkdir -p dist/tts
         cp ../../tts-assets/*.bin dist/tts/ 2>/dev/null || true

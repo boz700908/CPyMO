@@ -39,6 +39,7 @@ LDFLAGS += --preload-file enter.wav --preload-file menu.wav --preload-file selec
 endif
 
 LDFLAGS := \
+	--preload-file startup.wav \
 	$(EM_FLAGS) \
 	-lidbfs.js \
 	-lSDL2 \

@@ -303,6 +303,7 @@
     <ClCompile Include="..\sdl2\cpymo_backend_masktrans.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_movie.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_save.c" />
+    <ClCompile Include="..\sdl2\cpymo_backend_startup_music.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_text.c" />
     <ClCompile Include="..\sdl2\main.c" />
     <ClCompile Include="cpymo_backend_uwp.cpp" />

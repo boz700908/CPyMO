@@ -185,6 +185,9 @@
     <ClCompile Include="..\sdl2\cpymo_backend_save.c">
       <Filter>cpymo_backend_sdl2</Filter>
     </ClCompile>
+    <ClCompile Include="..\sdl2\cpymo_backend_startup_music.c">
+      <Filter>cpymo_backend_sdl2</Filter>
+    </ClCompile>
     <ClCompile Include="..\sdl2\cpymo_backend_text.c">
       <Filter>cpymo_backend_sdl2</Filter>
     </ClCompile>

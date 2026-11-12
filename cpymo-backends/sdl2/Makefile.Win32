@@ -72,6 +72,7 @@ build: $(TARGET)
 	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist enter.wav copy /Y enter.wav . >nul
 	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist menu.wav copy /Y menu.wav . >nul
 	@if "$(ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD)" == "1" if exist select.wav copy /Y select.wav . >nul
+	@if exist startup.wav copy /Y startup.wav . >nul
 
 clean:
 	@rd /S /Q $(BUILD_DIR)

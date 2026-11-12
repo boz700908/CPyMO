@@ -292,6 +292,7 @@ sdmc:/switch/cpymo.nro
 sdmc:/switch/enter.wav
 sdmc:/switch/menu.wav
 sdmc:/switch/select.wav
+sdmc:/switch/startup.wav
 sdmc:/switch/tts/rtld.bin
 sdmc:/switch/tts/main.bin
 sdmc:/switch/tts/sdk.bin
@@ -308,6 +309,8 @@ sdmc:/switch/tts/D32-YAFANG.vtdb2
 * 除中文音库外，其他语言的 `vtdb2` 音库同理：需要你有权使用的对应文件，放入同一目录并把名字改成 `D32-*.vtdb2` 中你实际持有的那个即可（程序按固定名查找）。
 
 音效文件 `enter.wav`、`menu.wav`、`select.wav` 与普通版本一致，放在 `.nro` 同级目录。
+
+`sdmc:/switch/startup.wav` 是启动音乐（《Song of PyMO》），同样放在 `.nro` 同级目录：进入游戏选择器时循环播放，选中游戏或离开选择器时停止。缺这个文件时只是没有启动音乐，不影响其他功能。
 
 语音参数保存在 `sdmc:/pymogames/tts.conf`，设置页新增 5 项：语速、音高、音量、音色、情感。只有切换到新值时才写入，浏览时朗读“名称 + 值”，修改时只朗读“值”。
 
@@ -1000,6 +1003,11 @@ CPyMO ASCII ART仅支持键盘操作：
 
 此乐曲在支持启动音乐的平台作为CPyMO的启动音乐使用，为CPyMO软件的一部分。
 乐谱文件可使用Muse Score 4打开。
+
+当前的落地方式：
+
+* **PSP**：音乐以 `SND0` 区段打进 `EBOOT.PBP`（`cpymo-backends/sdl2/psp-snd0.at3`），由系统在 XMB 中播放。
+* **SDL2 后端（桌面端 / Switch / iOS）**：进入游戏选择器时播放、选中游戏或离开选择器时停止，音频取随包分发的 `startup.wav`（由 `psp-snd0.at3` 转码而来，22050Hz 单声道）。
 
 作曲：许兴逸
 

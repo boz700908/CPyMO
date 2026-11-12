@@ -90,3 +90,10 @@ elseif (APPLE AND NOT IOS)
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${ACCESSIBILITY_WAVS} $<TARGET_FILE_DIR:cpymo>)
 	endif ()
 endif ()
+
+# 启动音乐《Song of PyMO》：与无障碍无关，所有桌面平台都随包分发
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/startup.wav")
+	add_custom_command(TARGET cpymo POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"${CMAKE_CURRENT_SOURCE_DIR}/startup.wav" $<TARGET_FILE_DIR:cpymo>)
+endif ()

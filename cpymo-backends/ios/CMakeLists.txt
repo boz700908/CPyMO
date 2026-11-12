@@ -79,6 +79,12 @@ if (ENABLE_ACCESSIBILITY)
 endif ()
 
 set_source_files_properties("./Packaging/AppIcon.icns" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+set(STARTUP_MUSIC "../sdl2/startup.wav")
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${STARTUP_MUSIC}")
+    target_sources(cpymo PRIVATE ${STARTUP_MUSIC})
+    set_source_files_properties(${STARTUP_MUSIC} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+endif ()
 set(MACOSX_BUNDLE_GUI_IDENTIFIER xyz.xydm.cpymo)
 set(MACOSX_BUNDLE_COPYRIGHT Unlicense)
 set(MACOSX_BUNDLE_BUNDLE_NAME cpymo)
