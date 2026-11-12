@@ -45,8 +45,7 @@ BUILD		:=	build.Switch
 SOURCES		:=	../sdl2 ../../cpymo
 #DATA		:=	data
 INCLUDES	:=	
-#ROMFS	:=	romfs
-
+ROMFS	:=	romfs
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
@@ -170,8 +169,13 @@ ifneq ($(APP_TITLEID),)
 	export NACPFLAGS += --titleid=$(APP_TITLEID)
 endif
 
+# 只有 romfs 目录真的存在时才打进去，否则 elf2nro 会报错。
 ifneq ($(ROMFS),)
+ifeq ($(wildcard $(CURDIR)/$(ROMFS)),)
+$(warning romfs 目录 $(CURDIR)/$(ROMFS) 不存在，本次不打 romfs)
+else
 	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)
+endif
 endif
 
 .PHONY: $(BUILD) clean all

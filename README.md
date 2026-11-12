@@ -34,6 +34,19 @@ pymo参见：<https://github.com/pymo/pymo>
 
 把`cpymo.exe`复制到游戏文件夹并双击启动。
 
+## 各平台该下载哪一个
+
+发布产物都自带运行时资源（音效、启动音乐、语音库），不需要另外下载。
+
+平台            | 产物                                              | 说明
+--------------- | ------------------------------------------------- | ----
+Windows         | `cpymo.exe`                                       | **单个 exe**。启动音乐、音效与读屏桥 Tolk 都已编进 exe，首次用到语音时自解析到 `%LOCALAPPDATA%\CPyMO\runtime\`。
+Linux           | `.deb` / `.rpm` / `.pkg.tar.zst` / `.apk` / `.AppImage` | 安装后就是 `/usr/bin/cpymo` 一个文件；AppImage 是单个可执行文件，`chmod +x` 后直接运行。
+macOS           | `CPyMO-*.dmg`                                     | 内含 `CPyMO.app`。未签名也未公证，首次请右键→打开，或执行 `xattr -dr com.apple.quarantine /Applications/CPyMO.app`。
+Nintendo Switch | `cpymo.nro`                                       | **单个 nro**。语音库已打进 nro 的 romfs，只拷这一个文件也能朗读；要换音库时把文件放到 `sdmc:/switch/` 下的 `tts/` 目录，外置优先。
+
+其余平台沿用各自原有的产物格式：3DS 是 `cpymo.cia` / `cpymo.3dsx`，PSP 是 `EBOOT.PBP`，PS Vita 是 `cpymo.vpk`，Wii 是 `boot.dol`，Android 是 `apk`，iOS 是 `ipa`，Web 是 Emscripten 的 `html`。
+
 ## 在3DS/PSP/Wii上运行游戏时，我需要对游戏的数据包进行转换？
 
 一般情况下，3DS和PSP版本CPyMO可以直接运行s60v5版本，如果你想获得更好的体验或者你在使用Wii，可以下载[CPyMO GUITool](https://github.com/PyMO-Ecosphere/CPyMO-GUITool)来创建面向3DS、PSP和Wii的游戏包。

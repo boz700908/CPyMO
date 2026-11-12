@@ -67,6 +67,15 @@ jobs:
       with:
         submodules: true
 
+    - name: Stage TTS assets into romfs
+      shell: bash
+      run: |
+        set -e
+        test -d tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
+        mkdir -p cpymo-backends/sdl2/romfs/tts
+        cp tts-assets/*.bin tts-assets/*.vtdb2 cpymo-backends/sdl2/romfs/tts/
+        ls -l cpymo-backends/sdl2/romfs/tts
+
     - name: Build
       shell: bash
       run: |

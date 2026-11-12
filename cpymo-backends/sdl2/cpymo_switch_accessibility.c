@@ -17,6 +17,10 @@
 static char g_assets_dir[512];
 static bool g_tts_attempted;
 
+/* 只发一个 nro 也能出声：TTS 资产会被打进 nro 的 romfs。
+ * 老 libnx 没有这个符号时地址为空，静默跳过（外置文件仍然可用）。 */
+extern int romfsMountFromCurrentProcess(const char *) __attribute__((weak));
+
 static void sw_items_load(void);
 static void sw_items_apply(void);
 static void sw_items_save(void);
@@ -53,6 +57,24 @@ static bool sw_try_dir(const char *dir)
 }
 
 /* 候选目录：环境变量 > nro 同级的 tts/ > sdmc:/pymogames/tts > sdmc:/switch/tts */
+/* romfs 内嵌的资产兜底：单独一个 nro 也能用，外置文件优先（音库可更新）。 */
+static bool sw_try_romfs(void)
+{
+    static int state; /* 0 没试过，1 已挂载，2 不可用 */
+
+    if (state == 2) return false;
+    if (state == 0) {
+        if (!romfsMountFromCurrentProcess) {
+            state = 2;
+            return false;
+        }
+        state = (romfsMountFromCurrentProcess("romfs") == 0) ? 1 : 2;
+        if (state != 1) return false;
+    }
+
+    return sw_try_dir("romfs:/tts");
+}
+
 static bool sw_locate_assets(void)
 {
     char path[640];
@@ -72,6 +94,7 @@ static bool sw_locate_assets(void)
     if (sw_try_dir("sdmc:/pymogames/tts")) return true;
     if (sw_try_dir("sdmc:/switch/tts")) return true;
     if (sw_try_dir("sdmc:/switch/cpymo/tts")) return true;
+    if (sw_try_romfs()) return true;
 
     return false;
 }
@@ -84,7 +107,7 @@ bool cpymo_switch_accessibility_tts_start(void)
     if (!sw_locate_assets()) {
         printf("[a11y] 找不到 TTS 资产目录（rtld.bin / main.bin / sdk.bin）\n");
         printf("[a11y] 已尝试：$CPYMO_SWITCH_TTS_DIR / <nro>/tts / "
-               "sdmc:/pymogames/tts / sdmc:/switch/tts\n");
+               "sdmc:/pymogames/tts / sdmc:/switch/tts / romfs:/tts\n");
         return false;
     }
 
