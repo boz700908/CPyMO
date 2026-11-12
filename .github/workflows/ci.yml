@@ -100,7 +100,17 @@ jobs:
         unzip makerom-v0.17-ubuntu_x86_64.zip -d .
         chmod +x makerom
 
+    - name: Restore FFmpeg cache
+      id: ffmpeg-cache
+      uses: actions/cache@v4
+      with:
+        path: cpymo-backends/build.FFmpeg.3DS
+        key: ffmpeg-3ds-${{ hashFiles('cpymo-backends/3ds/build-3ds-ffmpeg.sh') }}
+        restore-keys: |
+          ffmpeg-3ds-
+
     - name: Build FFmpeg
+      if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
       run: |
         cd ./cpymo-backends/3ds
         chmod +x ./build-3ds-ffmpeg.sh
@@ -213,7 +223,22 @@ jobs:
     - name: Setup Ninja
       uses: ashutoshvarma/setup-ninja@v1.1
 
+    - name: Prepare PSPDEV directory
+      run: |
+        sudo mkdir -p /usr/local/pspdev
+        sudo chown -R $USER: /usr/local/pspdev
+
+    - name: Restore PSPDEV cache
+      id: pspdev-cache
+      uses: actions/cache@v4
+      with:
+        path: /usr/local/pspdev
+        key: pspdev-${{ runner.os }}-v1
+        restore-keys: |
+          pspdev-
+
     - name: Install PSPDEV
+      if: steps.pspdev-cache.outputs.cache-hit != 'true'
       run: |
         git clone https://github.com/pspdev/pspdev.git --depth 1
         cd pspdev
@@ -225,7 +250,17 @@ jobs:
         ./build-all.sh
         psp-pacman -Syu
 
+    - name: Restore FFmpeg cache
+      id: ffmpeg-cache
+      uses: actions/cache@v4
+      with:
+        path: cpymo-backends/build.FFmpeg.PSP
+        key: ffmpeg-psp-${{ hashFiles('cpymo-backends/sdl2/build-psp-ffmpeg.sh') }}
+        restore-keys: |
+          ffmpeg-psp-
+
     - name: Build FFmpeg
+      if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
       run: |
         export PSPDEV=/usr/local/pspdev
         export PATH=$PATH:$PSPDEV/bin
@@ -257,7 +292,17 @@ jobs:
       with:
         submodules: true
 
+    - name: Restore FFmpeg cache
+      id: ffmpeg-cache
+      uses: actions/cache@v4
+      with:
+        path: cpymo-backends/build.FFmpeg.Emscripten
+        key: ffmpeg-emscripten-${{ hashFiles('cpymo-backends/sdl2/build-emscripten-ffmpeg.sh') }}
+        restore-keys: |
+          ffmpeg-emscripten-
+
     - name: Build FFmpeg
+      if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
       run: |
         cd cpymo-backends/sdl2
         chmod +x ./build-emscripten-ffmpeg.sh
@@ -324,7 +369,17 @@ jobs:
         with:
           submodules: true
 
+      - name: Restore FFmpeg cache
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: cpymo-backends/ios/FFmpeg-iOS-build-script/thin/arm64
+          key: ffmpeg-ios-arm64-${{ hashFiles('cpymo-backends/ios/FFmpeg-iOS-build-script/build-ffmpeg.sh') }}
+          restore-keys: |
+            ffmpeg-ios-arm64-
+
       - name: Build FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: bash
         working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
         run: |
@@ -370,7 +425,17 @@ jobs:
         with:
           submodules: true
 
+      - name: Restore FFmpeg cache
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: cpymo-backends/ios/FFmpeg-iOS-build-script/thin/arm64
+          key: ffmpeg-ios-arm64-${{ hashFiles('cpymo-backends/ios/FFmpeg-iOS-build-script/build-ffmpeg.sh') }}
+          restore-keys: |
+            ffmpeg-ios-arm64-
+
       - name: Build FFmpeg
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: bash
         working-directory: ./cpymo-backends/ios/FFmpeg-iOS-build-script
         run: |
@@ -428,7 +493,17 @@ jobs:
       with:
         ndk-version: r21e
 
+    - name: Restore FFmpeg cache
+      id: ffmpeg-cache
+      uses: actions/cache@v4
+      with:
+        path: cpymo-backends/android/ffmpeg-android-maker/output
+        key: ffmpeg-android-${{ hashFiles('cpymo-backends/android/build-android-ffmpeg.sh') }}-v1
+        restore-keys: |
+          ffmpeg-android-
+
     - name: Build FFmpeg
+      if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
       env:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
       run: |
@@ -453,6 +528,16 @@ jobs:
           fi
         done
         test "$built" = 1
+
+    - name: Restore Gradle cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ hashFiles('cpymo-backends/android/**/*.gradle*', 'cpymo-backends/android/**/gradle-wrapper.properties') }}
+        restore-keys: |
+          gradle-${{ runner.os }}-
 
     - name: Build APK
       run: |
@@ -501,7 +586,9 @@ jobs:
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
-        path: ${{ github.workspace }}/.vcpkg-binary-cache
+        path: |
+          ${{ github.workspace }}/.vcpkg-binary-cache
+          ${{ github.workspace }}/vcpkg/downloads
         key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
         restore-keys: |
           vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
@@ -548,6 +635,7 @@ jobs:
       with:
         msystem: MINGW32
         update: true
+        cache: true
         # SDL 1.2 的构建命令是 mingw32-make，这个别名由 mingw-w64-i686-make 提供，
         # 不在 mingw-w64-i686-toolchain 组里（此前 exit 127 就是这个原因）。
         install: mingw-w64-i686-toolchain mingw-w64-i686-make unzip
@@ -715,7 +803,9 @@ jobs:
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
-        path: ${{ github.workspace }}/.vcpkg-binary-cache
+        path: |
+          ${{ github.workspace }}/.vcpkg-binary-cache
+          ${{ github.workspace }}/vcpkg/downloads
         key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
         restore-keys: |
           vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
@@ -877,7 +967,9 @@ jobs:
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
-        path: ${{ github.workspace }}/.vcpkg-binary-cache
+        path: |
+          ${{ github.workspace }}/.vcpkg-binary-cache
+          ${{ github.workspace }}/vcpkg/downloads
         key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
         restore-keys: |
           vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
