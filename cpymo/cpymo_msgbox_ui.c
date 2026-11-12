@@ -4,6 +4,7 @@
 #include "cpymo_localization.h"
 #include "cpymo_key_hold.h"
 #include "cpymo_accessibility.h"
+#include "cpymo_safe_area.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -44,17 +45,37 @@ static error_t cpymo_msgbox_ui_okcancel_finish(cpymo_engine *e, bool is_ok)
 	return func ? func(e, data, is_ok) : CPYMO_ERR_SUCC;
 }
 
+/* 消息框视口：扣掉安全区后的可用范围；未注册 provider 时就是整屏。 */
+static void cpymo_msgbox_ui_viewport(
+	const cpymo_engine *e, float *out_left, float *out_top,
+	float *out_width, float *out_height)
+{
+	cpymo_safe_area sa;
+	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+
+	float w = (float)e->gameconfig.imagesize_w - sa.left - sa.right;
+	float h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
+	if (w < (float)e->gameconfig.imagesize_w * 0.5f) { sa.left = 0; w = (float)e->gameconfig.imagesize_w; }
+	if (h < (float)e->gameconfig.imagesize_h * 0.5f) { sa.top = 0; h = (float)e->gameconfig.imagesize_h; }
+
+	*out_left = sa.left;
+	*out_top = sa.top;
+	*out_width = w;
+	*out_height = h;
+}
+
 static void cpymo_msgbox_ui_get_btn_rect(
 	float *out_xywh,
 	float txt_width,
 	float font_size,
+	float screen_left,
 	float screen_w,
 	float y)
 {
 	float btn_width = txt_width * 3.0f;
 	float btn_height = font_size * 1.5f;
 
-	out_xywh[0] = screen_w / 2 - btn_width / 2;
+	out_xywh[0] = screen_left + screen_w / 2 - btn_width / 2;
 	out_xywh[1] = y;
 	out_xywh[2] = btn_width;
 	out_xywh[3] = btn_height;
@@ -65,7 +86,8 @@ static int cpymo_msgbox_ui_get_mouse_selection(cpymo_engine *e)
 	cpymo_msgbox_ui *ui = (cpymo_msgbox_ui *)cpymo_ui_data(e);
 	float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);
 
-	float screen_w = (float)e->gameconfig.imagesize_w, screen_h = (float)e->gameconfig.imagesize_h;
+	float screen_left, screen_top, screen_w, screen_h;
+	cpymo_msgbox_ui_viewport(e, &screen_left, &screen_top, &screen_w, &screen_h);
 
 	const cpymo_input *input = &e->input;
 	if (!input->mouse_position_useable)
@@ -81,8 +103,9 @@ static int cpymo_msgbox_ui_get_mouse_selection(cpymo_engine *e)
 			xywh,
 			btn_width,
 			fontsize,
+			screen_left,
 			screen_w,
-			ui->cancel_btn ? screen_h * 0.5f : screen_h * 0.618f);
+			screen_top + (ui->cancel_btn ? screen_h * 0.5f : screen_h * 0.618f));
 
 		float x = input->mouse_x;
 		float y = input->mouse_y;
@@ -94,8 +117,9 @@ static int cpymo_msgbox_ui_get_mouse_selection(cpymo_engine *e)
 				xywh,
 				btn_width,
 				fontsize,
+				screen_left,
 				screen_w,
-				screen_h * 0.5f + fontsize * 1.75f + (8.0f / (fontsize / 32)));
+				screen_top + screen_h * 0.5f + fontsize * 1.75f + (8.0f / (fontsize / 32)));
 
 			if (x >= xywh[0] && x <= xywh[0] + xywh[2] && y >= xywh[1] && y <= xywh[1] + xywh[3])
 				return 1;
@@ -184,6 +208,7 @@ static void cpymo_msgbox_ui_draw_btn(
 	float btn_width,
 	float txt_width, 
 	float font_size, 
+	float screen_left,
 	float screen_w,
 	float screen_h,
 	float y, 
@@ -191,7 +216,7 @@ static void cpymo_msgbox_ui_draw_btn(
 	bool key_down)
 {
 	float xywh[4];
-	cpymo_msgbox_ui_get_btn_rect(xywh, btn_width, font_size, screen_w, y);
+	cpymo_msgbox_ui_get_btn_rect(xywh, btn_width, font_size, screen_left, screen_w, y);
 
 	cpymo_color gray;
 	gray.r = 128;
@@ -207,7 +232,7 @@ static void cpymo_msgbox_ui_draw_btn(
 
 	cpymo_backend_text_draw(
 		btn_txt,
-		screen_w / 2 - txt_width / 2,
+		screen_left + screen_w / 2 - txt_width / 2,
 		y + xywh[3] / 2 + font_size / 2 - font_size * 0.15f,
 		sel ? cpymo_color_black : cpymo_color_white,
 		1.0f,
@@ -225,14 +250,16 @@ static void cpymo_msgbox_ui_draw(const cpymo_engine *e, const void *ui_data)
 	#endif
 
 	float screen_w = (float)e->gameconfig.imagesize_w, screen_h = (float)e->gameconfig.imagesize_h;
+	float vleft, vtop, vw, vh;
+	cpymo_msgbox_ui_viewport(e, &vleft, &vtop, &vw, &vh);
 	float xywh[] = { -100, -100, screen_w + 200, screen_h + 200 };
 	cpymo_backend_image_fill_rects(xywh, 1, cpymo_color_black, 0.5f, cpymo_backend_image_draw_type_bg);
 
 	const cpymo_msgbox_ui *ui = (const cpymo_msgbox_ui *)ui_data;
 	float fontsize = cpymo_gameconfig_font_size(&e->gameconfig);
 
-	float x = (screen_w - ui->message_width) / 2;
-	float y = screen_h * 0.3f + fontsize / 2;
+	float x = vleft + (vw - ui->message_width) / 2;
+	float y = vtop + vh * 0.3f + fontsize / 2;
 	cpymo_backend_text_draw(ui->message, x, y, cpymo_color_white, 1.0f, cpymo_backend_image_draw_type_ui_element);
 
 	bool key_down = e->input.mouse_button || e->input.ok;
@@ -244,9 +271,10 @@ static void cpymo_msgbox_ui_draw(const cpymo_engine *e, const void *ui_data)
 		btn_width,
 		ui->confirm_btn_width, 
 		fontsize, 
-		screen_w, 
+		vleft,
+		vw, 
 		screen_h,
-		ui->cancel_btn ? screen_h * 0.5f : screen_h * 0.618f,
+		vtop + (ui->cancel_btn ? vh * 0.5f : vh * 0.618f),
 		ui->selection == 0,
 		key_down);
 
@@ -256,9 +284,10 @@ static void cpymo_msgbox_ui_draw(const cpymo_engine *e, const void *ui_data)
 			btn_width,
 			ui->cancel_btn_width,
 			fontsize,
-			screen_w,
+			vleft,
+			vw,
 			screen_h,
-			screen_h * 0.5f + fontsize * 1.75f + (8.0f / (fontsize / 32)),
+			vtop + vh * 0.5f + fontsize * 1.75f + (8.0f / (fontsize / 32)),
 			ui->selection == 1,
 			key_down);
 	}
