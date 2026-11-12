@@ -105,6 +105,9 @@ jobs:
         else
           install -m 600 /tmp/keys.raw /tmp/prod.keys
         fi
+        # hacBrewPack 用前缀匹配 key 名，会把 34 位的 master_kek_source_* 当成期望 32 位的 key
+        awk -F'=' 'NF>=2 { v=$2; gsub(/[ \t\r]/,"",v); if (length(v)==34) next } { print }' /tmp/prod.keys > /tmp/prod.clean
+        install -m 600 /tmp/prod.clean /tmp/prod.keys
         echo "keys 有效行数: $(grep -c . /tmp/prod.keys)"
 
     - name: Build hacBrewPack
