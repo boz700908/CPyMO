@@ -498,8 +498,16 @@ jobs:
     - name: Set up NASM
       uses: ilammy/setup-nasm@v1.3.1
 
+    - name: Restore vcpkg binary cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.vcpkg-binary-cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+
     - name: Donwload vcpkg
-      run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
+      run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
       run: |
@@ -507,6 +515,8 @@ jobs:
         ./vcpkg/vcpkg integrate install
 
     - name: Install FFmpeg
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
       run: |
         ./vcpkg/vcpkg install ffmpeg:x86-uwp ffmpeg:x64-uwp ffmpeg:arm64-uwp
 
@@ -702,8 +712,16 @@ jobs:
           libxkbcommon-dev \
           libegl1-mesa-dev
 
+    - name: Restore vcpkg binary cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.vcpkg-binary-cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+
     - name: Donwload vcpkg
-      run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
+      run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
       run: |
@@ -720,9 +738,13 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
 
     - name: Install SDL2
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
       run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
 
     - name: Install FFMPEG
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
       run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
 
     - name: Configure CMake
@@ -852,8 +874,16 @@ jobs:
           libxkbcommon-dev \
           libegl1-mesa-dev
 
+    - name: Restore vcpkg binary cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.vcpkg-binary-cache
+        key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+
     - name: Donwload vcpkg
-      run: git clone --depth 1 --branch master -- https://github.com/microsoft/vcpkg
+      run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
       run: |
@@ -870,9 +900,13 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
 
     - name: Install SDL2
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
       run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
 
     - name: Install FFMPEG
+      env:
+        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
       run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
 
     - name: Configure CMake
