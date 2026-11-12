@@ -43,8 +43,7 @@ pymo参见：<https://github.com/pymo/pymo>
 Windows         | `cpymo.exe`                                       | **单个 exe**。启动音乐、音效与读屏桥 Tolk 都已编进 exe，首次用到语音时自解析到 `%LOCALAPPDATA%\CPyMO\runtime\`。
 Linux           | `.deb` / `.rpm` / `.pkg.tar.zst` / `.apk` / `.AppImage` | 安装后就是 `/usr/bin/cpymo` 一个文件；AppImage 是单个可执行文件，`chmod +x` 后直接运行。
 macOS           | `CPyMO-*.dmg`                                     | 内含 `CPyMO.app`。未签名也未公证，首次请右键→打开，或执行 `xattr -dr com.apple.quarantine /Applications/CPyMO.app`。
-Nintendo Switch | `cpymo.nro`                                       | **单个 nro**。语音库、音效与启动音乐都打进 nro 自身的 romfs，只拷这一个文件就能完整出声；想换音库或音效时把文件放到 `sdmc:/switch/` 下（`tts/` 目录与同级 wav），外置优先。
-Nintendo Switch（实验） | `0100000000010000.nsp`                        | 由 `Switch NSP (experimental)` 工作流手动产出，语音资源同样在 romfs 里，装完不需要额外文件；只能在自制固件上安装，见下文「安装成 NSP（实验）」。
+Nintendo Switch | `cpymo.nro`、`0100000000010000.nsp`               | **单文件**。语音库、音效与启动音乐都打进 romfs，只拷一个文件就能完整出声；想换音库或音效时把文件放到 `sdmc:/switch/` 下（`tts/` 目录与同级 wav），外置优先。另有一份可安装的 `.nsp`，装完不需要任何额外文件，只能在自制固件上安装，见下文「安装成 NSP」。
 
 其余平台沿用各自原有的产物格式：3DS 是 `cpymo.cia` / `cpymo.3dsx`，PSP 是 `EBOOT.PBP`，PS Vita 是 `cpymo.vpk`，Wii 是 `boot.dol`，Android 是 `apk`，iOS 是 `ipa`，Web 是 Emscripten 的 `html`。
 
@@ -323,14 +322,15 @@ sdmc:/switch/tts/D32-YAFANG.vtdb2
 * 仓库中的 `tts-assets/` 目录只是为了让自动化构建能直接产出可自测的包，**不构成**对上述任何资源的授权，也不表示本项目有权分发它们。请勿将其用于商业用途或二次分发；若权利人提出要求，将立即移除。
 * 除中文音库外，其他语言的 `vtdb2` 音库同理：需要你有权使用的对应文件，放入同一目录并把名字改成 `D32-*.vtdb2` 中你实际持有的那个即可（程序按固定名查找）。
 
-### 安装成 NSP（实验）
+### 安装成 NSP
 
-`Switch NSP (experimental)` 工作流（`.github/workflows/switch-xci.yml`，手动触发）把构建产物打成可安装的 `.nsp`：
+`ci.yml` 里的 `Nintendo Switch (NSP)` job 在无障碍 Switch 包之后接着把产物打成可安装的 `.nsp`（每次都随全量 CI 一起产出）：
 
 * title id 固定为 `0100000000010000`，产物名为 `0100000000010000.nsp`；
 * 语音引擎、音库、音效与启动音乐都在 NSP 的 romfs 分区里，装上就是一个完整的包，SD 卡上不需要再放任何文件；
 * 打包过程需要 `prod.keys`（仓库 Secret `SWITCH_PROD_KEYS`），只用于在 Actions 里生成 NCA，不会进入产物，也不随发布分发；
-* 只能在 Atmosphere 等自制固件上安装运行，不经过任天堂的签名校验。XCI 需要有效的 RSA 签名，本项目不提供，也不再出 XCI。
+* 只能在 Atmosphere 等自制固件上安装运行，不经过任天堂的签名校验。XCI 需要有效的 RSA 签名，本项目不提供，也不再出 XCI；
+* 安装与启动**尚未在真机上验证**过，只验证到「NSP 内确实带了 romfs、体积与结构正确」这一步。
 
 安装后读写位置与 `.nro` 版一致：存档在 `sdmc:/pymogames/`，语音参数在 `sdmc:/pymogames/tts.conf`。想覆盖 romfs 里的音库或音效，把文件放到 `sdmc:/switch/` 下的对应位置即可（外置优先）。
 
