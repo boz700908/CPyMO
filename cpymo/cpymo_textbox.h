@@ -15,6 +15,9 @@ typedef struct {
 	struct cpymo_textbox_line *lines;
 	size_t active_line;
 	float x, y, w, h, char_size, alpha, typing_x;
+	/* 词级折行（issue #50）：上一个字符是否空白、当前词从当前字符起的剩余宽度 */
+	bool prev_is_space;
+	float word_remain_w;
 	cpymo_color col;
 	cpymo_str remain_text;
 

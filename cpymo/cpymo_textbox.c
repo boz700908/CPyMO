@@ -98,6 +98,8 @@ error_t cpymo_textbox_init(
 
     o->timer = 0;
     o->draw_cursor = false;
+    o->prev_is_space = true;
+    o->word_remain_w = 0.0f;
 
     #ifdef ENABLE_TEXT_EXTRACT
     cpymo_accessibility_play_sound(SOUND_ENTER);
@@ -119,6 +121,8 @@ static void cpymo_textbox_clear_chars_pool_and_lines(cpymo_textbox *tb)
         tb->lines[0].pool_slice_size = 0;
     }
     tb->typing_x = tb->x;
+    tb->prev_is_space = true;
+    tb->word_remain_w = 0.0f;
 }
 
 void cpymo_textbox_free(cpymo_textbox *tb, cpymo_backlog *write_to_backlog)
@@ -195,6 +199,8 @@ static bool cpymo_textbox_nextline(cpymo_textbox *tb)
         last_line->begin_pool_index + last_line->pool_slice_size;
     tb->lines[tb->active_line].pool_slice_size = 0;
     tb->typing_x = tb->x;
+    tb->prev_is_space = true;
+    tb->word_remain_w = 0.0f;
 
     if (tb->backlog_buf) {
         cpymo_str_copy(
@@ -229,6 +235,42 @@ static char *cpymo_textbox_get_backlog_text(cpymo_textbox *tb)
     return ret_backlog_text;
 }
 
+/* issue #50：词级折行用到的两个小工具。空白的判定与折行共用；
+ * 全角空格（U+3000）也算可断行处，否则日文里手打的全角空格会被忽略。 */
+static bool cpymo_textbox_char_is_space(cpymo_str ch)
+{
+    if (ch.len == 1) {
+        unsigned char c = (unsigned char)ch.begin[0];
+        return c == ' ' || c == '\t';
+    }
+    if (ch.len == 3) {
+        const unsigned char *b = (const unsigned char *)ch.begin;
+        return b[0] == 0xE3 && b[1] == 0x80 && b[2] == 0x80;
+    }
+    return false;
+}
+
+/* 从 remain 起量到下一个空白（或换行标记）为止的宽度，即当前词的宽度。 */
+static float cpymo_textbox_measure_word(cpymo_str remain, float char_size)
+{
+    float w = 0.0f;
+    while (remain.len) {
+        if (cpymo_str_starts_with_str(remain, "\n") ||
+            cpymo_str_starts_with_str(remain, "\\n") ||
+            cpymo_str_starts_with_str(remain, "\\r"))
+            break;
+
+        cpymo_str next = remain;
+        cpymo_str ch = cpymo_str_utf8_try_head(&next);
+        if (ch.len == 0 || next.len >= remain.len) break;
+        if (cpymo_textbox_char_is_space(ch)) break;
+
+        w += cpymo_backend_text_width(ch, char_size);
+        remain = next;
+    }
+    return w;
+}
+
 static error_t cpymo_textbox_add_char(cpymo_textbox *tb)
 {
     assert(tb->lines);
@@ -256,6 +298,23 @@ static error_t cpymo_textbox_add_char(cpymo_textbox *tb)
     float tbw = tb->w;
     if (tb->active_line == tb->max_lines - 1)
         tbw -= tb->char_size;
+
+    /* 词级折行（issue #50）：整词放不进本行剩余宽度时，把词整体挪到下一行，
+     * 不要从拉丁文单词中间切开。没有空格的文字（中日文）整段宽度必然超过行宽，
+     * 于是这里不触发，落回下面的字符级折行，行为与改之前一致。 */
+    bool is_space = cpymo_textbox_char_is_space(ch);
+    bool at_line_start = tb->typing_x <= tb->x + 0.001f;
+
+    if (!is_space &&
+        (at_line_start || tb->prev_is_space || tb->word_remain_w <= 0.0f))
+        tb->word_remain_w = cpymo_textbox_measure_word(tb->remain_text, tb->char_size);
+
+    if (!is_space && !at_line_start &&
+        tb->word_remain_w > 0.0f && tb->word_remain_w <= tbw &&
+        tb->typing_x + tb->word_remain_w > tb->x + tbw) {
+        if (!cpymo_textbox_nextline(tb)) goto TEXT_FADEIN_FINISHED;
+        return cpymo_textbox_add_char(tb);
+    }
     
     if (tb->x + tbw - tb->typing_x < ch_w) {
         if (!cpymo_textbox_nextline(tb)) 
@@ -283,6 +342,12 @@ static error_t cpymo_textbox_add_char(cpymo_textbox *tb)
     tb->chars_pool_size++;
     tb->lines[tb->active_line].pool_slice_size++;
     tb->typing_x += ch_w;
+    tb->prev_is_space = is_space;
+    if (is_space) tb->word_remain_w = 0.0f;
+    else if (tb->word_remain_w > 0.0f) {
+        tb->word_remain_w -= ch_w;
+        if (tb->word_remain_w < 0.0f) tb->word_remain_w = 0.0f;
+    }
     tb->remain_text = remain_text;
     return CPYMO_ERR_SUCC;
 
