@@ -47,6 +47,8 @@ jobs:
         cp cpymo.nro dist/
         test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
         cp startup.wav dist/
+        pacman -S --noconfirm --needed zip >/dev/null 2>&1 || true
+        ( cd dist && zip -qr ../CPyMO-switch.zip . && mv ../CPyMO-switch.zip dist/ )
         ls -R dist
 
     - name: Upload
@@ -88,6 +90,8 @@ jobs:
         cp ../../tts-assets/*.vtdb2 dist/tts/ 2>/dev/null || true
         test -f dist/tts/rtld.bin && test -f dist/tts/main.bin && test -f dist/tts/sdk.bin \
           || { echo "tts 资源不完整（需要 rtld/main/sdk）"; exit 1; }
+        pacman -S --noconfirm --needed zip >/dev/null 2>&1 || true
+        ( cd dist && zip -qr ../CPyMO-switch.zip . && mv ../CPyMO-switch.zip dist/ )
         ls -R dist
 
     - name: Upload
@@ -165,14 +169,20 @@ jobs:
           mv wii-meta.xml meta.xml
           mv wii-icon.png icon.png
 
+      - name: 'Package'
+        run: |
+          cd ./cpymo-backends/sdl1
+          pacman -S --noconfirm --needed zip >/dev/null 2>&1 || true
+          mkdir -p dist/apps/CPyMO
+          cp boot.dol icon.png meta.xml dist/apps/CPyMO/
+          cd dist && zip -qr ../CPyMO-wii.zip apps
+          unzip -l ../CPyMO-wii.zip
+
       - name: 'Upload'
         uses: actions/upload-artifact@v6.0.0
         with:
           name: CPyMO for Nintendo Wii
-          path: |
-            ./cpymo-backends/sdl1/boot.dol
-            ./cpymo-backends/sdl1/icon.png
-            ./cpymo-backends/sdl1/meta.xml
+          path: ./cpymo-backends/sdl1/CPyMO-wii.zip
 
   build-psv:
     name: 'Sony PSV'
@@ -864,25 +874,40 @@ jobs:
         strip ./build/build/cpymo
         strip ./build/build/cpymo-tool
 
-    - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+    - name: Package
       if: ${{ runner.os != 'Windows' }}
-      with:
-        name: CPyMO for ${{ matrix.package-name }}
-        path: |
-            ./build/build/cpymo
-            ./build/build/cpymo-tool
-            ./build/build/MinSizeRel/cpymo.exe
-            ./build/build/MinSizeRel/cpymo-tool.exe
+      run: |
+        set -e
+        name="CPyMO-$(printf '%s' "${{ matrix.package-name }}" | tr ' ()' '___')"
+        mkdir -p "dist/$name"
+        cp ./build/build/cpymo ./build/build/cpymo-tool "dist/$name/"
+        for f in ./build/build/*.wav ./build/build/Release/*.wav; do
+          [ -f "$f" ] && cp "$f" "dist/$name/" || true
+        done
+        cd dist
+        if [ "$(uname -s)" = "Linux" ]; then tar -czf "$name.tar.gz" "$name"; else zip -qr "$name.zip" "$name"; fi
+        ls -l
+
+    - name: Package
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        $name = "CPyMO-" + ("${{ matrix.package-name }}" -replace '[ \(\)]', '_')
+        New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
+        Copy-Item "build/build/Release/cpymo.exe","build/build/Release/cpymo-tool.exe" "dist/$name/"
+        foreach ($pat in @("*.dll","*.wav","*.ini","*.conf")) {
+          Copy-Item "build/build/Release/$pat" "dist/$name/" -ErrorAction SilentlyContinue
+        }
+        Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip" -Force
+        Get-ChildItem "dist"
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
-      if: ${{ runner.os == 'Windows' }}
       with:
         name: CPyMO for ${{ matrix.package-name }}
         path: |
-            ./build/build/Release/cpymo.exe
-            ./build/build/Release/cpymo-tool.exe
+            ./dist/*.zip
+            ./dist/*.tar.gz
 
   build-desktop-accessibility:
     name: 'Desktop (Accessibility)'
@@ -1029,30 +1054,40 @@ jobs:
         strip ./build/build/cpymo
         strip ./build/build/cpymo-tool
 
-    - name: Upload
-      uses: actions/upload-artifact@v6.0.0
+    - name: Package
       if: ${{ runner.os != 'Windows' }}
-      with:
-        name: CPyMO for ${{ matrix.package-name }}
-        path: |
-            ./build/build/cpymo
-            ./build/build/cpymo-tool
-            ./build/build/*.wav
-            ./build/build/MinSizeRel/cpymo.exe
-            ./build/build/MinSizeRel/cpymo-tool.exe
+      run: |
+        set -e
+        name="CPyMO-$(printf '%s' "${{ matrix.package-name }}" | tr ' ()' '___')"
+        mkdir -p "dist/$name"
+        cp ./build/build/cpymo ./build/build/cpymo-tool "dist/$name/"
+        for f in ./build/build/*.wav ./build/build/Release/*.wav; do
+          [ -f "$f" ] && cp "$f" "dist/$name/" || true
+        done
+        cd dist
+        if [ "$(uname -s)" = "Linux" ]; then tar -czf "$name.tar.gz" "$name"; else zip -qr "$name.zip" "$name"; fi
+        ls -l
+
+    - name: Package
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        $name = "CPyMO-" + ("${{ matrix.package-name }}" -replace '[ \(\)]', '_')
+        New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
+        Copy-Item "build/build/Release/cpymo.exe","build/build/Release/cpymo-tool.exe" "dist/$name/"
+        foreach ($pat in @("*.dll","*.wav","*.ini","*.conf")) {
+          Copy-Item "build/build/Release/$pat" "dist/$name/" -ErrorAction SilentlyContinue
+        }
+        Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip" -Force
+        Get-ChildItem "dist"
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
-      if: ${{ runner.os == 'Windows' }}
       with:
         name: CPyMO for ${{ matrix.package-name }}
         path: |
-            ./build/build/Release/cpymo.exe
-            ./build/build/Release/cpymo-tool.exe
-            ./build/build/Release/*.dll
-            ./build/build/Release/*.ini
-            ./build/build/Release/*.conf
-            ./build/build/Release/*.wav
+            ./dist/*.zip
+            ./dist/*.tar.gz
 
   build-ascii-art:
     name: 'CPyMO ASCII Art'
