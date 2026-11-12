@@ -13,6 +13,8 @@
 #include <ctype.h>
 #include <stdint.h>
 #include "cpymo_accessibility.h"
+#include "cpymo_safe_area.h"
+#include <stdlib.h>
 
 #define ALBUM_MAX_CGS_SINGLE_PAGE 25
 static const float album_scroll_time = 3.0f;
@@ -551,15 +553,32 @@ static error_t cpymo_album_prev_page(cpymo_engine *e, cpymo_album *a)
 	}
 }
 
+/* 相册网格与标题的安全区视口；未注册 provider 时等同于整屏。 */
+static void cpymo_album_viewport(
+	const cpymo_engine *e, float *vx, float *vy, float *vw, float *vh)
+{
+	cpymo_safe_area sa;
+	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+
+	float w = (float)e->gameconfig.imagesize_w - sa.left - sa.right;
+	float h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
+	if (w < (float)e->gameconfig.imagesize_w * 0.5f) { sa.left = 0; w = (float)e->gameconfig.imagesize_w; }
+	if (h < (float)e->gameconfig.imagesize_h * 0.5f) { sa.top = 0; h = (float)e->gameconfig.imagesize_h; }
+
+	*vx = sa.left; *vy = sa.top; *vw = w; *vh = h;
+}
+
 #ifndef __3DS__
 static bool cpymo_album_check_mouse_in_box(cpymo_engine *e, size_t i) {
 	size_t row = i / 5;
 	size_t col = i % 5;
+	float vx, vy, vw, vh;
+	cpymo_album_viewport(e, &vx, &vy, &vw, &vh);
 	float
-		x = (float)e->gameconfig.imagesize_w * (0.03f + 0.19f * col),
-		y = (float)e->gameconfig.imagesize_h * (0.02f + 0.19f * row),
-		w = (float)e->gameconfig.imagesize_w * 0.17f,
-		h = (float)e->gameconfig.imagesize_h * 0.17f,
+		x = vx + vw * (0.03f + 0.19f * col),
+		y = vy + vh * (0.02f + 0.19f * row),
+		w = vw * 0.17f,
+		h = vh * 0.17f,
 		mx = e->input.mouse_x,
 		my = e->input.mouse_y;
 
@@ -881,11 +900,13 @@ static void cpymo_album_draw(const cpymo_engine *e, const void *_a)
 	for (size_t i = 0; i < a->cg_count; ++i) {
 		size_t row = i / 5;
 		size_t col = i % 5;
+		float vx, vy, vw, vh;
+		cpymo_album_viewport(e, &vx, &vy, &vw, &vh);
 		float xywh[] = {
-			(float)e->gameconfig.imagesize_w * (0.03f + 0.19f * (float)col),
-			(float)e->gameconfig.imagesize_h * (0.02f + 0.19f * (float)row),
-			(float)e->gameconfig.imagesize_w * 0.17f,
-			(float)e->gameconfig.imagesize_h * 0.17f
+			vx + vw * (0.03f + 0.19f * (float)col),
+			vy + vh * (0.02f + 0.19f * (float)row),
+			vw * 0.17f,
+			vh * 0.17f
 		};
 
 		const cpymo_album_cg_info *info = &a->cg_infos[i];
@@ -933,11 +954,14 @@ static void cpymo_album_draw(const cpymo_engine *e, const void *_a)
 
 	const cpymo_album_cg_info *info = &a->cg_infos[a->current_cg_selection];
 	if (info->title) {
-		float draw_y = e->gameconfig.imagesize_h / 4.0f;
-		if (a->current_cg_selection < 15) draw_y *= 3;
+		float vx, vy, vw, vh;
+		cpymo_album_viewport(e, &vx, &vy, &vw, &vh);
+
+		float draw_y = vy + vh / 4.0f;
+		if (a->current_cg_selection < 15) draw_y = vy + vh * 3.0f / 4.0f;
 
 		float xywh[] = {
-			(e->gameconfig.imagesize_w - info->title_width) / 2 - 20,
+			vx + (vw - info->title_width) / 2 - 20,
 			draw_y - cpymo_gameconfig_font_size(&e->gameconfig),
 			info->title_width + 40,
 			cpymo_gameconfig_font_size(&e->gameconfig) + 12.0f
@@ -952,7 +976,7 @@ static void cpymo_album_draw(const cpymo_engine *e, const void *_a)
 
 		cpymo_backend_text_draw(
 			info->title,
-			(e->gameconfig.imagesize_w - info->title_width) / 2,
+			vx + (vw - info->title_width) / 2,
 			draw_y,
 			cpymo_color_white,
 			1.0f,
