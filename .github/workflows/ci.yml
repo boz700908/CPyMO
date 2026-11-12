@@ -45,7 +45,7 @@ jobs:
         path: ./cpymo-backends/sdl2/cpymo.nro
 
   build-switch-a11y:
-    name: 'Nintendo Switch (无障碍 / ReadSpeaker TTS)'
+    name: 'Nintendo Switch (Accessibility)'
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20230507
 
@@ -80,7 +80,7 @@ jobs:
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
       with:
-        name: CPyMO-Switch-Accessibility
+        name: CPyMO for Nintendo Switch (Accessibility)
         path: ./cpymo-backends/sdl2/dist
 
   build-3ds:
