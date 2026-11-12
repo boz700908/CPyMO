@@ -145,9 +145,14 @@ void cpymo_textbox_draw(
         return;
 
     if (tb->draw_cursor && e->say.msg_cursor && !e->say.auto_mode) {
-        float x = tb->w + tb->x - tb->char_size;
-        float y = tb->lines[tb->max_lines - 1].y - tb->char_size;
+        /* issue #57：光标紧随文本之后，不再固定在对话框右下角。
+         * typing_x 是最后放下的字符的右边界，active_line 是最后有内容的那一行。 */
+        float x = tb->typing_x;
+        float y = tb->lines[tb->active_line].y - tb->char_size;
         float wh = tb->char_size;
+
+        if (x + wh > tb->x + tb->w) x = tb->x + tb->w - wh;
+        if (x < tb->x) x = tb->x;
 
         float draw_w = (float)e->say.msg_cursor_w;
         float draw_h = (float)e->say.msg_cursor_h;
