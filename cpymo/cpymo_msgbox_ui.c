@@ -50,18 +50,16 @@ static void cpymo_msgbox_ui_viewport(
 	const cpymo_engine *e, float *out_left, float *out_top,
 	float *out_width, float *out_height)
 {
+	const float w = (float)e->gameconfig.imagesize_w;
+	const float h = (float)e->gameconfig.imagesize_h;
 	cpymo_safe_area sa;
 	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+	const cpymo_rect view = cpymo_safe_area_usable_rect(&sa, w, h, 0.5f);
 
-	float w = (float)e->gameconfig.imagesize_w - sa.left - sa.right;
-	float h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
-	if (w < (float)e->gameconfig.imagesize_w * 0.5f) { sa.left = 0; w = (float)e->gameconfig.imagesize_w; }
-	if (h < (float)e->gameconfig.imagesize_h * 0.5f) { sa.top = 0; h = (float)e->gameconfig.imagesize_h; }
-
-	*out_left = sa.left;
-	*out_top = sa.top;
-	*out_width = w;
-	*out_height = h;
+	*out_left = view.x;
+	*out_top = view.y;
+	*out_width = view.w;
+	*out_height = view.h;
 }
 
 static void cpymo_msgbox_ui_get_btn_rect(

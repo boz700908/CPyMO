@@ -58,17 +58,14 @@ void cpymo_list_ui_ignore_key_hold_exit_onetime(struct cpymo_engine *e)
 static inline void cpymo_list_ui_viewport(
 	const cpymo_engine *e, float *out_top, float *out_height)
 {
+	const float w = (float)e->gameconfig.imagesize_w;
+	const float h = (float)e->gameconfig.imagesize_h;
 	cpymo_safe_area sa;
 	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+	const cpymo_rect view = cpymo_safe_area_usable_rect(&sa, w, h, 0.5f);
 
-	float h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
-	if (h < (float)e->gameconfig.imagesize_h * 0.5f) {
-		sa.top = 0;
-		h = (float)e->gameconfig.imagesize_h;
-	}
-
-	if (out_top) *out_top = sa.top;
-	if (out_height) *out_height = h;
+	if (out_top) *out_top = view.y;
+	if (out_height) *out_height = view.h;
 }
 
 static inline float cpymo_list_ui_get_y(const cpymo_engine *e, int relative_to_current)

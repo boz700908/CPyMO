@@ -33,3 +33,24 @@ void cpymo_safe_area_get(
 		out->bottom = 0.0f;
 	}
 }
+
+cpymo_rect cpymo_safe_area_usable_rect(
+	const cpymo_safe_area *sa, float logical_w, float logical_h, float min_ratio)
+{
+	float left = sa->left;
+	float top = sa->top;
+	float w = logical_w - sa->left - sa->right;
+	float h = logical_h - sa->top - sa->bottom;
+
+	if (w < logical_w * min_ratio) {
+		left = 0.0f;
+		w = logical_w;
+	}
+
+	if (h < logical_h * min_ratio) {
+		top = 0.0f;
+		h = logical_h;
+	}
+
+	return cpymo_rect_make(left, top, w, h);
+}

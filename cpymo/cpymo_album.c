@@ -557,15 +557,16 @@ static error_t cpymo_album_prev_page(cpymo_engine *e, cpymo_album *a)
 static void cpymo_album_viewport(
 	const cpymo_engine *e, float *vx, float *vy, float *vw, float *vh)
 {
+	const float w = (float)e->gameconfig.imagesize_w;
+	const float h = (float)e->gameconfig.imagesize_h;
 	cpymo_safe_area sa;
 	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+	const cpymo_rect view = cpymo_safe_area_usable_rect(&sa, w, h, 0.5f);
 
-	float w = (float)e->gameconfig.imagesize_w - sa.left - sa.right;
-	float h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
-	if (w < (float)e->gameconfig.imagesize_w * 0.5f) { sa.left = 0; w = (float)e->gameconfig.imagesize_w; }
-	if (h < (float)e->gameconfig.imagesize_h * 0.5f) { sa.top = 0; h = (float)e->gameconfig.imagesize_h; }
-
-	*vx = sa.left; *vy = sa.top; *vw = w; *vh = h;
+	*vx = view.x;
+	*vy = view.y;
+	*vw = view.w;
+	*vh = view.h;
 }
 
 #ifndef __3DS__
