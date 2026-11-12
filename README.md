@@ -43,7 +43,8 @@ pymo参见：<https://github.com/pymo/pymo>
 Windows         | `cpymo.exe`                                       | **单个 exe**。启动音乐、音效与读屏桥 Tolk 都已编进 exe，首次用到语音时自解析到 `%LOCALAPPDATA%\CPyMO\runtime\`。
 Linux           | `.deb` / `.rpm` / `.pkg.tar.zst` / `.apk` / `.AppImage` | 安装后就是 `/usr/bin/cpymo` 一个文件；AppImage 是单个可执行文件，`chmod +x` 后直接运行。
 macOS           | `CPyMO-*.dmg`                                     | 内含 `CPyMO.app`。未签名也未公证，首次请右键→打开，或执行 `xattr -dr com.apple.quarantine /Applications/CPyMO.app`。
-Nintendo Switch | `cpymo.nro`                                       | **单个 nro**。语音库已打进 nro 的 romfs，只拷这一个文件也能朗读；要换音库时把文件放到 `sdmc:/switch/` 下的 `tts/` 目录，外置优先。
+Nintendo Switch | `cpymo.nro`                                       | **单个 nro**。语音库、音效与启动音乐都打进 nro 自身的 romfs，只拷这一个文件就能完整出声；想换音库或音效时把文件放到 `sdmc:/switch/` 下（`tts/` 目录与同级 wav），外置优先。
+Nintendo Switch（实验） | `0100000000010000.nsp`                        | 由 `Switch NSP (experimental)` 工作流手动产出，语音资源同样在 romfs 里，装完不需要额外文件；只能在自制固件上安装，见下文「安装成 NSP（实验）」。
 
 其余平台沿用各自原有的产物格式：3DS 是 `cpymo.cia` / `cpymo.3dsx`，PSP 是 `EBOOT.PBP`，PS Vita 是 `cpymo.vpk`，Wii 是 `boot.dol`，Android 是 `apk`，iOS 是 `ipa`，Web 是 Emscripten 的 `html`。
 
@@ -275,7 +276,7 @@ make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1
 
 ### 语音资源（构建产物已附带，可自行替换）
 
-`.nro` 本身不内嵌语音引擎与音库，构建会把它们放在与 `.nro` 同级的 `tts/` 目录里一起打包（源文件在仓库的 `tts-assets/`），整包拷贝到 SD 卡即可直接朗读，不需要再自己提取。
+构建会把语音引擎与音库（源文件在仓库的 `tts-assets/`）连同音效、启动音乐一起放进 `.nro` 自身的 romfs，产物只有一个 `.nro`，拷到 SD 卡即可朗读，不需要再自己提取，也不必另外拷贝 `tts/` 目录。
 
 如果你要换用自己的固件导出，或换上另一语言的音库，需要准备下面四个文件，并且放在**同一个目录**里：
 
@@ -288,7 +289,7 @@ D32-YAFANG.vtdb2  中文音库（ReadSpeaker 自带普通话女声）
 
 * 前三个文件是 Switch 系统自带的 ReadSpeaker 语音引擎的三个 NSO 模块，请从**你自己合法持有的固件**中导出；本程序只把它们映射进内存并执行，不会修改它们，也不需要额外的导出表或转译层。
 * `D32-YAFANG.vtdb2` 是随 ReadSpeaker 分发的音库。程序只认这一个文件名（以及旧式 `.vtdb`），不会自动改名，请保持上表写法。
-* 这四个文件不参与编译、不嵌入 `.nro`，只是随 Actions 附件/Release 一起分发；只想要裸 `.nro` 时可以不下载它们。
+* 这四个文件只作为 romfs 数据随 `.nro` 分发，不会被编进可执行代码，也不会被修改内容。
 
 放置位置按以下顺序查找，第一个凑齐三件 `.bin` 的目录生效（空目录会被跳过）：
 
@@ -297,8 +298,9 @@ D32-YAFANG.vtdb2  中文音库（ReadSpeaker 自带普通话女声）
 3. `sdmc:/pymogames/tts`
 4. `sdmc:/switch/tts`
 5. `sdmc:/switch/cpymo/tts`
+6. `romfs:/tts`（构建时打进 `.nro` 自身 romfs 的那一份，上面几项都没有时才用它）
 
-例如把 Actions 附件里的 `dist/` 整个拷到 `sdmc:/switch/`，最终应当是这样：
+只想要单文件时，把 `cpymo.nro` 拷到 `sdmc:/switch/` 就够了。下面是最完整的外置布局，用于替换音库或音效（外置优先于 romfs）：
 
 ```text
 sdmc:/switch/cpymo.nro
@@ -321,9 +323,20 @@ sdmc:/switch/tts/D32-YAFANG.vtdb2
 * 仓库中的 `tts-assets/` 目录只是为了让自动化构建能直接产出可自测的包，**不构成**对上述任何资源的授权，也不表示本项目有权分发它们。请勿将其用于商业用途或二次分发；若权利人提出要求，将立即移除。
 * 除中文音库外，其他语言的 `vtdb2` 音库同理：需要你有权使用的对应文件，放入同一目录并把名字改成 `D32-*.vtdb2` 中你实际持有的那个即可（程序按固定名查找）。
 
+### 安装成 NSP（实验）
+
+`Switch NSP (experimental)` 工作流（`.github/workflows/switch-xci.yml`，手动触发）把构建产物打成可安装的 `.nsp`：
+
+* title id 固定为 `0100000000010000`，产物名为 `0100000000010000.nsp`；
+* 语音引擎、音库、音效与启动音乐都在 NSP 的 romfs 分区里，装上就是一个完整的包，SD 卡上不需要再放任何文件；
+* 打包过程需要 `prod.keys`（仓库 Secret `SWITCH_PROD_KEYS`），只用于在 Actions 里生成 NCA，不会进入产物，也不随发布分发；
+* 只能在 Atmosphere 等自制固件上安装运行，不经过任天堂的签名校验。XCI 需要有效的 RSA 签名，本项目不提供，也不再出 XCI。
+
+安装后读写位置与 `.nro` 版一致：存档在 `sdmc:/pymogames/`，语音参数在 `sdmc:/pymogames/tts.conf`。想覆盖 romfs 里的音库或音效，把文件放到 `sdmc:/switch/` 下的对应位置即可（外置优先）。
+
 音效文件 `enter.wav`、`menu.wav`、`select.wav` 与普通版本一致，放在 `.nro` 同级目录。
 
-`sdmc:/switch/startup.wav` 是启动音乐（《Song of PyMO》），同样放在 `.nro` 同级目录：应用启动进入游戏选择器后从头播放一次、不循环；选中游戏进入后立即停止，避免压住游戏开场音乐；直接拉起单一游戏的构建不播放。缺这个文件时只是没有启动音乐，不影响其他功能。
+`sdmc:/switch/startup.wav` 是启动音乐（《Song of PyMO》），同样放在 `.nro` 同级目录（无障碍构建里它也在 romfs 中，没有外置文件时从 romfs 播）：应用启动进入游戏选择器后从头播放一次、不循环；选中游戏进入后立即停止，避免压住游戏开场音乐；直接拉起单一游戏的构建不播放。缺这个文件时只是没有启动音乐，不影响其他功能。
 
 语音参数保存在 `sdmc:/pymogames/tts.conf`，设置页新增 5 项：语速、音高、音量、音色、情感。只有切换到新值时才写入，浏览时朗读“名称 + 值”，修改时只朗读“值”。
 
