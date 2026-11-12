@@ -3,6 +3,7 @@
 #include "cpymo_import_sdl2.h"
 #include "cpymo_embedded_assets.h"
 #include "cpymo_tolk_runtime.h"
+#include "cpymo_switch_audio.h"
 #include "cpymo_switch_diag.h"
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
@@ -216,6 +217,9 @@ static SDL_AudioDeviceID accessibility_audio_dev = 0;
 static SDL_AudioSpec accessibility_audio_spec = {0};
 static Uint8 *accessibility_wav_bufs[4] = {NULL, NULL, NULL, NULL};
 static Uint32 accessibility_wav_lens[4] = {0, 0, 0, 0};
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+static SDL_AudioSpec accessibility_wav_specs[4];
+#endif
 
 /* Boost WAV sample amplitude to match Android SoundPool perceived volume.
  * Android SoundPool plays at full system volume through ASSISTANCE_SONIFICATION
@@ -314,6 +318,9 @@ void cpymo_sdl2_accessibility_sound_init(void)
         }
 
         if (loaded) {
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+            accessibility_wav_specs[i] = spec;
+#endif
             CPYMO_DIAG("[diag] 音效 %s 已加载\n", sound_files[i]);
             /* Boost volume to match Android SoundPool perceived loudness */
             amplify_wav_buffer(accessibility_wav_bufs[i], accessibility_wav_lens[i],
@@ -327,6 +334,7 @@ void cpymo_sdl2_accessibility_sound_init(void)
     if (base_path) SDL_free(base_path);
 
     /* Open audio device with WAV's actual spec (not hardcoded) */
+#if !defined(__SWITCH__) || !defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
     if (have_spec) {
         accessibility_audio_spec = wav_spec;
         accessibility_audio_dev = SDL_OpenAudioDevice(NULL, 0, &wav_spec, NULL, 0);
@@ -349,10 +357,14 @@ void cpymo_sdl2_accessibility_sound_init(void)
             }
         }
     }
+#endif
 }
 
 void cpymo_sdl2_accessibility_sound_free(void)
 {
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+    cpymo_sw_audio_stop(CPYMO_SW_AUDIO_FEEDBACK);
+#endif
     for (int i = 1; i <= 3; i++) {
         if (accessibility_wav_bufs[i]) {
             SDL_FreeWAV(accessibility_wav_bufs[i]);
@@ -371,6 +383,9 @@ void cpymo_sdl2_accessibility_sound_free(void)
 
 void cpymo_sdl2_accessibility_sound_reset(void)
 {
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+    return;
+#endif
     /* Close and reopen the audio device on the new default output.
      * Windows reassigns the default device when headphones are
      * plugged/unplugged; reopened devices pick up the new output. */
@@ -397,6 +412,12 @@ void cpymo_sdl2_accessibility_sound_reset(void)
 
 void cpymo_sdl2_accessibility_play_sound(int sound_type)
 {
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+    if (sound_type >= 1 && sound_type <= 3 && accessibility_wav_bufs[sound_type])
+        cpymo_sw_audio_play(CPYMO_SW_AUDIO_FEEDBACK, &accessibility_wav_specs[sound_type],
+                            accessibility_wav_bufs[sound_type],
+                            accessibility_wav_lens[sound_type], SDL_MIX_MAXVOLUME);
+#else
     if (sound_type >= 1 && sound_type <= 3
         && accessibility_audio_dev
         && accessibility_wav_bufs[sound_type]) {
@@ -414,6 +435,8 @@ void cpymo_sdl2_accessibility_play_sound(int sound_type)
         MessageBeep(sound);
 #endif
     }
+
+#endif
 
     /* === Vibration (scaled for game controller rumble motor inertia) ===
      * Android uses linear vibration motors that respond instantly to short pulses

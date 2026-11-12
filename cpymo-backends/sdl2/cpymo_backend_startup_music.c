@@ -3,6 +3,7 @@
 #include "cpymo_import_sdl2.h"
 #include "cpymo_embedded_assets.h"
 #include "cpymo_switch_diag.h"
+#include "cpymo_switch_audio.h"
 #include <stdio.h>
 
 /* 《Song of PyMO》启动音乐（SDL2 后端）。
@@ -142,6 +143,14 @@ void cpymo_backend_startup_music_play(void)
 	startup_music_format = wav_spec.format;
 	startup_music_pos = 0;
 
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	cpymo_sw_audio_play(CPYMO_SW_AUDIO_STARTUP, &wav_spec, startup_music_pcm,
+		startup_music_len, CPYMO_STARTUP_MUSIC_VOLUME);
+	SDL_FreeWAV(startup_music_pcm);
+	startup_music_pcm = NULL;
+	startup_music_len = 0;
+	return;
+#endif
 	wav_spec.callback = &cpymo_backend_startup_music_callback;
 	wav_spec.userdata = NULL;
 
@@ -165,6 +174,9 @@ void cpymo_backend_startup_music_play(void)
 	 * 直接进游戏的构建从未 play 过，这里是空操作。 */
 void cpymo_backend_startup_music_stop(void)
 {
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	cpymo_sw_audio_stop(CPYMO_SW_AUDIO_STARTUP);
+#endif
 	/* SDL_CloseAudioDevice 会等回调线程退出，之后才能释放 PCM。 */
 	if (startup_music_dev) {
 		SDL_CloseAudioDevice(startup_music_dev);

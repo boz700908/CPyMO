@@ -40,10 +40,10 @@
 
 #define TT_TEXT_MAX      4096      /* 单条朗读文本上限（含 vtml 标签） */
 #define TT_REQ_SLOTS     8         /* 请求环槽数 */
-#define TT_MAX_CHUNK     12000     /* 引擎单块输出上限（样本数） */
+#define TT_MAX_CHUNK     12000     /* 引擎单块输出上限（字节） */
 #define TT_SAMPLE_RATE   32000
 #define TT_IMAGE_MAX     3
-#define TT_RING_SAMPLES  98304     /* 3.07s @32000Hz，2 的幂 */
+#define TT_RING_SAMPLES  131072    /* 4.10s @32000Hz，2 的幂 */
 #define TT_RING_BYTES    (TT_RING_SAMPLES * 2)
 #define TT_RING_MASK     (TT_RING_BYTES - 1)
 
@@ -670,34 +670,67 @@ static bool tt_patch_word(const char *what, int img, uint32_t off,
 /* PCM 环形缓冲（引擎线程写，SDL 音频回调读，全程无锁）                  */
 /* ------------------------------------------------------------------ */
 
-static unsigned g_cb_count;
-
-static void tt_audio_cb(void *ud, Uint8 *stream, int len)
+void cpymo_switch_tts_mix(Uint8 *stream, int len, SDL_AudioFormat format,
+                          int freq, int channels)
 {
+    static int phase, sample_valid;
+    static int16_t sample;
+    union { float f[512]; int32_t i32[512]; int16_t i16[512]; } buffer;
     uint32_t flush, r, w;
-    int n = 0;
+    int sample_bytes, frame_bytes, remaining;
 
-    (void)ud;
-
-    ++g_cb_count;
-    if (g_cb_count == 1 || (g_cb_count % 1000u) == 0u)
-        CPYMO_DIAG("[tts] SDL 音频回调第 %u 次，请求 %d 字节\n", g_cb_count, len);
+    if (!__atomic_load_n(&g_audio_open, __ATOMIC_ACQUIRE) || freq <= 0 ||
+        channels <= 0 || channels > 8) return;
+    sample_bytes = SDL_AUDIO_BITSIZE(format) / 8;
+    if ((format != AUDIO_S16SYS && format != AUDIO_S32SYS && format != AUDIO_F32SYS) ||
+        sample_bytes <= 0) return;
+    frame_bytes = sample_bytes * channels;
+    remaining = len / frame_bytes;
 
     flush = __atomic_load_n(&g_flush_gen, __ATOMIC_ACQUIRE);
     if (flush != g_flush_seen) {
         g_flush_seen = flush;
         w = __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE);
         __atomic_store_n(&g_ring_r, w, __ATOMIC_RELEASE);
+        sample_valid = 0;
+        phase = 0;
     }
 
     r = g_ring_r;
     w = __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE);
-    while (n < len && r != w) {
-        stream[n++] = g_ring[r & TT_RING_MASK];
-        r++;
+    while (remaining > 0) {
+        int frames = remaining > 64 ? 64 : remaining;
+        int i, ch;
+        for (i = 0; i < frames; ++i) {
+            while (!sample_valid || phase >= freq) {
+                uint8_t raw[2];
+                if (w - r < 2) {
+                    sample_valid = 0;
+                    phase = 0;
+                    break;
+                }
+                raw[0] = g_ring[r & TT_RING_MASK];
+                raw[1] = g_ring[(r + 1) & TT_RING_MASK];
+                memcpy(&sample, raw, sizeof(sample));
+                r += 2;
+                if (sample_valid) phase -= freq;
+                sample_valid = 1;
+            }
+            for (ch = 0; ch < channels; ++ch) {
+                int idx = i * channels + ch;
+                int16_t v = sample_valid ? sample : 0;
+                if (format == AUDIO_F32SYS) buffer.f[idx] = (float)v / 32768.0f;
+                else if (format == AUDIO_S32SYS) buffer.i32[idx] = (int32_t)v * 65536;
+                else buffer.i16[idx] = v;
+            }
+            if (sample_valid) phase += TT_SAMPLE_RATE;
+        }
+        SDL_MixAudioFormat(stream, (const Uint8 *)&buffer, format,
+                           (Uint32)(frames * frame_bytes), SDL_MIX_MAXVOLUME);
+        stream += frames * frame_bytes;
+        remaining -= frames;
     }
     __atomic_store_n(&g_ring_r, r, __ATOMIC_RELEASE);
-    if (n < len) SDL_memset(stream + n, 0, (size_t)(len - n));
 }
 
 static uint32_t tt_ring_pending(void)
@@ -815,17 +848,17 @@ static bool tt_synth(const char *text)
         c.x[7] = (uint64_t)(uintptr_t)(frame + 0x58);
         cpymo_sw_tts_call_guest(&c);
 
-        rc = (int64_t)c.result;
+        rc = (int32_t)c.result;
         if (rc < 0) {
             CPYMO_DIAG("[tts] synth 返回 %lld\n", (long long)rc);
             return false;
         }
 
         got = *(uint32_t *)(void *)(frame + 0x60);
-        if (got > TT_MAX_CHUNK) got = TT_MAX_CHUNK;
+        if (got > TT_MAX_CHUNK || (got & 1u)) return false;
         if (got) {
-            if (!tt_wait_ring_space((size_t)got * 2, 20000000000ull)) return false;
-            tt_ring_write(g_outbuf, (size_t)got * 2);
+            if (!tt_wait_ring_space(got, 20000000000ull)) return false;
+            tt_ring_write(g_outbuf, got);
         }
         step = 1;
         if (rc == 1) break;
@@ -1187,26 +1220,7 @@ static bool tt_prepare(const char *dir)
 
 static bool tt_audio_init(void)
 {
-    SDL_AudioSpec want, have;
-
-    SDL_memset(&want, 0, sizeof(want));
-    want.freq = TT_SAMPLE_RATE;
-    want.format = AUDIO_S16SYS;
-    want.channels = 1;
-    want.samples = 1024;
-    want.callback = tt_audio_cb;
-    want.userdata = NULL;
-
-    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
-        return tt_fail("SDL 音频子系统启动失败：%s", SDL_GetError());
-
-    g_adev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-    if (!g_adev) return tt_fail("打开 TTS 音频设备失败：%s", SDL_GetError());
-    if (have.freq != TT_SAMPLE_RATE)
-        CPYMO_DIAG("[tts] 注意：实际采样率 %d（期望 %d）\n", have.freq, TT_SAMPLE_RATE);
-    g_audio_open = true;
-    SDL_PauseAudioDevice(g_adev, 0);
-    CPYMO_DIAG("[tts] 音频设备已开：%d Hz %d ch\n", have.freq, have.channels);
+    __atomic_store_n(&g_audio_open, true, __ATOMIC_RELEASE);
     return true;
 }
 
@@ -1308,11 +1322,7 @@ void cpymo_switch_tts_free(void)
     /* 引擎线程驻留在 guest 里，只能靠它自己退出；这里给 200ms 让它收尾 */
     if (g_thread_started) svcSleepThread(200000000ull);
 
-    if (g_audio_open) {
-        SDL_CloseAudioDevice(g_adev);
-        g_audio_open = false;
-        g_adev = 0;
-    }
+    __atomic_store_n(&g_audio_open, false, __ATOMIC_RELEASE);
     /* 代码内存映射与 guest 区域有意不释放：线程可能还停在 guest 里，
        进程随后就退出了，操作系统会回收。 */
     g_state = CPYMO_SWITCH_TTS_STATE_IDLE;

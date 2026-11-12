@@ -2,6 +2,7 @@
 #include "../../cpymo/cpymo_engine.h"
 #include "../include/cpymo_backend_audio.h"
 #include "cpymo_import_sdl2.h"
+#include "cpymo_switch_audio.h"
 #include <stdbool.h>
 #include <assert.h>
 
@@ -59,6 +60,9 @@ static void cpymo_backend_audio_sdl_callback(void *userdata, Uint8 * stream, int
 			szlen = (size_t)len - written;
 		}
 	}
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	cpymo_sw_audio_mix(stream, len);
+#endif
 }
 
 const cpymo_backend_audio_info *cpymo_backend_audio_get_info(void)
@@ -127,6 +131,9 @@ void cpymo_backend_audio_init()
 		return;
 	}
 
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	cpymo_sw_audio_init();
+#endif
 	SDL_LockAudio();
 	SDL_PauseAudio(0);
 
@@ -137,6 +144,9 @@ void cpymo_backend_audio_free()
 	if (audio_enabled) {
 		SDL_CloseAudio();
 	}
+#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+	cpymo_sw_audio_free();
+#endif
 }
 
 void cpymo_backend_audio_lock(void)
