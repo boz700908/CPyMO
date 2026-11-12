@@ -47,6 +47,22 @@ Nintendo Switch | `cpymo.nro`、`0100000050594d4f.nsp`               | **单文�
 
 其余平台沿用各自原有的产物格式：3DS 是 `cpymo.cia` / `cpymo.3dsx`，PSP 是 `EBOOT.PBP`，PS Vita 是 `cpymo.vpk`，Wii 是 `boot.dol`，Android 是 `apk`，iOS 是 `ipa`，Web 是 Emscripten 的 `html`。
 
+### 普通版与无障碍版
+
+有语音输出通道的平台，两版成对发布，命名与 GitHub Actions 的产物名完全一致：
+
+平台 | 普通版 | 无障碍版
+---- | ------ | --------
+Windows / Linux / macOS | `CPyMO for Windows x64`（x86、ARM64、ARM64EC、Linux x64、macOS x64、macOS Apple Silicon 同理） | 同名后加 `(Accessibility)`
+Android | `CPyMO for Android` | `CPyMO for Android (Accessibility)`
+iOS | `CPyMO for iOS` | `CPyMO for iOS (Accessibility)`
+Web | `CPyMO for Web` | `CPyMO for Web (Accessibility)`
+Nintendo Switch | `CPyMO for Nintendo Switch` | `CPyMO for Nintendo Switch (Accessibility)`（另有 `CPyMO for Nintendo Switch (NSP)`）
+
+两版用同一套构建脚本、同一套打包流程，区别只在是否开启无障碍编译开关；无障碍版不会改变普通版的产物。
+
+3DS、PSP、PS Vita、Wii、UWP 以及 SDL 1.2 的两个桌面版本只发普通版。这些运行环境里没有可用的语音输出通道（Tolk、Speech Dispatcher、NSSpeechSynthesizer 与各主机原生 TTS 都没有对应实现），所以不另发一个「装了也不出声」的无障碍版。
+
 ## 在3DS/PSP/Wii上运行游戏时，我需要对游戏的数据包进行转换？
 
 一般情况下，3DS和PSP版本CPyMO可以直接运行s60v5版本，如果你想获得更好的体验或者你在使用Wii，可以下载[CPyMO GUITool](https://github.com/PyMO-Ecosphere/CPyMO-GUITool)来创建面向3DS、PSP和Wii的游戏包。
@@ -72,9 +88,9 @@ Sony PSP          | SDL2 | 无       | FFmpeg             | 外置字体        
 Linux           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     | 视障帮助
 macOS           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 加载系统字体  | 视障帮助
 iOS             | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器,视障帮助
-Nintendo Switch | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器
+Nintendo Switch | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器,视障帮助
 UWP             | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | 游戏选择器
-Emscripten      | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     |
+Emscripten      | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     | 视障帮助
 Android         | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器,视障帮助
 
 ### 第三梯队

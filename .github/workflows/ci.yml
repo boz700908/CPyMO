@@ -710,6 +710,10 @@ jobs:
     - name: Build APK (Accessibility)
       run: |
         cd ./cpymo-backends/android
+        # 必须先清干净：否则 Gradle/CMake 会复用上一步普通版的产物，
+        # 无障碍 APK 里其实没有无障碍代码。
+        ./gradlew clean --stacktrace
+        rm -rf app/.cxx app/build
         ./gradlew assembleRelease --stacktrace
         cp ./app/build/outputs/apk/release/app-release.apk ../../cpymo-accessibility-signed.apk
       env:
