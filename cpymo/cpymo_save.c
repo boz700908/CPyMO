@@ -216,6 +216,36 @@ error_t cpymo_save_write(cpymo_engine * e, unsigned short save_id)
 	}
 
 
+	// BACKLOG
+	{
+		const size_t backlog_count = cpymo_backlog_record_count(&e->backlog);
+		uint32_t backlog_count_u32 = (uint32_t)backlog_count;
+		const uint32_t backlog_count_le = PACK32(backlog_count_u32);
+
+		if (fwrite(&backlog_count_le, sizeof(backlog_count_le), 1, save) != 1) {
+			fclose(save);
+			return CPYMO_ERR_UNKNOWN;
+		}
+
+		for (size_t i = 0; i < backlog_count; ++i) {
+			const char *name_text = NULL, *vo = NULL, *text = NULL;
+			float font_size = 0;
+			if (!cpymo_backlog_record_get(
+				&e->backlog, i, &name_text, &vo, &text, &font_size))
+				continue;
+
+			WRITE_STR(name_text ? name_text : empty);
+			WRITE_STR(vo);
+			WRITE_STR(text);
+
+			const uint32_t font_size_le = PACK32(font_size);
+			if (fwrite(&font_size_le, sizeof(font_size_le), 1, save) != 1) {
+				fclose(save);
+				return CPYMO_ERR_UNKNOWN;
+			}
+		}
+	}
+
 	#undef PACK32
 	#undef WRITE_STR
 
@@ -521,6 +551,49 @@ error_t cpymo_save_load_savedata(cpymo_engine *e, FILE *save)
 
 	if (strbuf) free(strbuf);
 	strbuf = NULL;
+
+	// BACKLOG (absent in save data written by CPyMO before 1.2.0)
+	{
+		uint32_t backlog_count_le = 0;
+		if (fread(&backlog_count_le, sizeof(backlog_count_le), 1, save) == 1) {
+			const uint32_t backlog_count = end_le32toh(backlog_count_le);
+
+			for (uint32_t i = 0; i < backlog_count; ++i) {
+				char *name_text = NULL, *vo = NULL, *text = NULL;
+				uint32_t font_size_le = 0;
+
+				if (cpymo_save_read_string(&name_text, save) != CPYMO_ERR_SUCC)
+					break;
+
+				if (cpymo_save_read_string(&vo, save) != CPYMO_ERR_SUCC) {
+					free(name_text);
+					break;
+				}
+
+				if (cpymo_save_read_string(&text, save) != CPYMO_ERR_SUCC) {
+					free(name_text);
+					free(vo);
+					break;
+				}
+
+				if (fread(&font_size_le, sizeof(font_size_le), 1, save) != 1) {
+					free(name_text);
+					free(vo);
+					free(text);
+					break;
+				}
+
+				font_size_le = end_le32toh(font_size_le);
+				const float font_size = CAST(float, font_size_le);
+
+				cpymo_backlog_record_restore(
+					&e->backlog, name_text, vo, text, font_size);
+
+				free(name_text);
+				free(vo);
+			}
+		}
+	}
 
 	if (e->interpreter == NULL) return CPYMO_ERR_BAD_FILE_FORMAT;
 

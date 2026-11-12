@@ -19,9 +19,7 @@ typedef struct cpymo_backlog_record {
 	char *text;
 	float font_size;
 
-#ifdef ENABLE_TEXT_EXTRACT
-	char *name_str;
-#endif
+	char *name_text;
 } cpymo_backlog_record;
 
 error_t cpymo_backlog_init(cpymo_backlog *b)
@@ -33,9 +31,7 @@ error_t cpymo_backlog_init(cpymo_backlog *b)
 	b->owning_name = false;
 	b->pending_name = NULL;
 
-#ifdef ENABLE_TEXT_EXTRACT
-	b->pending_name_str = NULL;
-#endif
+	b->pending_name_text = NULL;
 
 	for (size_t i = 0; i < CPYMO_BACKLOG_MAX_RECORDS; i++) {
 		b->records[i].vo_filename[0] = '\0';
@@ -44,9 +40,7 @@ error_t cpymo_backlog_init(cpymo_backlog *b)
 		b->records[i].text = NULL;
 		b->records[i].text_render = NULL;
 
-#ifdef ENABLE_TEXT_EXTRACT
-		b->records[i].name_str = NULL;
-#endif
+		b->records[i].name_text = NULL;
 	}
 
 	return CPYMO_ERR_SUCC;
@@ -57,9 +51,7 @@ static void cpymo_backlog_record_clean(cpymo_backlog_record *rec)
 	if (rec->owning_name && rec->name) {
 		cpymo_backend_text_free(rec->name);
 
-#ifdef ENABLE_TEXT_EXTRACT
-		if (rec->name_str) free(rec->name_str);
-#endif
+		if (rec->name_text) free(rec->name_text);
 	}
 
 	if (rec->text_render) cpymo_backend_text_free(rec->text_render);
@@ -72,9 +64,7 @@ static void cpymo_backlog_record_clean(cpymo_backlog_record *rec)
 	rec->name = NULL;
 	rec->vo_filename[0] = '\0';
 
-#ifdef ENABLE_TEXT_EXTRACT
-	rec->name_str = NULL;
-#endif
+	rec->name_text = NULL;
 }
 
 void cpymo_backlog_free(cpymo_backlog *b)
@@ -82,9 +72,7 @@ void cpymo_backlog_free(cpymo_backlog *b)
 	if (b->owning_name && b->pending_name) {
 		cpymo_backend_text_free(b->pending_name);
 
-#ifdef ENABLE_TEXT_EXTRACT
-		if (b->pending_name_str) free(b->pending_name_str);
-#endif
+		if (b->pending_name_text) free(b->pending_name_text);
 	}
 
 	for (size_t i = 0; i < CPYMO_BACKLOG_MAX_RECORDS; i++) {
@@ -106,18 +94,14 @@ void cpymo_backlog_record_write_name(
 {
 	if (b->owning_name && b->pending_name) {
 		cpymo_backend_text_free(b->pending_name);
-#ifdef ENABLE_TEXT_EXTRACT
-		if (b->pending_name_str) free(b->pending_name_str);
-#endif
+		if (b->pending_name_text) free(b->pending_name_text);
 	}
 
 	b->owning_name = name == NULL ? false : true;
 	b->pending_name = name;
 
-#ifdef ENABLE_TEXT_EXTRACT
-	b->pending_name_str = 
+	b->pending_name_text = 
 		name == NULL ? NULL : cpymo_str_copy_malloc(name_text);
-#endif
 }
 
 error_t cpymo_backlog_record_write_text(
@@ -132,9 +116,7 @@ error_t cpymo_backlog_record_write_text(
 	rec->name = b->pending_name;
 	rec->owning_name = b->owning_name;
 
-#ifdef ENABLE_TEXT_EXTRACT
-	rec->name_str = b->pending_name_str;
-#endif
+	rec->name_text = b->pending_name_text;
 
 	b->owning_name = false;
 	rec->text = text;
@@ -144,6 +126,86 @@ error_t cpymo_backlog_record_write_text(
 
 	b->next_record_to_write = (b->next_record_to_write + 1) % CPYMO_BACKLOG_MAX_RECORDS;
 	return CPYMO_ERR_SUCC;
+}
+
+size_t cpymo_backlog_record_count(const cpymo_backlog *b)
+{
+	size_t n = 0;
+	for (size_t i = 0; i < CPYMO_BACKLOG_MAX_RECORDS; ++i)
+		if (b->records[i].text) ++n;
+	return n;
+}
+
+static const cpymo_backlog_record *cpymo_backlog_record_at(
+	const cpymo_backlog *b, size_t logical_index)
+{
+	size_t i = b->next_record_to_write;
+	for (size_t k = 0; k < CPYMO_BACKLOG_MAX_RECORDS; ++k) {
+		const cpymo_backlog_record *rec = &b->records[i];
+		if (rec->text) {
+			if (logical_index == 0) return rec;
+			--logical_index;
+		}
+
+		i = (i + 1) % CPYMO_BACKLOG_MAX_RECORDS;
+	}
+
+	return NULL;
+}
+
+bool cpymo_backlog_record_get(
+	const cpymo_backlog *b,
+	size_t logical_index,
+	const char **name_text,
+	const char **vo_filename,
+	const char **text,
+	float *font_size)
+{
+	const cpymo_backlog_record *rec =
+		cpymo_backlog_record_at(b, logical_index);
+	if (rec == NULL) return false;
+
+	if (name_text) *name_text = rec->name_text;
+	if (vo_filename) *vo_filename = rec->vo_filename;
+	if (text) *text = rec->text;
+	if (font_size) *font_size = rec->font_size;
+
+	return true;
+}
+
+error_t cpymo_backlog_record_restore(
+	cpymo_backlog *b,
+	const char *name_text,
+	const char *vo_filename,
+	char *text,
+	float font_size)
+{
+	if (!(font_size > 0.0f)) font_size = 32.0f;
+
+	if (text == NULL) {
+		text = (char *)malloc(sizeof(char));
+		if (text == NULL) return CPYMO_ERR_OUT_OF_MEM;
+		text[0] = '\0';
+	}
+
+	if (name_text && *name_text) {
+		cpymo_backend_text name = NULL;
+		float w = 0;
+		error_t err = cpymo_backend_text_create(
+			&name, &w, cpymo_str_pure(name_text), font_size);
+		if (err != CPYMO_ERR_SUCC) {
+			free(text);
+			return err;
+		}
+
+		cpymo_backlog_record_write_name(
+			b, name, cpymo_str_pure(name_text));
+	}
+
+	if (vo_filename && *vo_filename)
+		cpymo_backlog_record_write_vo(b, cpymo_str_pure(vo_filename));
+
+	return cpymo_backlog_record_write_text(b, text, font_size);
 }
 
 static void cpymo_backlog_ui_draw_node(const cpymo_engine *e, const void *node_to_draw, float y)
@@ -222,6 +284,7 @@ static void *cpymo_backlog_ui_get_prev(const cpymo_engine *e, const void *ui_dat
 
 typedef struct {
 	bool press_key_down_to_close;
+	size_t last_played_index;
 } cpymo_backlog_ui;
 
 static error_t cpymo_backlog_ui_update(cpymo_engine *e, float dt, void *selected)
@@ -237,6 +300,18 @@ static error_t cpymo_backlog_ui_update(cpymo_engine *e, float dt, void *selected
 		ui->press_key_down_to_close = false;
 	}
 
+	/* Issue #57: replay the voice of the record under the cursor. */
+	if (selected) {
+		size_t index = (size_t)cpymo_list_ui_encode_uint_node_dec(selected);
+		if (index != ui->last_played_index) {
+			ui->last_played_index = index;
+			const cpymo_backlog_record *rec = &e->backlog.records[index];
+			if (rec->vo_filename[0])
+				cpymo_audio_vo_play(e, cpymo_str_pure(rec->vo_filename));
+			else cpymo_audio_vo_stop(e);
+		}
+	}
+
 	return CPYMO_ERR_SUCC;
 }
 
@@ -244,9 +319,9 @@ static error_t cpymo_backlog_ui_update(cpymo_engine *e, float dt, void *selected
 static void cpymo_backlog_ui_extract_text(cpymo_engine *e, size_t index)
 {
 	if (e->backlog.records[index].text) {
-		if (e->backlog.records[index].name_str) {
+		if (e->backlog.records[index].name_text) {
 			cpymo_engine_extract_text_cstr(
-				e, e->backlog.records[index].name_str);
+				e, e->backlog.records[index].name_text);
 			cpymo_engine_extract_text_cstr(e, "\n");
 		}
 		cpymo_engine_extract_text_cstr(e, e->backlog.records[index].text);
@@ -295,6 +370,7 @@ error_t cpymo_backlog_ui_enter(cpymo_engine *e)
 #endif
 
 	ui->press_key_down_to_close = true;
+	ui->last_played_index = (size_t)-1;
 
 	return CPYMO_ERR_SUCC;
 }
