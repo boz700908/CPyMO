@@ -287,6 +287,7 @@
     <ClCompile Include="..\..\cpymo\cpymo_package.c" />
     <ClCompile Include="..\..\cpymo\cpymo_parser.c" />
     <ClCompile Include="..\..\cpymo\cpymo_rmenu.c" />
+    <ClCompile Include="..\..\cpymo\cpymo_safe_area.c" />
     <ClCompile Include="..\..\cpymo\cpymo_save.c" />
     <ClCompile Include="..\..\cpymo\cpymo_save_global.c" />
     <ClCompile Include="..\..\cpymo\cpymo_save_ui.c" />
@@ -308,7 +309,9 @@
     <ClCompile Include="..\sdl2\cpymo_backend_input.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_masktrans.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_movie.c" />
+    <ClCompile Include="..\sdl2\cpymo_backend_safe_area.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_save.c" />
+    <ClCompile Include="..\sdl2\cpymo_embedded_assets.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_startup_music.c" />
     <ClCompile Include="..\sdl2\cpymo_backend_text.c" />
     <ClCompile Include="..\sdl2\main.c" />
