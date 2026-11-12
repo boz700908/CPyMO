@@ -8,6 +8,9 @@ find_package (FFMPEG REQUIRED)
 file (GLOB CPYMO_BACKEND_SRC "*.h" "*.c")
 
 add_executable (cpymo ${CPYMO_BACKEND_SRC})
+# 生成的 cpymo_embedded_assets_data.c 落在构建目录，它 include 的头在本目录，
+# 所以必须把源码目录本身放进搜索路径（MSVC 不会自动带上）。
+target_include_directories (cpymo PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # 把随包分发的 WAV 编进可执行文件，供单文件分发（.exe / 单二进制 / .app 内的程序）使用。
 # 运行时仍优先读文件，找不到才用内嵌数据。
