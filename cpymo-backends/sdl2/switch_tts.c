@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <SDL.h>
+#include "cpymo_import_sdl2.h"
 
 /* ------------------------------------------------------------------ */
 /* 大小与常量                                                          */

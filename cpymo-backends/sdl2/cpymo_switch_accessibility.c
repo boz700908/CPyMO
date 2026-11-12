@@ -2,7 +2,7 @@
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 
-#include <SDL.h>
+#include "cpymo_import_sdl2.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
