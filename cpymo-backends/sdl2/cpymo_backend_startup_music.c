@@ -1,6 +1,7 @@
 #include "../../cpymo/cpymo_prelude.h"
 #include "../include/cpymo_backend_startup_music.h"
 #include "cpymo_import_sdl2.h"
+#include "cpymo_embedded_assets.h"
 #include <stdio.h>
 
 /* 《Song of PyMO》启动音乐（SDL2 后端）。
@@ -95,6 +96,14 @@ static int cpymo_backend_startup_music_load(SDL_AudioSpec *out_spec)
 	startup_music_len = 0;
 
 	if (SDL_LoadWAV("startup.wav", out_spec,
+			&startup_music_pcm, &startup_music_len) != NULL)
+		return 1;
+
+	startup_music_pcm = NULL;
+	startup_music_len = 0;
+
+	/* 单文件分发：资源已编进可执行文件，没有外置 startup.wav 时也能响。 */
+	if (cpymo_embedded_load_wav("startup.wav", out_spec,
 			&startup_music_pcm, &startup_music_len) != NULL)
 		return 1;
 

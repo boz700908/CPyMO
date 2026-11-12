@@ -9,6 +9,30 @@ file (GLOB CPYMO_BACKEND_SRC "*.h" "*.c")
 
 add_executable (cpymo ${CPYMO_BACKEND_SRC})
 
+# 把随包分发的 WAV 编进可执行文件，供单文件分发（.exe / 单二进制 / .app 内的程序）使用。
+# 运行时仍优先读文件，找不到才用内嵌数据。
+find_package (Python3 COMPONENTS Interpreter QUIET)
+set (CPYMO_EMBED_FILES "")
+foreach (wav startup.wav enter.wav menu.wav select.wav)
+	if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${wav}")
+		list (APPEND CPYMO_EMBED_FILES "${wav}=${CMAKE_CURRENT_SOURCE_DIR}/${wav}")
+	endif ()
+endforeach ()
+if (Python3_Interpreter_FOUND AND CPYMO_EMBED_FILES)
+	execute_process (
+		COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_assets.py"
+			"${CMAKE_CURRENT_BINARY_DIR}/cpymo_embedded_assets_data.c" ${CPYMO_EMBED_FILES}
+		RESULT_VARIABLE CPYMO_EMBED_RESULT)
+	if (NOT CPYMO_EMBED_RESULT EQUAL 0)
+		message (FATAL_ERROR "生成内嵌资源失败")
+	endif ()
+	target_sources (cpymo PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/cpymo_embedded_assets_data.c")
+	target_compile_definitions (cpymo PRIVATE CPYMO_EMBEDDED_ASSETS)
+	message (STATUS "内嵌资源: ${CPYMO_EMBED_FILES}")
+else ()
+	message (STATUS "内嵌资源: 未启用（缺少 Python3 或没有 wav）")
+endif ()
+
 if (APPLE AND NOT IOS AND ENABLE_ACCESSIBILITY)
 	target_sources(cpymo PRIVATE "cpymo_backend_text_macos.m")
 	target_link_libraries(cpymo PRIVATE "-framework AppKit")

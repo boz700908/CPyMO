@@ -1,6 +1,7 @@
 #include "../../cpymo/cpymo_prelude.h"
 #include "../include/cpymo_backend_text.h"
 #include "cpymo_import_sdl2.h"
+#include "cpymo_embedded_assets.h"
 
 #ifndef DISABLE_STB_TRUETYPE
 
@@ -287,6 +288,13 @@ void cpymo_sdl2_accessibility_sound_init(void)
             } else {
                 loaded = 1;
             }
+        }
+
+        /* 单文件分发：资源已编进可执行文件，没有外置 wav 时也能出声 */
+        if (!loaded) {
+            if (cpymo_embedded_load_wav(sound_files[i], &spec,
+                    &accessibility_wav_bufs[i], &accessibility_wav_lens[i]) != NULL)
+                loaded = 1;
         }
 
         if (loaded) {
