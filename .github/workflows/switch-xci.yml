@@ -7,20 +7,16 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  pack:
-    name: 'Switch NSP/XCI'
+  build:
+    name: Build NRO + NPDM
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20230507
-    env:
-      SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
-
     steps:
     - uses: actions/checkout@v4.4.0
       with:
-        submodules: true
+        submodules: recursive
 
     - name: Build NRO
-      shell: bash
       run: |
         set -o pipefail
         cd ./cpymo-backends/sdl2
@@ -34,31 +30,10 @@ jobs:
         tail -3 /tmp/build.log
         ls -l cpymo.nro build.Switch/cpymo.nacp 2>&1 || true
 
-    - name: Probe tools
-      shell: bash
-      run: |
-        for t in elf2nso elf2nro npdmtool nacptool; do
-          printf '%-10s ' "$t"; command -v "$t" || echo "缺少"
-        done
-        echo "--- elf2nso ---"; elf2nso 2>&1 | head -6 || true
-        echo "--- npdmtool ---"; npdmtool 2>&1 | head -6 || true
-        echo "--- nacptool ---"; nacptool 2>&1 | head -8 || true
-        echo "--- 图标 ---"; ls cpymo.jpg icon.jpg 2>&1 || true
-
-    - name: Pack NSP
-      if: env.SWITCH_PROD_KEYS != ''
-      shell: bash
+    - name: Make exefs, NPDM and control
       run: |
         set -euxo pipefail
         cd ./cpymo-backends/sdl2
-        printf '%s\n' "$SWITCH_PROD_KEYS" > /tmp/keys.raw
-        if base64 -d /tmp/keys.raw > /tmp/keys.dec 2>/dev/null && grep -q header_key /tmp/keys.dec; then
-          install -m 600 /tmp/keys.dec /tmp/prod.keys
-        else
-          install -m 600 /tmp/keys.raw /tmp/prod.keys
-        fi
-        echo "keys 有效行数: $(grep -c . /tmp/prod.keys)"
-
         mkdir -p /tmp/pkg/exefs /tmp/pkg/control
         cp build.Switch/cpymo.elf /tmp/pkg/
         elf2nso /tmp/pkg/cpymo.elf /tmp/pkg/exefs/main
@@ -92,28 +67,66 @@ jobs:
         }
         JSON
         npdmtool /tmp/pkg/npdm.json /tmp/pkg/exefs/main.npdm
-        nacptool --create "CPyMO" "boz700908" "0x0100000000010000" /tmp/pkg/control/control.nacp
+        nacptool --create "CPyMO" "boz700908" "1.0.0" /tmp/pkg/control/control.nacp --titleid=0x0100000000010000
         ls -l /tmp/pkg/exefs /tmp/pkg/control
 
-        pacman -S --noconfirm --needed gcc make >/dev/null 2>&1 || true
+    - name: Upload exefs
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: switch-exefs
+        path: |
+          /tmp/pkg/exefs
+          /tmp/pkg/control
+        if-no-files-found: error
+
+  pack:
+    name: Pack NSP
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download exefs
+      uses: actions/download-artifact@v6.0.0
+      with:
+        name: switch-exefs
+        path: /tmp/pkg
+
+    - name: Write keys
+      env:
+        SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
+      run: |
+        set -euo pipefail
+        printf '%s\n' "$SWITCH_PROD_KEYS" > /tmp/keys.raw
+        if base64 -d /tmp/keys.raw > /tmp/keys.dec 2>/dev/null && grep -q header_key /tmp/keys.dec; then
+          install -m 600 /tmp/keys.dec /tmp/prod.keys
+        else
+          install -m 600 /tmp/keys.raw /tmp/prod.keys
+        fi
+        echo "keys 有效行数: $(grep -c . /tmp/prod.keys)"
+
+    - name: Build hacBrewPack
+      run: |
+        set -euxo pipefail
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq build-essential
         git clone --depth 1 https://github.com/rlaphoenix/hacBrewPack /tmp/hbp
         cd /tmp/hbp
-        [ -f config.mk.template ] && cp config.mk.template config.mk || true
-        make -j 2>&1 | tail -25
+        make -j"$(nproc)" 2>&1 | tail -25
 
+    - name: Pack NSP
+      run: |
+        set -euxo pipefail
+        cd /tmp/hbp
         ./hacBrewPack -k /tmp/prod.keys --nologo --noromfs \
           --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
           --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
           --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
           --keepncadir --titleid 0100000000010000 \
           --titlename CPyMO --titlepublisher boz700908 2>&1 | tail -60
-        ls -l /tmp/pkg/nsp /tmp/pkg/nca
-        cp /tmp/pkg/nsp/*.nsp /tmp/cpymo.nsp || true
-        ls -l /tmp/cpymo.nsp
+        ls -l /tmp/pkg/nsp
 
-    - name: Upload
-      if: env.SWITCH_PROD_KEYS != ''
+    - name: Upload NSP
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO Switch NSP (experimental)
-        path: /tmp/cpymo.nsp
+        path: /tmp/pkg/nsp/*.nsp
+        if-no-files-found: error
