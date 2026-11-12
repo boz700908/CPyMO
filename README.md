@@ -260,16 +260,50 @@ cd到`cpymo-backends/sdl2`，执行`make -j -f Makefile.Switch`即可编译到�
 make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1
 ```
 
-需要在 SD 卡上准备语音引擎与音库：
+### 语音资源（不随 `.nro` 分发，需自行准备）
 
-```
-sdmc:/pymogames/tts/rtld.bin
-sdmc:/pymogames/tts/main.bin
-sdmc:/pymogames/tts/sdk.bin
-sdmc:/pymogames/tts/D32-YAFANG.vtdb2
+`.nro` 里不打包语音引擎和音库。需要你自己准备下面四个文件，并且放在**同一个目录**里：
+
+```text
+rtld.bin          语音引擎加载器（NSO 模块）
+main.bin          语音引擎主体（NSO 模块）
+sdk.bin           引擎依赖的运行时（NSO 模块）
+D32-YAFANG.vtdb2  中文音库（ReadSpeaker 自带普通话女声）
 ```
 
-也可以放在 `.nro` 同级的 `tts/` 目录或 `sdmc:/switch/tts`；环境变量 `CPYMO_SWITCH_TTS_DIR` 优先级最高。
+* 前三个文件是 Switch 系统自带的 ReadSpeaker 语音引擎的三个 NSO 模块，请从**你自己合法持有的固件**中导出；本程序只把它们映射进内存并执行，不会修改它们，也不需要额外的导出表或转译层。
+* `D32-YAFANG.vtdb2` 是随 ReadSpeaker 分发的音库。程序只认这一个文件名（以及旧式 `.vtdb`），不会自动改名，请保持上表写法。
+* 构建产物里已经带好一份（见下面的 `tts-assets/`），从 Actions 附件或 Release 下载时直接拷到 SD 卡即可，不需要自己再提取。
+
+放置位置按以下顺序查找，第一个凑齐三件 `.bin` 的目录生效（空目录会被跳过）：
+
+1. 环境变量 `CPYMO_SWITCH_TTS_DIR` 指向的目录（优先级最高）
+2. `.nro` 同级的 `tts/` 目录
+3. `sdmc:/pymogames/tts`
+4. `sdmc:/switch/tts`
+5. `sdmc:/switch/cpymo/tts`
+
+例如把 Actions 附件里的 `dist/` 整个拷到 `sdmc:/switch/`，最终应当是这样：
+
+```text
+sdmc:/switch/cpymo.nro
+sdmc:/switch/enter.wav
+sdmc:/switch/menu.wav
+sdmc:/switch/select.wav
+sdmc:/switch/tts/rtld.bin
+sdmc:/switch/tts/main.bin
+sdmc:/switch/tts/sdk.bin
+sdmc:/switch/tts/D32-YAFANG.vtdb2
+```
+
+语音引擎加载失败时，控制台（Eden 的日志窗口）会打印 `[tts] FAIL: ...`，第一行通常就写明了是哪个文件没找到、或者是不是文件放错了目录。
+
+### 语音资源的版权声明
+
+* Switch 自带的 ReadSpeaker / Nuance Vocalizer 语音引擎（`rtld.bin`、`main.bin`、`sdk.bin`）与 `vtdb2` 音库的著作权归任天堂及各自权利人所有，**不是本项目的源码**，也不在本项目的 AGPL-3.0 授权范围内。
+* 本项目只调用你主机固件里已经存在的语音引擎，不提供、不修改、不绕过任何授权或校验机制；使用前请自行确认你对所持有的固件与音库拥有合法使用权。
+* 仓库中的 `tts-assets/` 目录只是为了让自动化构建能直接产出可自测的包，**不构成**对上述任何资源的授权，也不表示本项目有权分发它们。请勿将其用于商业用途或二次分发；若权利人提出要求，将立即移除。
+* 除中文音库外，其他语言的 `vtdb2` 音库同理：需要你有权使用的对应文件，放入同一目录并把名字改成 `D32-*.vtdb2` 中你实际持有的那个即可（程序按固定名查找）。
 
 音效文件 `enter.wav`、`menu.wav`、`select.wav` 与普通版本一致，放在 `.nro` 同级目录。
 
