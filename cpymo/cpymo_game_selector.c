@@ -3,6 +3,7 @@
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
 #include "cpymo_localization.h"
+#include "cpymo_safe_area.h"
 #include "cpymo_accessibility.h"
 #include "../stb/stb_image.h"
 #include <assert.h>
@@ -174,17 +175,40 @@ typedef struct {
 	float font_size;
 } cpymo_game_selector_empty_ui;
 
+/* 把居中文字夹进安全区（刘海 / 圆角 / 折叠屏）；未注册 provider 时等同于原居中。 */
+static float cpymo_game_selector_empty_ui_x(
+	const cpymo_engine *e, const cpymo_safe_area *sa, float inner_cx, float w)
+{
+	float x = inner_cx - w / 2;
+	const float right = (float)e->gameconfig.imagesize_w - sa->right;
+	if (x < sa->left) x = sa->left;
+	if (x + w > right) x = right - w;
+	if (x < 0) x = 0;
+	return x;
+}
+
 static void cpymo_game_selector_empty_ui_draw(const cpymo_engine *e, const void *ui_data)
 {
 	cpymo_game_selector_empty_ui *ui = (cpymo_game_selector_empty_ui *)ui_data;
 
 	float fontsize = ui->font_size;
 
+	cpymo_safe_area sa;
+	cpymo_safe_area_get(&sa, e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+
+	float area_w = (float)e->gameconfig.imagesize_w - sa.left - sa.right;
+	float area_h = (float)e->gameconfig.imagesize_h - sa.top - sa.bottom;
+	if (area_w < fontsize * 2) { sa.left = 0; sa.right = 0; area_w = (float)e->gameconfig.imagesize_w; }
+	if (area_h < fontsize * 2) { sa.top = 0; sa.bottom = 0; area_h = (float)e->gameconfig.imagesize_h; }
+
+	const float inner_cx = sa.left + area_w / 2;
+	const float inner_cy = sa.top + area_h / 2;
+
 	if (ui->msg1) {
 		cpymo_backend_text_draw(
 			ui->msg1,
-			(e->gameconfig.imagesize_w - ui->msg1_w) / 2,
-			(e->gameconfig.imagesize_h - fontsize) / 2,
+			cpymo_game_selector_empty_ui_x(e, &sa, inner_cx, ui->msg1_w),
+			inner_cy - fontsize / 2,
 			cpymo_color_white, 0.5f,
 			cpymo_backend_image_draw_type_ui_element);
 	}
@@ -192,8 +216,8 @@ static void cpymo_game_selector_empty_ui_draw(const cpymo_engine *e, const void 
 	if (ui->msg2) {
 		cpymo_backend_text_draw(
 			ui->msg2,
-			(e->gameconfig.imagesize_w - ui->msg2_w) / 2,
-			(e->gameconfig.imagesize_h - fontsize) / 2 + fontsize + fontsize / 2,
+			cpymo_game_selector_empty_ui_x(e, &sa, inner_cx, ui->msg2_w),
+			inner_cy - fontsize / 2 + fontsize + fontsize / 2,
 			cpymo_color_white, 0.25f,
 			cpymo_backend_image_draw_type_ui_element);
 	}
