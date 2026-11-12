@@ -599,14 +599,15 @@ jobs:
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
+        # 只缓存二进制产物。vcpkg/downloads 一旦进缓存，恢复时会把 vcpkg/ 目录一并建出来，
+        # 紧接的 git clone 就撞上「目标已存在」而失败（Windows 上必现）。
         path: |
           ${{ github.workspace }}/.vcpkg-binary-cache
-          ${{ github.workspace }}/vcpkg/downloads
-        key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        key: vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
         restore-keys: |
-          vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+          vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
 
-    - name: Donwload vcpkg
+    - name: Download vcpkg
       run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
@@ -816,14 +817,15 @@ jobs:
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
+        # 只缓存二进制产物。vcpkg/downloads 一旦进缓存，恢复时会把 vcpkg/ 目录一并建出来，
+        # 紧接的 git clone 就撞上「目标已存在」而失败（Windows 上必现）。
         path: |
           ${{ github.workspace }}/.vcpkg-binary-cache
-          ${{ github.workspace }}/vcpkg/downloads
-        key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        key: vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
         restore-keys: |
-          vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+          vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
 
-    - name: Donwload vcpkg
+    - name: Download vcpkg
       run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
@@ -980,14 +982,15 @@ jobs:
     - name: Restore vcpkg binary cache
       uses: actions/cache@v4
       with:
+        # 只缓存二进制产物。vcpkg/downloads 一旦进缓存，恢复时会把 vcpkg/ 目录一并建出来，
+        # 紧接的 git clone 就撞上「目标已存在」而失败（Windows 上必现）。
         path: |
           ${{ github.workspace }}/.vcpkg-binary-cache
-          ${{ github.workspace }}/vcpkg/downloads
-        key: vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
+        key: vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
         restore-keys: |
-          vcpkg-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
+          vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
 
-    - name: Donwload vcpkg
+    - name: Download vcpkg
       run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
 
     - name: Bootstrap vcpkg
