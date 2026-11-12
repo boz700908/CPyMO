@@ -1,0 +1,45 @@
+name: Switch Accessibility
+
+# 只编 Switch 无障碍版本，用来快速拿编译错误和可下载的 .nro
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'cpymo-backends/sdl2/**'
+      - 'cpymo/**'
+      - 'tts-assets/**'
+      - '.github/workflows/switch-a11y.yml'
+
+jobs:
+  build:
+    name: 'Nintendo Switch (无障碍 / ReadSpeaker TTS)'
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:20230507
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: |
+        cd ./cpymo-backends/sdl2
+        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1 2>&1 | tail -120
+
+    - name: Package
+      run: |
+        cd ./cpymo-backends/sdl2
+        mkdir -p dist
+        cp cpymo.nro dist/ 2>/dev/null || true
+        cp enter.wav menu.wav select.wav dist/ 2>/dev/null || true
+        if [ -d ../../tts-assets ]; then
+          mkdir -p dist/tts
+          cp ../../tts-assets/*.bin dist/tts/ 2>/dev/null || true
+          cp ../../tts-assets/*.vtdb2 dist/tts/ 2>/dev/null || true
+        fi
+        ls -lR dist | head -40
+
+    - name: Upload
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO-Switch-Accessibility
+        path: ./cpymo-backends/sdl2/dist
