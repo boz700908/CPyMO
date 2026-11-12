@@ -29,6 +29,10 @@ jobs:
       run: |
         set -e
         test -d tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
+        for name in rtld main sdk; do
+          test "$(head -c 4 "tts-assets/$name.bin")" = NSO0 || { echo "$name.bin 不是 NSO0"; exit 1; }
+        done
+        test -s tts-assets/D32-YAFANG.vtdb2 || { echo "缺少音库"; exit 1; }
         mkdir -p cpymo-backends/sdl2/romfs/tts
         cp tts-assets/*.bin tts-assets/*.vtdb2 cpymo-backends/sdl2/romfs/tts/
         cp cpymo-backends/sdl2/*.wav cpymo-backends/sdl2/romfs/
