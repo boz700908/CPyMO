@@ -1,0 +1,101 @@
+name: Switch XCI (experimental)
+
+on:
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  pack:
+    name: 'Switch NSP/XCI'
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:20230507
+    env:
+      SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
+
+    steps:
+    - uses: actions/checkout@v4.4.0
+      with:
+        submodules: true
+
+    - name: Build NRO
+      shell: bash
+      run: |
+        set -o pipefail
+        cd ./cpymo-backends/sdl2
+        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1 2>&1 | tail -40
+        ls -l cpymo.nro cpymo.elf build.Switch/cpymo.nacp 2>&1 || true
+
+    - name: Probe tools
+      shell: bash
+      run: |
+        for t in elf2nso elf2nro npdmtool nacptool; do
+          printf '%-10s ' "$t"; command -v "$t" || echo "缺少"
+        done
+        echo "--- elf2nso ---"; elf2nso 2>&1 | head -6 || true
+        echo "--- npdmtool ---"; npdmtool 2>&1 | head -6 || true
+        echo "--- nacptool ---"; nacptool 2>&1 | head -8 || true
+        echo "--- 图标 ---"; ls cpymo.jpg icon.jpg 2>&1 || true
+
+    - name: Pack NSP
+      if: env.SWITCH_PROD_KEYS != ''
+      shell: bash
+      run: |
+        set -euxo pipefail
+        cd ./cpymo-backends/sdl2
+        printf '%s\n' "$SWITCH_PROD_KEYS" > /tmp/keys.raw
+        if base64 -d /tmp/keys.raw > /tmp/keys.dec 2>/dev/null && grep -q header_key /tmp/keys.dec; then
+          install -m 600 /tmp/keys.dec /tmp/prod.keys
+        else
+          install -m 600 /tmp/keys.raw /tmp/prod.keys
+        fi
+        echo "keys 有效行数: $(grep -c . /tmp/prod.keys)"
+
+        mkdir -p /tmp/pkg/exefs /tmp/pkg/control
+        cp build.Switch/cpymo.elf /tmp/pkg/
+        elf2nso /tmp/pkg/cpymo.elf /tmp/pkg/exefs/main
+        cat > /tmp/pkg/npdm.json <<'JSON'
+        {
+          "name": "CPyMO",
+          "title_id": "0x0100000000010000",
+          "main_thread_stack_size": "0x00100000",
+          "main_thread_priority": 44,
+          "default_cpu_id": 0,
+          "process_category": 0,
+          "is_retail": false,
+          "pool_partition": 0,
+          "is_64_bit": false,
+          "address_space_type": 3,
+          "service_access": ["*"],
+          "kernel_capabilities": [
+            { "type": "kernel_flags", "value": { "highest_thread_priority": 63, "lowest_thread_priority": 24, "highest_cpu_id": 3 } }
+          ]
+        }
+        JSON
+        npdmtool /tmp/pkg/npdm.json /tmp/pkg/exefs/main.npdm
+        nacptool --create "CPyMO" "boz700908" "0x0100000000010000" /tmp/pkg/control/control.nacp
+        ls -l /tmp/pkg/exefs /tmp/pkg/control
+
+        pacman -S --noconfirm --needed gcc make >/dev/null 2>&1 || true
+        git clone --depth 1 https://github.com/rlaphoenix/hacBrewPack /tmp/hbp
+        cd /tmp/hbp
+        [ -f config.mk.template ] && cp config.mk.template config.mk || true
+        make -j 2>&1 | tail -25
+
+        ./hacBrewPack -k /tmp/prod.keys --nologo --noromfs \
+          --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
+          --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
+          --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
+          --keepncadir --titleid 0100000000010000 \
+          --titlename CPyMO --titlepublisher boz700908 2>&1 | tail -60
+        ls -l /tmp/pkg/nsp /tmp/pkg/nca
+        cp /tmp/pkg/nsp/*.nsp /tmp/cpymo.nsp || true
+        ls -l /tmp/cpymo.nsp
+
+    - name: Upload
+      if: env.SWITCH_PROD_KEYS != ''
+      uses: actions/upload-artifact@v6.0.0
+      with:
+        name: CPyMO Switch NSP (experimental)
+        path: /tmp/cpymo.nsp
