@@ -256,6 +256,15 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		POP_ARG(show_immediately_str);
 		bool show_immediately = cpymo_str_atoi(show_immediately_str) != 0;
 
+		/* issue #57: content 若精确等于已定义的变量名，显示其数值；
+		 * 其余情况一律按字面量显示，避免误伤普通文本。 */
+		char content_num[16];
+		if (cpymo_vars_access(&engine->vars, content)) {
+			snprintf(content_num, sizeof(content_num), "%d",
+				(int)cpymo_vars_eval(&engine->vars, content));
+			content = cpymo_str_pure(content_num);
+		}
+
 		cpymo_engine_extract_text(engine, content);
 		cpymo_engine_extract_text_submit(engine);
 
