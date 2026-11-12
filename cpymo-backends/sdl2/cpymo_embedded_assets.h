@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include <SDL.h>
+#include "cpymo_import_sdl2.h"
 
 #ifdef __cplusplus
 extern "C" {
