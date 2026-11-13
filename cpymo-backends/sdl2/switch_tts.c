@@ -69,13 +69,14 @@
 #define OFF_SDK_INIT_MODULE  0x11c010  /* nninitInitializeSdkModule → 直接 ret */
 
 /* ------------------------------------------------------------------ */
-/* 寄存器快照（asm 与 C 的契约，严格 0xA0 字节）                        */
+/* 寄存器快照（asm 与 C 的契约，严格 0xA8 字节）                        */
 /* ------------------------------------------------------------------ */
 
 typedef struct {
     uint64_t x[18];   /* 0x00..0x88  x0..x17 */
     uint64_t x18;     /* 0x90 */
     uint64_t sp;      /* 0x98 */
+    uint64_t lr;      /* 0xA0  guest x30，trampoline 存的现场 */
 } tt_regs;
 
 typedef struct {
@@ -291,6 +292,11 @@ enum { TT_TRACE_HEAP, TT_TRACE_PERM, TT_TRACE_ATTR, TT_TRACE_QUERY,
        TT_TRACE_INFO, TT_TRACE_RNG, TT_TRACE_COUNT };
 static uint32_t g_boot_trace[TT_TRACE_COUNT];
 static uint64_t g_boot_query_addr;
+/* guest 线程最后一次进 shim 时的 LR（guest VA）；由宿主线程在超时/失败时转储 */
+static uint64_t g_boot_lr;
+/* guest 线程侧产生的错误码（1=音库切换失败 2=合成失败 3=片段音库不可用
+   4=heap 分配失败 5=heap 二次扩容被拒 6=TTS 堆指针重定位不匹配） */
+static uint32_t g_async_err;
 static bool     g_quit;
 
 /* 请求环由短时互斥锁保护；不在音频回调中访问。 */
@@ -525,15 +531,22 @@ typedef struct {
 #define TT_PM_W             2u
 #define TT_PM_X             4u
 
+static void tt_note_lr(const tt_regs *r)
+{
+    __atomic_store_n(&g_boot_lr, r ? r->lr : 0, __ATOMIC_RELAXED);
+}
+
 static void shim_set_heap_size(tt_regs *r)
 {
     /*
-     * svcSetHeapSize(void **out, u64 size)：宿主的返回值放在 x1，x0 是 Result。
-     * 引擎要多大就给多大（按 1MB 对齐），拿不到就逐级减半；给不出请求的
-     * 大小时只能记日志，引擎越界与否不由我们控制。
+     * svcSetHeapSize(size 入 x1)：Result 入 x0，堆基址入 x1。
+     * 引擎要多大就给多大（按 1MB 对齐），拿不到就逐级减半。
+     * 这里跑在 guest 线程上，禁止 stdio/日志：只记原子计数，
+     * 由宿主线程在超时或失败时统一转储。
      */
     uint64_t want = r->x[1];
     __atomic_add_fetch(&g_boot_trace[TT_TRACE_HEAP], 1, __ATOMIC_RELAXED);
+    tt_note_lr(r);
 
     if (!g_heap_mem) {
         size_t min_sz = (size_t)32 << 20;
@@ -546,15 +559,11 @@ static void shim_set_heap_size(tt_regs *r)
             if (g_heap_mem) { g_heap_size = sz; break; }
             sz >>= 1;
         }
-        if (g_heap_mem) {
-            g_heap_va = (uintptr_t)g_heap_mem;
-            CPYMO_DIAG("[tts] SetHeapSize 请求 0x%llx -> 给 0x%zx @0x%llx\n",
-                   (unsigned long long)want, g_heap_size,
-                   (unsigned long long)g_heap_va);
-        }
+        if (!g_heap_mem) __atomic_store_n(&g_async_err, 4, __ATOMIC_RELAXED);
+        g_heap_va = (uintptr_t)g_heap_mem; /* 失败时为 0，让 guest 走自己的错误路径 */
     } else if (want > (uint64_t)g_heap_size) {
-        CPYMO_DIAG("[tts] 警告：再次请求 0x%llx > 已有 0x%zx\n",
-               (unsigned long long)want, g_heap_size);
+        /* 已有堆无法原地扩容：guest 若按新大小访问会越界，只记错误码 */
+        __atomic_store_n(&g_async_err, 5, __ATOMIC_RELAXED);
     }
     r->x[0] = 0;
     r->x[1] = (uint64_t)g_heap_va;
@@ -563,6 +572,7 @@ static void shim_set_heap_size(tt_regs *r)
 static void shim_set_mem_perm(tt_regs *r)
 {
     __atomic_add_fetch(&g_boot_trace[TT_TRACE_PERM], 1, __ATOMIC_RELAXED);
+    tt_note_lr(r);
     (void)r;
     r->x[0] = 0;
 }
@@ -570,6 +580,7 @@ static void shim_set_mem_perm(tt_regs *r)
 static void shim_set_mem_attr(tt_regs *r)
 {
     __atomic_add_fetch(&g_boot_trace[TT_TRACE_ATTR], 1, __ATOMIC_RELAXED);
+    tt_note_lr(r);
     (void)r;
     r->x[0] = 0;
 }
@@ -609,6 +620,7 @@ static void shim_query_memory(tt_regs *r)
     void *out = (void *)(uintptr_t)r->x[0];
     uintptr_t addr = (uintptr_t)r->x[2];
     __atomic_add_fetch(&g_boot_trace[TT_TRACE_QUERY], 1, __ATOMIC_RELAXED);
+    tt_note_lr(r);
     __atomic_store_n(&g_boot_query_addr, (uint64_t)addr, __ATOMIC_RELAXED);
     if (out) tt_region_of(addr, (tt_meminfo *)out);
     r->x[0] = 0;
@@ -621,6 +633,7 @@ static void shim_get_info(tt_regs *r)
     uint64_t id = r->x[1];
     uint64_t v = 0;
     __atomic_add_fetch(&g_boot_trace[TT_TRACE_INFO], 1, __ATOMIC_RELAXED);
+    tt_note_lr(r);
 
     switch (id) {
         case 21: v = (uint64_t)g_heap_va + (uint64_t)g_heap_size; break;
@@ -637,6 +650,7 @@ static void shim_rng(tt_regs *r)
     void *buf = (void *)(uintptr_t)r->x[0];
     size_t len = (size_t)r->x[1];
     __atomic_add_fetch(&g_boot_trace[TT_TRACE_RNG], 1, __ATOMIC_RELAXED);
+    tt_note_lr(r);
     if (buf && len) memset(buf, 0, len);
     r->x[0] = 0;
 }
@@ -838,27 +852,45 @@ static void tt_wait_playback(uint64_t timeout_ns)
 /* 合成：把一条文本灌进引擎，分块把 PCM 抽出来                          */
 /* ------------------------------------------------------------------ */
 
+static size_t tt_append_str(uint8_t *buf, size_t cap, size_t n, const char *s)
+{
+    while (*s && n + 1 < cap) buf[n++] = (uint8_t)*s++;
+    return n;
+}
+
+static size_t tt_append_uint(uint8_t *buf, size_t cap, size_t n, unsigned v)
+{
+    char tmp[12];
+    int i = 0;
+    do { tmp[i++] = (char)('0' + v % 10); v /= 10; } while (v && i < (int)sizeof(tmp));
+    while (i && n + 1 < cap) buf[n++] = (uint8_t)tmp[--i];
+    return n;
+}
+
 static size_t tt_build_input(const char *text, const cpymo_switch_tts_params *params)
 {
+    static const char open_head[] = "<vtml_emotion category=\"";
+    static const char open_mid[] = "\" level=\"";
+    static const char open_tail[] = "\">";
     static const char close_tag[] = "</vtml_emotion>";
-    size_t cap = g_inbuf_size, n = 0, i, cl;
+    size_t cap = g_inbuf_size, n = 0, i;
 
+    /* 引擎线程上禁止 newlib stdio（依赖 TLS）；这里手工拼 VTML 输入 */
     if (params->emotion_level > 0) {
-        int w = snprintf((char *)g_inbuf, cap,
-                         "<vtml_emotion category=\"%s\" level=\"%d\">",
-                         params->emotion_category, params->emotion_level);
-        if (w < 0 || (size_t)w >= cap) return 0;
-        n = (size_t)w;
+        n = tt_append_str(g_inbuf, cap, n, open_head);
+        n = tt_append_str(g_inbuf, cap, n, params->emotion_category);
+        n = tt_append_str(g_inbuf, cap, n, open_mid);
+        n = tt_append_uint(g_inbuf, cap, n, (unsigned)params->emotion_level);
+        n = tt_append_str(g_inbuf, cap, n, open_tail);
+        if (n + 1 >= cap) return 0;
     }
     for (i = 0; text[i]; i++) {
         if (n + 1 >= cap) break;
         g_inbuf[n++] = (text[i] == '<') ? '>' : (uint8_t)text[i];
     }
     if (params->emotion_level > 0) {
-        cl = sizeof(close_tag) - 1;
-        if (n + cl + 1 >= cap) return 0;
-        memcpy(g_inbuf + n, close_tag, cl);
-        n += cl;
+        n = tt_append_str(g_inbuf, cap, n, close_tag);
+        if (n + 1 >= cap) return 0;
     }
     g_inbuf[n] = 0;
     return n;
@@ -917,7 +949,8 @@ static bool tt_synth(const char *text, uint32_t abort_gen, int voice)
 
         rc = (int32_t)c.result;
         if (rc < 0) {
-            CPYMO_DIAG("[tts] synth 返回 %lld\n", (long long)rc);
+            /* guest 线程内不得走 stdio，只记错误码，宿主线程负责输出 */
+            __atomic_store_n(&g_async_err, 2, __ATOMIC_RELAXED);
             return false;
         }
 
@@ -962,7 +995,7 @@ static bool tt_select_language(cpymo_tts_language lang, int voice)
     cpymo_sw_tts_call_guest(&c);
     if ((int32_t)c.result != 0) {
         g_active_voice = -1;
-        CPYMO_DIAG("[tts] 音库 %d 初始化失败: %d\n", voice, (int32_t)c.result);
+        __atomic_store_n(&g_async_err, 1, __ATOMIC_RELAXED);
         return false;
     }
     g_active_voice = voice;
@@ -1029,9 +1062,9 @@ static void tt_engine_loop(void)
                 if (selected && __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen &&
                     !__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) {
                     if (!tt_synth(text + pos, abort_gen, voice))
-                        CPYMO_DIAG("[tts] 音库 %d 合成失败\n", voice);
+                        __atomic_store_n(&g_async_err, 2, __ATOMIC_RELAXED);
                 } else if (!selected) {
-                    CPYMO_DIAG("[tts] 片段音库不可用\n");
+                    __atomic_store_n(&g_async_err, 3, __ATOMIC_RELAXED);
                 }
                 text[pos + n] = saved;
                 pos += n;
@@ -1051,8 +1084,8 @@ static void tt_boot_hook(tt_regs *r)
     tt_call c;
 
     (void)r;
+    /* guest 线程上禁止 stdio/日志；进度全部走原子变量，宿主线程统一转储 */
     __atomic_store_n(&g_boot_stage, 2, __ATOMIC_RELAXED);
-    CPYMO_DIAG("[tts] nnMain 入口钩子命中\n");
 
     memset(&c, 0, sizeof(c));
     c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
@@ -1071,8 +1104,9 @@ static void tt_boot_hook(tt_regs *r)
 
     if (*(uintptr_t *)(void *)(m + OFF_MAIN_TTS_HEAP_GOT) !=
         (uintptr_t)(m + OFF_MAIN_TTS_HEAP_PTR)) {
-        tt_fail0("TTS 堆指针重定位不匹配");
-        g_boot_result = -1;
+        /* 6 = TTS 堆指针重定位不匹配 */
+        g_boot_result = -2;
+        __atomic_store_n(&g_async_err, 6, __ATOMIC_RELAXED);
         g_engine_ok = false;
         g_boot_done = true;
         eventFire(&g_boot_event);
@@ -1096,7 +1130,6 @@ static void tt_boot_hook(tt_regs *r)
     g_boot_done = true;
     if (!g_engine_ok) g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
     if (g_engine_ok) g_active_voice = 11;
-    CPYMO_DIAG("[tts] 引擎 init -> %lld\n", (long long)g_boot_result);
     eventFire(&g_boot_event);
 
     if (!g_engine_ok) {
@@ -1123,9 +1156,9 @@ static void tt_guest_thread_main(void *arg)
 
 void cpymo_sw_tts_guest_returned(void)
 {
-    CPYMO_DIAG("[tts] guest 从 rtld 返回了（异常）\n");
+    /* guest 线程内不得走 stdio；状态由宿主线程根据 boot 事件转储 */
     if (g_state != CPYMO_SWITCH_TTS_STATE_FAILED)
-        tt_fail0("guest 意外返回");
+        g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
     if (!g_boot_done) {
         g_boot_done = true;
         g_boot_result = -1;
@@ -1545,18 +1578,22 @@ void cpymo_switch_tts_params_default(cpymo_switch_tts_params *params)
     params->emotion_level = 1;
 }
 
+static const char *tt_async_err_msg(uint32_t code);
+static void tt_fmt_guest_addr(uint64_t va, char *buf, size_t cap);
+
 bool cpymo_switch_tts_init(const char *assets_dir)
 {
     if (g_state == CPYMO_SWITCH_TTS_STATE_READY) return true;
     if (g_state == CPYMO_SWITCH_TTS_STATE_FAILED) return false;
     if (!assets_dir || !*assets_dir) return tt_fail0("没有给 TTS 资产目录");
-
     g_state = CPYMO_SWITCH_TTS_STATE_LOADING;
     g_error[0] = 0;
     __atomic_store_n(&g_boot_stage, 0, __ATOMIC_RELAXED);
     for (int i = 0; i < TT_TRACE_COUNT; ++i)
         __atomic_store_n(&g_boot_trace[i], 0, __ATOMIC_RELAXED);
     __atomic_store_n(&g_boot_query_addr, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_boot_lr, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_async_err, 0, __ATOMIC_RELAXED);
     mutexLock(&g_params_mutex);
     if (g_params.voice == 0) cpymo_switch_tts_params_default(&g_params);
     mutexUnlock(&g_params_mutex);
@@ -1578,8 +1615,12 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     g_thread_started = true;
 
     Result boot_wait = eventWait(&g_boot_event, 30000000000ull);
-    if (R_FAILED(boot_wait)) {
-        CPYMO_DIAG("[tts] boot trace: wait=0x%08x stage=%u heap=%u perm=%u attr=%u query=%u info=%u rng=%u last_query=0x%llx\n",
+    {
+        /* 无论成败都转储一次引导轨迹；这些计数只由 guest 线程写，此处只读 */
+        char lr_buf[48];
+        tt_fmt_guest_addr(__atomic_load_n(&g_boot_lr, __ATOMIC_RELAXED),
+                          lr_buf, sizeof(lr_buf));
+        CPYMO_DIAG("[tts] boot trace: wait=0x%08x stage=%u heap=%u perm=%u attr=%u query=%u info=%u rng=%u last_query=0x%llx last_svc=%s\n",
             (unsigned)boot_wait,
             (unsigned)__atomic_load_n(&g_boot_stage, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_HEAP], __ATOMIC_RELAXED),
@@ -1588,7 +1629,13 @@ bool cpymo_switch_tts_init(const char *assets_dir)
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_QUERY], __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_INFO], __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_RNG], __ATOMIC_RELAXED),
-            (unsigned long long)__atomic_load_n(&g_boot_query_addr, __ATOMIC_RELAXED));
+            (unsigned long long)__atomic_load_n(&g_boot_query_addr, __ATOMIC_RELAXED),
+            lr_buf);
+        uint32_t err = __atomic_load_n(&g_async_err, __ATOMIC_ACQUIRE);
+        const char *msg = tt_async_err_msg(err);
+        if (msg) CPYMO_DIAG("[tts] guest 侧事件：%s\n", msg);
+    }
+    if (R_FAILED(boot_wait)) {
         return tt_fail0("等待引擎初始化事件失败或超时（30s）");
     }
     if (!g_boot_done || !g_engine_ok) {
@@ -1680,9 +1727,47 @@ void cpymo_switch_tts_get_params(cpymo_switch_tts_params *out)
     mutexUnlock(&g_params_mutex);
 }
 
-/* 一切都在引擎线程里推进，宿主这边没有每帧要做的事 */
+static const char *tt_async_err_msg(uint32_t code)
+{
+    switch (code) {
+        case 1: return "音库切换失败";
+        case 2: return "合成失败";
+        case 3: return "片段音库不可用";
+        case 4: return "heap 内存分配失败";
+        case 5: return "heap 二次扩容被拒";
+        case 6: return "TTS 堆指针重定位不匹配";
+        default: return NULL;
+    }
+}
+
+/* 把 guest LR 翻译成「镜像+偏移」，只在宿主线程调用 */
+static void tt_fmt_guest_addr(uint64_t va, char *buf, size_t cap)
+{
+    static const char *const names[TT_IMAGE_MAX] = { "rtld", "main", "sdk" };
+    int i;
+
+    if (!va) { snprintf(buf, cap, "-"); return; }
+    for (i = 0; i < TT_IMAGE_MAX; i++) {
+        if (va >= g_img_va[i] && va < g_img_va[i] + g_img_size[i]) {
+            snprintf(buf, cap, "%s+0x%llx", names[i],
+                     (unsigned long long)(va - g_img_va[i]));
+            return;
+        }
+    }
+    if (g_rx && va >= (uintptr_t)g_rx && va < (uintptr_t)g_rx + g_window_size)
+        snprintf(buf, cap, "tramp+0x%llx",
+                 (unsigned long long)(va - (uintptr_t)g_rx));
+    else
+        snprintf(buf, cap, "host/%llx", (unsigned long long)va);
+}
+
 void cpymo_switch_tts_pump(void)
 {
+    /* guest 线程只能记错误码；在游戏主线程（宿主）里安全地补记日志 */
+    uint32_t err = __atomic_exchange_n(&g_async_err, 0, __ATOMIC_ACQ_REL);
+    const char *msg = tt_async_err_msg(err);
+    if (msg)
+        CPYMO_DIAG("[tts] guest 侧事件：%s\n", msg);
 }
 
 #endif /* __SWITCH__ && ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY */
