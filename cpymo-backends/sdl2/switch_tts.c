@@ -1400,7 +1400,7 @@ void cpymo_switch_tts_params_default(cpymo_switch_tts_params *params)
 {
     if (!params) return;
     memset(params, 0, sizeof(*params));
-    params->voice = 10;
+    params->voice = 11; /* D32-YAFANG，繁体中文 */
     params->pitch = 150;
     params->rate = 135;
     params->volume = 90;
@@ -1501,6 +1501,7 @@ void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
 {
     if (!params) return;
     g_params = *params;
+    g_params.voice = 11; /* 目前只加载 D32-YAFANG 音库 */
     if (g_params.pitch < 1) g_params.pitch = 1;
     if (g_params.rate < 1) g_params.rate = 1;
     if (g_params.volume < 0) g_params.volume = 0;

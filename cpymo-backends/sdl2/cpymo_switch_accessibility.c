@@ -163,7 +163,7 @@ static const char *const sw_emotion_cats[CPYMO_SW_TTS_EMOTION_MAX + 1] = {
 };
 
 /* 与 CPYMO_SW_TTS_ITEM_* 顺序一致；默认值与引擎 params_default 对齐 */
-static int g_items[CPYMO_SW_TTS_ITEM_COUNT] = { 135, 150, 90, 10, 2 };
+static int g_items[CPYMO_SW_TTS_ITEM_COUNT] = { 135, 150, 90, 11, 2 };
 
 static int sw_item_min(int item)
 {
@@ -171,7 +171,7 @@ static int sw_item_min(int item)
         case CPYMO_SW_TTS_ITEM_RATE:
         case CPYMO_SW_TTS_ITEM_PITCH:  return 50;
         case CPYMO_SW_TTS_ITEM_VOLUME: return 0;
-        case CPYMO_SW_TTS_ITEM_VOICE:  return 1;
+        case CPYMO_SW_TTS_ITEM_VOICE:  return 11;
         default:                       return 0;
     }
 }
@@ -182,7 +182,7 @@ static int sw_item_max(int item)
         case CPYMO_SW_TTS_ITEM_RATE:
         case CPYMO_SW_TTS_ITEM_PITCH:  return 400;
         case CPYMO_SW_TTS_ITEM_VOLUME: return 100;
-        case CPYMO_SW_TTS_ITEM_VOICE:  return 20;
+        case CPYMO_SW_TTS_ITEM_VOICE:  return 11;
         default:                       return CPYMO_SW_TTS_EMOTION_MAX;
     }
 }
