@@ -986,14 +986,27 @@ static void tt_engine_loop(void)
                 char saved;
                 cpymo_tts_language lang;
                 int voice;
+                bool selected;
                 if (!n) break;
                 lang = g_voice_data[seg.language] ? seg.language : CPYMO_TTS_LANG_ZH;
                 voice = voices[lang];
                 saved = text[pos + n];
                 text[pos + n] = 0;
-                if (tt_select_language(lang, voice) &&
-                    __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen)
-                    tt_synth(text + pos, abort_gen, voice);
+                selected = tt_select_language(lang, voice);
+                if (!selected && lang != CPYMO_TTS_LANG_ZH &&
+                    __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen &&
+                    !__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) {
+                    lang = CPYMO_TTS_LANG_ZH;
+                    voice = voices[lang];
+                    selected = tt_select_language(lang, voice);
+                }
+                if (selected && __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen &&
+                    !__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) {
+                    if (!tt_synth(text + pos, abort_gen, voice))
+                        CPYMO_DIAG("[tts] 音库 %d 合成失败\n", voice);
+                } else if (!selected) {
+                    CPYMO_DIAG("[tts] 片段音库不可用\n");
+                }
                 text[pos + n] = saved;
                 pos += n;
             }
