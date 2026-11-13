@@ -1397,7 +1397,10 @@ static void tt_push(const char *utf8, cpymo_switch_tts_mode mode)
     uint32_t slot;
     size_t len = strlen(utf8);
 
-    if (len >= TT_TEXT_MAX) len = TT_TEXT_MAX - 1;
+    if (len >= TT_TEXT_MAX) {
+        len = TT_TEXT_MAX - 1;
+        while (len && (((unsigned char)utf8[len] & 0xc0) == 0x80)) --len;
+    }
     mutexLock(&g_req_mutex);
     if (mode != CPYMO_SWITCH_TTS_APPEND) {
         g_req_tail = g_req_head;
