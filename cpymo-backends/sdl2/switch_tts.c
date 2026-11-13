@@ -22,6 +22,7 @@
 #include "switch_tts.h"
 #include "cpymo_switch_diag.h"
 #include "switch_tts_lang.h"
+#include "switch_tts_queue.h"
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 
@@ -1470,22 +1471,18 @@ static void tt_push(const char *utf8, cpymo_switch_tts_mode mode)
         while (len && (((unsigned char)utf8[len] & 0xc0) == 0x80)) --len;
     }
     mutexLock(&g_req_mutex);
-    if (mode != CPYMO_SWITCH_TTS_APPEND) {
-        g_req_tail = g_req_head;
+    if (mode == CPYMO_SWITCH_TTS_INTERRUPT) {
         __atomic_add_fetch(&g_abort_gen, 1, __ATOMIC_RELEASE);
-        if (mode == CPYMO_SWITCH_TTS_INTERRUPT) {
-            __atomic_store_n(&g_flush_to, __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE), __ATOMIC_RELEASE);
-            __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
-        }
-    } else if (g_req_head - g_req_tail >= TT_REQ_SLOTS) {
+        __atomic_store_n(&g_flush_to, __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE), __ATOMIC_RELEASE);
+        __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
+    }
+    if (!cpymo_tts_queue_reserve(&g_req_head, &g_req_tail, TT_REQ_SLOTS, mode, &slot)) {
         mutexUnlock(&g_req_mutex);
         return;
     }
 
-    slot = g_req_head % TT_REQ_SLOTS;
     memcpy(g_req_text[slot], utf8, len);
     g_req_text[slot][len] = 0;
-    g_req_head++;
     mutexUnlock(&g_req_mutex);
     eventFire(&g_cmd_event);
 }
