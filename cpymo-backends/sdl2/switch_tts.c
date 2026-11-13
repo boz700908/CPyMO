@@ -233,6 +233,7 @@ static cpymo_switch_tts_state g_state = CPYMO_SWITCH_TTS_STATE_IDLE;
 static char g_error[192];
 static bool g_engine_ok;
 static cpymo_switch_tts_params g_params;
+static Mutex g_params_mutex;
 
 /* 可执行窗口 */
 static uint8_t *g_rw;            /* 可写别名（映射前写，映射后可继续读） */
@@ -809,15 +810,15 @@ static void tt_wait_playback(uint64_t timeout_ns)
 /* 合成：把一条文本灌进引擎，分块把 PCM 抽出来                          */
 /* ------------------------------------------------------------------ */
 
-static size_t tt_build_input(const char *text)
+static size_t tt_build_input(const char *text, const cpymo_switch_tts_params *params)
 {
     static const char close_tag[] = "</vtml_emotion>";
     size_t cap = g_inbuf_size, n = 0, i, cl;
 
-    if (g_params.emotion_level > 0) {
+    if (params->emotion_level > 0) {
         int w = snprintf((char *)g_inbuf, cap,
                          "<vtml_emotion category=\"%s\" level=\"%d\">",
-                         g_params.emotion_category, g_params.emotion_level);
+                         params->emotion_category, params->emotion_level);
         if (w < 0 || (size_t)w >= cap) return 0;
         n = (size_t)w;
     }
@@ -825,7 +826,7 @@ static size_t tt_build_input(const char *text)
         if (n + 1 >= cap) break;
         g_inbuf[n++] = (text[i] == '<') ? '>' : (uint8_t)text[i];
     }
-    if (g_params.emotion_level > 0) {
+    if (params->emotion_level > 0) {
         cl = sizeof(close_tag) - 1;
         if (n + cl + 1 >= cap) return 0;
         memcpy(g_inbuf + n, close_tag, cl);
@@ -842,9 +843,12 @@ static bool tt_synth(const char *text)
     uint32_t abort_gen = __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE);
     uint32_t step = 0;
     size_t in_len;
+    cpymo_switch_tts_params snapshot;
+    const cpymo_switch_tts_params *params = &snapshot;
 
     if (!g_inbuf || !g_outbuf || !g_cstack) return false;
-    in_len = tt_build_input(text);
+    cpymo_switch_tts_get_params(&snapshot);
+    in_len = tt_build_input(text, params);
     if (in_len == 0) return false;
 
     memset(frame, 0, 0x70);
@@ -861,9 +865,9 @@ static bool tt_synth(const char *text)
         *(uint64_t *)(void *)(frame + 0x10) = step;
         *(uint64_t *)(void *)(frame + 0x18) = 0;
         *(uint64_t *)(void *)(frame + 0x20) = 0xffffffffull;
-        *(uint64_t *)(void *)(frame + 0x28) = (uint64_t)g_params.pitch;
-        *(uint64_t *)(void *)(frame + 0x30) = (uint64_t)g_params.rate;
-        *(uint64_t *)(void *)(frame + 0x38) = (uint64_t)g_params.volume;
+        *(uint64_t *)(void *)(frame + 0x28) = (uint64_t)params->pitch;
+        *(uint64_t *)(void *)(frame + 0x30) = (uint64_t)params->rate;
+        *(uint64_t *)(void *)(frame + 0x38) = (uint64_t)params->volume;
         *(uint64_t *)(void *)(frame + 0x40) = 400;
         *(uint64_t *)(void *)(frame + 0x48) = 0;
         *(uint64_t *)(void *)(frame + 0x50) = 0xffffffffull;
@@ -871,7 +875,7 @@ static bool tt_synth(const char *text)
         memset(&c, 0, sizeof(c));
         c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_SYNTH;
         c.sp = (uint64_t)sp;
-        c.x[0] = (uint64_t)g_params.voice;
+        c.x[0] = (uint64_t)params->voice;
         c.x[1] = 0;
         c.x[2] = (uint64_t)(uintptr_t)g_inbuf;
         c.x[3] = (uint64_t)in_len;
@@ -945,8 +949,10 @@ static void tt_boot_hook(tt_regs *r)
 {
     uint8_t *m = (uint8_t *)g_img_va[TT_IMG_MAIN];
     tt_call c;
+    cpymo_switch_tts_params params;
 
     (void)r;
+    cpymo_switch_tts_get_params(&params);
     CPYMO_DIAG("[tts] nnMain 入口钩子命中\n");
 
     memset(&c, 0, sizeof(c));
@@ -967,7 +973,7 @@ static void tt_boot_hook(tt_regs *r)
     memset(&c, 0, sizeof(c));
     c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_INIT;
     c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
-    c.x[0] = (uint64_t)g_params.voice;
+    c.x[0] = (uint64_t)params.voice;
     c.x[1] = 0xffffffffull;
     c.x[2] = (uint64_t)(uintptr_t)g_vtdb;
     c.x[3] = (uint64_t)g_vtdb_len;
@@ -1416,7 +1422,9 @@ bool cpymo_switch_tts_init(const char *assets_dir)
 
     g_state = CPYMO_SWITCH_TTS_STATE_LOADING;
     g_error[0] = 0;
+    mutexLock(&g_params_mutex);
     if (g_params.voice == 0) cpymo_switch_tts_params_default(&g_params);
+    mutexUnlock(&g_params_mutex);
 
     /* autoclear：等待即清除，与下面只用 eventWait 的用法配套 */
     eventCreate(&g_cmd_event, true);
@@ -1500,6 +1508,7 @@ void cpymo_switch_tts_stop(void)
 void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
 {
     if (!params) return;
+    mutexLock(&g_params_mutex);
     g_params = *params;
     g_params.voice = 11; /* 目前只加载 D32-YAFANG 音库 */
     if (g_params.pitch < 1) g_params.pitch = 1;
@@ -1511,11 +1520,15 @@ void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
     if (g_params.emotion_level < 0) g_params.emotion_level = 0;
     if (g_params.emotion_level > 10) g_params.emotion_level = 10;
     g_params.emotion_category[sizeof(g_params.emotion_category) - 1] = 0;
+    mutexUnlock(&g_params_mutex);
 }
 
 void cpymo_switch_tts_get_params(cpymo_switch_tts_params *out)
 {
-    if (out) *out = g_params;
+    if (!out) return;
+    mutexLock(&g_params_mutex);
+    *out = g_params;
+    mutexUnlock(&g_params_mutex);
 }
 
 /* 一切都在引擎线程里推进，宿主这边没有每帧要做的事 */
