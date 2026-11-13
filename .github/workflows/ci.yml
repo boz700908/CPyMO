@@ -31,19 +31,27 @@ jobs:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20230507
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
     - uses: actions/checkout@v4.4.0
       with:
         submodules: true
 
-    - name: Build
-      run: |
-        cd ./cpymo-backends/sdl2
-        make -j -f Makefile.Switch
-
-    - name: Package
+    # 与 build-macos 同一模式：一个 job 内按序产出普通版、无障碍版与 exefs。
+    - name: Build (普通版)
       shell: bash
       run: |
+        set -o pipefail
+        cd ./cpymo-backends/sdl2
+        make -j -f Makefile.Switch 2>&1 | tail -200
+
+    - name: Package (普通版)
+      shell: bash
+      run: |
+        set -e
         cd ./cpymo-backends/sdl2
         mkdir -p dist
         test -f build.Switch/cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
@@ -52,21 +60,20 @@ jobs:
         cp startup.wav dist/
         ls -R dist
 
-    - name: Upload
+    - name: Upload (普通版)
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for Nintendo Switch
         path: ./cpymo-backends/sdl2/dist
 
-  build-switch-accessibility:
-    name: 'Nintendo Switch (Accessibility)'
-    runs-on: ubuntu-latest
-    container: devkitpro/devkita64:20230507
-
-    steps:
-    - uses: actions/checkout@v4.4.0
-      with:
-        submodules: true
+    # 无障碍版与普通版共用 build.Switch 目录，必须先 clean 再改宏重编。
+    - name: Clean for accessibility build
+      shell: bash
+      run: |
+        set -e
+        cd ./cpymo-backends/sdl2
+        make -f Makefile.Switch clean
+        rm -rf dist romfs
 
     - name: Stage TTS assets into romfs
       shell: bash
@@ -85,16 +92,17 @@ jobs:
         cp cpymo-backends/sdl2/*.wav cpymo-backends/sdl2/romfs/
         ls -l cpymo-backends/sdl2/romfs/tts
 
-    - name: Build
+    - name: Build (无障碍版)
       shell: bash
       run: |
         set -o pipefail
         cd ./cpymo-backends/sdl2
-        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1 2>&1 | tail -160
+        make -j -f Makefile.Switch ENABLE_TEXT_EXTRACT=1 2>&1 | tail -200
 
-    - name: Package
+    - name: Package (无障碍版)
       shell: bash
       run: |
+        set -e
         cd ./cpymo-backends/sdl2
         mkdir -p dist
         test -f build.Switch/cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
@@ -110,7 +118,7 @@ jobs:
           || { echo "tts 资源不完整（需要 rtld/main/sdk）"; exit 1; }
         ls -R dist
 
-    - name: Upload
+    - name: Upload (无障碍版)
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for Nintendo Switch (Accessibility)
@@ -128,6 +136,7 @@ jobs:
         # NPDM 字段取值依据：title id 范围收窄到本程序自身；权限位与内核能力取
         # devkitPro/libnx homebrew 的常规值；service_access 只列 CPyMO(SDL2) 实际会用到的
         # 服务名（均在 libnx 源码中出现，长度 1..8，符合 NPDM 的 SACP 编码限制）。
+        # 版本字段与 control.nacp 的 1.0.0 保持一致（NPDM 是 u32，semver 打包为 major<<16）。
         cat > /tmp/pkg/npdm.json <<JSON
         {
           "name": "CPyMO",
@@ -137,7 +146,7 @@ jobs:
           "title_id_range_max": "0x$CPYMO_TITLE_ID",
           "program_id_range_min": "0x$CPYMO_TITLE_ID",
           "program_id_range_max": "0x$CPYMO_TITLE_ID",
-          "version": "0x0",
+          "version": "0x00010000",
           "system_resource_size": "0x0",
           "main_thread_stack_size": "0x00100000",
           "main_thread_priority": 44,
@@ -167,7 +176,7 @@ jobs:
     - name: Upload exefs
       uses: actions/upload-artifact@v6.0.0
       with:
-        name: switch-exefs
+        name: CPyMO for Nintendo Switch (exefs)
         path: |
           /tmp/pkg/exefs
           /tmp/pkg/control
@@ -175,7 +184,7 @@ jobs:
 
   build-switch-nsp:
     name: 'Nintendo Switch (NSP)'
-    needs: build-switch-accessibility
+    needs: build-switch
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -187,73 +196,8 @@ jobs:
     - name: Download exefs
       uses: actions/download-artifact@v6.0.0
       with:
-        name: switch-exefs
+        name: CPyMO for Nintendo Switch (exefs)
         path: /tmp/pkg
-
-    - name: Write keys
-      env:
-        SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
-      run: |
-        set -euo pipefail
-        printf '%s\n' "$SWITCH_PROD_KEYS" > /tmp/keys.raw
-        if base64 -d /tmp/keys.raw > /tmp/keys.dec 2>/dev/null && grep -q header_key /tmp/keys.dec; then
-          install -m 600 /tmp/keys.dec /tmp/prod.keys
-        else
-          install -m 600 /tmp/keys.raw /tmp/prod.keys
-        fi
-        # hacBrewPack 用前缀匹配 key 名，34 位的 master_kek_source_* 会被当成期望 32 位的 key
-        awk -F'=' 'NF>=2 { v=$2; gsub(/[ \t\r]/,"",v); if (length(v)==34) next } { print }' /tmp/prod.keys > /tmp/prod.clean
-        install -m 600 /tmp/prod.clean /tmp/prod.keys
-        echo "keys 有效行数: $(grep -c . /tmp/prod.keys)"
-
-    - name: Build hacBrewPack
-      run: |
-        set -euxo pipefail
-        sudo apt-get update -qq
-        sudo apt-get install -y -qq build-essential
-        git clone --depth 1 https://github.com/rlaphoenix/hacBrewPack /tmp/hbp
-        cd /tmp/hbp
-        if [ -f config.mk.template ]; then cp config.mk.template config.mk; fi
-        make -j"$(nproc)" 2>&1 | tail -25
-
-    - name: Stage romfs
-      run: |
-        set -e
-        test -d tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
-        for name in rtld main sdk; do
-          test "$(head -c 4 "tts-assets/$name.bin")" = NSO0 || { echo "$name.bin 不是 NSO0"; exit 1; }
-        done
-        for name in HIKARI ASHLEY GLORIA LENA ROXANE ELISA LOLA ANNE CHLOE HYERYUN HONG YAFANG; do
-          test -s "tts-assets/D32-$name.vtdb2" || { echo "缺少音库 $name"; exit 1; }
-        done
-        (cd tts-assets && sha256sum -c SHA256SUMS)
-        mkdir -p /tmp/pkg/romfs/tts
-        cp tts-assets/*.bin tts-assets/*.vtdb2 /tmp/pkg/romfs/tts/
-        cp cpymo-backends/sdl2/*.wav /tmp/pkg/romfs/
-        du -sh /tmp/pkg/romfs
-
-    - name: Pack NSP
-      run: |
-        set -euxo pipefail
-        test "$CPYMO_TITLE_ID" = "0100000050594d4f" || { echo "NSP 的 title id 必须固定为 0100000050594d4f，不允许随构建变化"; exit 1; }
-        cd /tmp/hbp
-        if [ ! -x ./hacbrewpack ]; then echo "没找到 hacbrewpack"; ls -l; exit 1; fi
-        # hacBrewPack 不生成 .tik/.cert：若 NCA 用 title key 加密，模拟器拿不到 title key
-        # 会在 Core 初始化阶段崩掉。--plaintext 让 section 不加密，yuzu/Eden 按 homebrew 直接加载。
-        ./hacbrewpack -k /tmp/prod.keys --nologo --plaintext --romfsdir /tmp/pkg/romfs \
-          --exefsdir /tmp/pkg/exefs --controldir /tmp/pkg/control \
-          --nspdir /tmp/pkg/nsp --ncadir /tmp/pkg/nca \
-          --tempdir /tmp/pkg/temp --backupdir /tmp/pkg/backup \
-          --keepncadir --titleid $CPYMO_TITLE_ID \
-          --titlename CPyMO --titlepublisher boz700908 2>&1 | tail -60
-        ls -l /tmp/pkg/nsp
-
-    - name: Upload NSP
-      uses: actions/upload-artifact@v6.0.0
-      with:
-        name: CPyMO for Nintendo Switch (NSP)
-        path: /tmp/pkg/nsp/*.nsp
-        if-no-files-found: error
 
   build-3ds:
     name: 'Nintendo 3DS'
