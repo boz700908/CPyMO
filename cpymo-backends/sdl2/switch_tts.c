@@ -21,6 +21,7 @@
 
 #include "switch_tts.h"
 #include "cpymo_switch_diag.h"
+#include "switch_tts_lang.h"
 
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 
@@ -268,6 +269,9 @@ static uint8_t  *g_outbuf;
 static size_t    g_outbuf_size;
 static uint8_t  *g_vtdb;
 static size_t    g_vtdb_len;
+static uint8_t *g_voice_data[CPYMO_TTS_LANG_COUNT];
+static size_t g_voice_size[CPYMO_TTS_LANG_COUNT];
+static int g_active_voice = -1;
 
 /* 引擎线程 */
 static Thread g_thread;
@@ -844,7 +848,7 @@ static size_t tt_build_input(const char *text, const cpymo_switch_tts_params *pa
     return n;
 }
 
-static bool tt_synth(const char *text, uint32_t abort_gen)
+static bool tt_synth(const char *text, uint32_t abort_gen, int voice)
 {
     uintptr_t sp = ((uintptr_t)g_cstack + g_cstack_size - 0x100) & ~(uintptr_t)0xF;
     uint8_t *frame = (uint8_t *)sp;
@@ -855,6 +859,7 @@ static bool tt_synth(const char *text, uint32_t abort_gen)
 
     if (!g_inbuf || !g_outbuf || !g_cstack) return false;
     cpymo_switch_tts_get_params(&snapshot);
+    snapshot.voice = voice;
     in_len = tt_build_input(text, params);
     if (in_len == 0) return false;
 
@@ -922,6 +927,28 @@ static bool tt_synth(const char *text, uint32_t abort_gen)
 /* 引擎线程：进入 guest 后就永久驻留在这里                              */
 /* ------------------------------------------------------------------ */
 
+static bool tt_select_language(cpymo_tts_language lang, int voice)
+{
+    tt_call c;
+    if (g_active_voice == voice) return true;
+    if (!g_voice_data[lang]) return false;
+    memset(&c, 0, sizeof(c));
+    c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_INIT;
+    c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
+    c.x[0] = (uint64_t)voice;
+    c.x[1] = 0xffffffffull;
+    c.x[2] = (uint64_t)(uintptr_t)g_voice_data[lang];
+    c.x[3] = (uint64_t)g_voice_size[lang];
+    cpymo_sw_tts_call_guest(&c);
+    if ((int32_t)c.result != 0) {
+        g_active_voice = -1;
+        CPYMO_DIAG("[tts] 音库 %d 初始化失败: %d\n", voice, (int32_t)c.result);
+        return false;
+    }
+    g_active_voice = voice;
+    return true;
+}
+
 static void tt_engine_loop(void)
 {
     char text[TT_TEXT_MAX];
@@ -946,7 +973,28 @@ static void tt_engine_loop(void)
             eventWait(&g_cmd_event, UINT64_MAX);
             continue;
         }
-        if (text[0]) tt_synth(text, abort_gen);
+        if (text[0]) {
+            static const int voices[CPYMO_TTS_LANG_COUNT] = { 11, 0, 9, 1 };
+            size_t pos = 0, len = strlen(text);
+            while (pos < len && __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen &&
+                   !__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) {
+                cpymo_tts_segment seg;
+                size_t n = cpymo_tts_next_segment(text + pos, len - pos, CPYMO_TTS_LANG_ZH, &seg);
+                char saved;
+                cpymo_tts_language lang;
+                int voice;
+                if (!n) break;
+                lang = g_voice_data[seg.language] ? seg.language : CPYMO_TTS_LANG_ZH;
+                voice = voices[lang];
+                saved = text[pos + n];
+                text[pos + n] = 0;
+                if (tt_select_language(lang, voice) &&
+                    __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen)
+                    tt_synth(text + pos, abort_gen, voice);
+                text[pos + n] = saved;
+                pos += n;
+            }
+        }
     }
 }
 
@@ -1006,6 +1054,7 @@ static void tt_boot_hook(tt_regs *r)
     g_engine_ok = (g_boot_result == 0);
     g_boot_done = true;
     if (!g_engine_ok) g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
+    if (g_engine_ok) g_active_voice = params.voice;
     CPYMO_DIAG("[tts] 引擎 init -> %lld\n", (long long)g_boot_result);
     eventFire(&g_boot_event);
 
@@ -1108,6 +1157,22 @@ static bool tt_load_vtdb(const char *dir)
     if (!found) return tt_fail("找不到音库（需 D32-YAFANG.vtdb2）：%s", dir);
     CPYMO_DIAG("[tts] 音库 %s, %zu 字节\n", path, g_vtdb_len);
     return true;
+}
+
+static void tt_load_language_voices(const char *dir)
+{
+    static const char *const names[CPYMO_TTS_LANG_COUNT] = {
+        NULL, "D32-HIKARI.vtdb2", "D32-HYERYUN.vtdb2", "D32-ASHLEY.vtdb2"
+    };
+    char path[512];
+    int i;
+    g_voice_data[CPYMO_TTS_LANG_ZH] = g_vtdb;
+    g_voice_size[CPYMO_TTS_LANG_ZH] = g_vtdb_len;
+    for (i = 1; i < CPYMO_TTS_LANG_COUNT; ++i) {
+        if (snprintf(path, sizeof(path), "%s/%s", dir, names[i]) >= (int)sizeof(path)) continue;
+        g_voice_data[i] = tt_read_file(path, &g_voice_size[i]);
+        if (!g_voice_data[i]) CPYMO_DIAG("[tts] 音库不可用: %s\n", path);
+    }
 }
 
 typedef struct {
@@ -1368,6 +1433,7 @@ static bool tt_prepare(const char *dir)
 
     if (!tt_alloc_regions()) return false;
     if (!tt_load_vtdb(dir)) return false;
+    tt_load_language_voices(dir);
 
     /* 顺序要求：rtld → main → sdk → vtdb（vtdb 在 heap，不参与相对寻址） */
     for (n = 0, i = 0; i < TT_IMAGE_MAX; i++) n += (int)g_img_size[i];
