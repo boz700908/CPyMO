@@ -1504,7 +1504,9 @@ void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
     g_params.voice = 11; /* 目前只加载 D32-YAFANG 音库 */
     if (g_params.pitch < 1) g_params.pitch = 1;
     if (g_params.rate < 1) g_params.rate = 1;
+    if (g_params.pitch > 1000) g_params.pitch = 1000;
     if (g_params.volume < 0) g_params.volume = 0;
+    if (g_params.rate > 1000) g_params.rate = 1000;
     if (g_params.volume > 1000) g_params.volume = 1000;
     if (g_params.emotion_level < 0) g_params.emotion_level = 0;
     if (g_params.emotion_level > 10) g_params.emotion_level = 10;

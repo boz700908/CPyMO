@@ -51,13 +51,13 @@ bool cpymo_switch_accessibility_ready(void);
 const char *cpymo_switch_accessibility_last_error(void);
 
 /* ---- TTS 参数项（设置页用；顺序必须与 cpymo_config_ui.c 的 ITEM_TTS_* 一致） ---- */
-#define CPYMO_SW_TTS_ITEM_RATE    0   /* 语速 50..400，默认 135 */
-#define CPYMO_SW_TTS_ITEM_PITCH   1   /* 音高 50..400，默认 150 */
-#define CPYMO_SW_TTS_ITEM_VOLUME  2   /* 音量  0..100，默认 90  */
+#define CPYMO_SW_TTS_ITEM_RATE    0   /* 语速 1..1000，默认 135 */
+#define CPYMO_SW_TTS_ITEM_PITCH   1   /* 音高 1..1000，默认 150 */
+#define CPYMO_SW_TTS_ITEM_VOLUME  2   /* 音量 0..1000，默认 90  */
 #define CPYMO_SW_TTS_ITEM_VOICE   3   /* 音色固定 11（D32-YAFANG） */
-#define CPYMO_SW_TTS_ITEM_EMOTION 4   /* 情感  0..5，  默认 2（高兴） */
+#define CPYMO_SW_TTS_ITEM_EMOTION 4   /* 情绪等级 0..10，默认 1（上限待验证） */
 #define CPYMO_SW_TTS_ITEM_COUNT   5
-#define CPYMO_SW_TTS_EMOTION_MAX  5
+#define CPYMO_SW_TTS_EMOTION_MAX  10
 
 int cpymo_switch_accessibility_tts_item_get(int item);
 void cpymo_switch_accessibility_tts_item_set(int item, int val);

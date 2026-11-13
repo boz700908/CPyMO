@@ -390,15 +390,15 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 
 #if CPYMO_SW_TTS_SETTINGS
 	INIT_ITEM(
-		ITEM_TTS_RATE, l->config_tts_rate, 50, 400,
+		ITEM_TTS_RATE, l->config_tts_rate, 1, 1000,
 		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_RATE), true);
 
 	INIT_ITEM(
-		ITEM_TTS_PITCH, l->config_tts_pitch, 50, 400,
+		ITEM_TTS_PITCH, l->config_tts_pitch, 1, 1000,
 		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_PITCH), true);
 
 	INIT_ITEM(
-		ITEM_TTS_VOLUME, l->config_tts_volume, 0, 100,
+		ITEM_TTS_VOLUME, l->config_tts_volume, 0, 1000,
 		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_VOLUME), true);
 
 	INIT_ITEM(
@@ -466,10 +466,8 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_inde
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
 	case ITEM_TTS_VOICE:
-		sprintf(val_str_buf, "%d", val);
-		break;
 	case ITEM_TTS_EMOTION:
-		val_str = l->config_tts_emotions[val];
+		sprintf(val_str_buf, "%d", val);
 		break;
 #endif
 	}
@@ -522,10 +520,8 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
 	case ITEM_TTS_VOICE:
-		sprintf(val_str_buf, "%d", val);
-		break;
 	case ITEM_TTS_EMOTION:
-		val_str = l->config_tts_emotions[val];
+		sprintf(val_str_buf, "%d", val);
 		break;
 #endif
 	}
@@ -579,10 +575,8 @@ static error_t cpymo_config_ui_set_value(
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
 	case ITEM_TTS_VOICE:
-		sprintf(val_str_buf, "%d", val);
-		break;
 	case ITEM_TTS_EMOTION:
-		val_str = l->config_tts_emotions[val];
+		sprintf(val_str_buf, "%d", val);
 		break;
 #endif
 	}
@@ -651,7 +645,7 @@ static error_t cpymo_config_ui_item_inc(cpymo_engine *e, cpymo_config_ui *ui, in
 	cpymo_config_ui_item *item = ui->items + item_index;
 	int step = 1;
 #if CPYMO_SW_TTS_SETTINGS
-	if (item_index == ITEM_TTS_RATE || item_index == ITEM_TTS_PITCH) step = 10;
+	if (item_index == ITEM_TTS_RATE || item_index == ITEM_TTS_PITCH || item_index == ITEM_TTS_VOLUME) step = 10;
 #endif
 	int new_val = item->value >= item->max_value ? item->min_value : item->value + step;
 	if (new_val > item->max_value)
@@ -670,7 +664,7 @@ static error_t cpymo_config_ui_item_dec(cpymo_engine *e, cpymo_config_ui *ui, in
 	cpymo_config_ui_item *item = ui->items + item_index;
 	int step = 1;
 #if CPYMO_SW_TTS_SETTINGS
-	if (item_index == ITEM_TTS_RATE || item_index == ITEM_TTS_PITCH) step = 10;
+	if (item_index == ITEM_TTS_RATE || item_index == ITEM_TTS_PITCH || item_index == ITEM_TTS_VOLUME) step = 10;
 #endif
 	int new_val = item->value <= item->min_value ? item->max_value : item->value - step;
 	if (new_val < item->min_value)
