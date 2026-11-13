@@ -415,9 +415,7 @@ static bool tt_lz4(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_
         for (i = 0; i < ml; i++) dst[o + i] = dst[o + i - off];
         o += ml;
     }
-    if (o > dst_len) return false;
-    if (o < dst_len) memset(dst + o, 0, dst_len - o);
-    return true;
+    return o == dst_len;
 }
 
 /* 解一个 NSO 到 dst（dst 容量 = 镜像总大小），返回各段信息 */
@@ -467,7 +465,7 @@ static bool tt_load_nso(const char *path, uint8_t *dst, uint32_t dst_cap,
         avail = file_len - seg[i].file_off;
         if (compressed) {
             size_t clen = h.comp[seg[i].idx];
-            if (clen > avail) clen = avail;
+            if (clen > avail) { free(file); return tt_fail0("NSO 压缩段长度不足"); }
             if (!tt_lz4(file + seg[i].file_off, clen,
                         dst + seg[i].mem_off, seg[i].size)) {
                 free(file);
