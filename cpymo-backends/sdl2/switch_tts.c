@@ -57,7 +57,7 @@
 #define OFF_MAIN_SYNTH       0x519c80  /* 分块合成 */
 #define OFF_MAIN_HEAP_OBJECT 0x1106588
 #define OFF_MAIN_HEAP_CTOR   0x5144c0
-#define OFF_MAIN_HEAP_INIT   0x514590
+#define OFF_MAIN_HEAP_INIT   0x4dfe90
 #define OFF_MAIN_HEAP_SET    0x4dfda0
 #define OFF_MAIN_HEAP_NAME   0xaa3f8b
 #define TT_ENGINE_HEAP_SIZE  (32u << 20)
