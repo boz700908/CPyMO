@@ -847,6 +847,7 @@ static bool tt_synth(const char *text)
     in_len = tt_build_input(text);
     if (in_len == 0) return false;
 
+    memset(frame, 0, 0x70);
     for (;;) {
         tt_call c;
         int64_t rc;
@@ -855,14 +856,16 @@ static bool tt_synth(const char *text)
         if (__atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) != abort_gen) return true;
         if (__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) return true;
 
-        memset(frame, 0, 0x70);
+        *(uint64_t *)(void *)(frame + 0x00) = 0;
         *(uint64_t *)(void *)(frame + 0x08) = (uint64_t)(uintptr_t)(frame + 0x58);
         *(uint64_t *)(void *)(frame + 0x10) = step;
+        *(uint64_t *)(void *)(frame + 0x18) = 0;
         *(uint64_t *)(void *)(frame + 0x20) = 0xffffffffull;
         *(uint64_t *)(void *)(frame + 0x28) = (uint64_t)g_params.pitch;
         *(uint64_t *)(void *)(frame + 0x30) = (uint64_t)g_params.rate;
         *(uint64_t *)(void *)(frame + 0x38) = (uint64_t)g_params.volume;
         *(uint64_t *)(void *)(frame + 0x40) = 400;
+        *(uint64_t *)(void *)(frame + 0x48) = 0;
         *(uint64_t *)(void *)(frame + 0x50) = 0xffffffffull;
 
         memset(&c, 0, sizeof(c));
