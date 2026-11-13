@@ -289,6 +289,7 @@ static uint8_t  g_ring[TT_RING_BYTES];
 static uint32_t g_ring_w;
 static uint32_t g_ring_r;
 static uint32_t g_flush_gen;
+static uint32_t g_flush_to;
 static uint32_t g_flush_seen;
 static uint32_t g_abort_gen;
 
@@ -719,8 +720,11 @@ void cpymo_switch_tts_mix(Uint8 *stream, int len, SDL_AudioFormat format,
     flush = __atomic_load_n(&g_flush_gen, __ATOMIC_ACQUIRE);
     if (flush != g_flush_seen) {
         g_flush_seen = flush;
+        uint32_t target = __atomic_load_n(&g_flush_to, __ATOMIC_ACQUIRE);
+        r = __atomic_load_n(&g_ring_r, __ATOMIC_ACQUIRE);
         w = __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE);
-        __atomic_store_n(&g_ring_r, w, __ATOMIC_RELEASE);
+        if (target - r <= w - r)
+            __atomic_store_n(&g_ring_r, target, __ATOMIC_RELEASE);
         sample_valid = 0;
         phase = 0;
     }
@@ -777,10 +781,11 @@ static void tt_ring_write(const uint8_t *p, size_t n)
     __atomic_store_n(&g_ring_w, w + (uint32_t)n, __ATOMIC_RELEASE);
 }
 
-static bool tt_wait_ring_space(size_t n, uint64_t timeout_ns)
+static bool tt_wait_ring_space(size_t n, uint64_t timeout_ns, uint32_t abort_gen)
 {
     uint64_t waited = 0;
     while (tt_ring_pending() + (uint32_t)n > TT_RING_BYTES) {
+        if (__atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) != abort_gen) return false;
         if (__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) return false;
         if (waited >= timeout_ns) return false;
         svcSleepThread(1000000ull);
@@ -796,7 +801,10 @@ static void tt_wait_playback(uint64_t timeout_ns)
     while (tt_ring_pending() > 0) {
         if (__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) return;
         if (waited >= timeout_ns) {
+            mutexLock(&g_req_mutex);
+            __atomic_store_n(&g_flush_to, __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE), __ATOMIC_RELEASE);
             __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
+            mutexUnlock(&g_req_mutex);
             return;
         }
         svcSleepThread(2000000ull);
@@ -891,8 +899,14 @@ static bool tt_synth(const char *text, uint32_t abort_gen)
         got = *(uint32_t *)(void *)(frame + 0x60);
         if (got > TT_MAX_CHUNK || (got & 1u)) return false;
         if (got) {
-            if (!tt_wait_ring_space(got, 20000000000ull)) return false;
+            if (!tt_wait_ring_space(got, 20000000000ull, abort_gen)) return false;
+            mutexLock(&g_req_mutex);
+            if (__atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) != abort_gen) {
+                mutexUnlock(&g_req_mutex);
+                return true;
+            }
             tt_ring_write(g_outbuf, got);
+            mutexUnlock(&g_req_mutex);
         }
         step = 1;
         if (rc == 1) break;
@@ -1375,8 +1389,10 @@ static void tt_push(const char *utf8, cpymo_switch_tts_mode mode)
     if (mode != CPYMO_SWITCH_TTS_APPEND) {
         g_req_tail = g_req_head;
         __atomic_add_fetch(&g_abort_gen, 1, __ATOMIC_RELEASE);
-        if (mode == CPYMO_SWITCH_TTS_INTERRUPT)
+        if (mode == CPYMO_SWITCH_TTS_INTERRUPT) {
+            __atomic_store_n(&g_flush_to, __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE), __ATOMIC_RELEASE);
             __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
+        }
     } else if (g_req_head - g_req_tail >= TT_REQ_SLOTS) {
         mutexUnlock(&g_req_mutex);
         return;
@@ -1493,6 +1509,7 @@ void cpymo_switch_tts_stop(void)
     mutexLock(&g_req_mutex);
     g_req_tail = g_req_head;
     __atomic_add_fetch(&g_abort_gen, 1, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_flush_to, __atomic_load_n(&g_ring_w, __ATOMIC_ACQUIRE), __ATOMIC_RELEASE);
     __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
     mutexUnlock(&g_req_mutex);
 }
