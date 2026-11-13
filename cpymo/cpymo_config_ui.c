@@ -12,7 +12,7 @@
 #if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
 #define CPYMO_SW_TTS_SETTINGS 1
 #include "../cpymo-backends/sdl2/cpymo_switch_accessibility.h"
-#define CONFIG_ITEMS 11
+#define CONFIG_ITEMS 12
 #else
 #define CONFIG_ITEMS 6
 #endif
@@ -47,6 +47,7 @@ typedef struct {
 #define ITEM_TTS_VOLUME 8
 #define ITEM_TTS_VOICE 9
 #define ITEM_TTS_EMOTION 10
+#define ITEM_TTS_HAN_FALLBACK 11
 #endif
 
 const static float side_padding = 16;
@@ -408,6 +409,10 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 	INIT_ITEM(
 		ITEM_TTS_EMOTION, l->config_tts_emotion, 0, CPYMO_SW_TTS_EMOTION_MAX,
 		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_EMOTION), true);
+
+	INIT_ITEM(
+		ITEM_TTS_HAN_FALLBACK, l->config_tts_han_fallback, 0, 1,
+		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_HAN_FALLBACK), true);
 #endif
 	
 	#undef INIT_ITEM
@@ -431,6 +436,7 @@ static void cpymo_config_ui_extract_setting_name(cpymo_engine *e, int item_id)
 	case ITEM_TTS_VOLUME: p = l->config_tts_volume; break;
 	case ITEM_TTS_VOICE: p = l->config_tts_voice; break;
 	case ITEM_TTS_EMOTION: p = l->config_tts_emotion; break;
+	case ITEM_TTS_HAN_FALLBACK: p = l->config_tts_han_fallback; break;
 #endif
 	default: assert(false);
 	}
@@ -465,6 +471,9 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_inde
 	case ITEM_TTS_VOICE:
 		val_str = val == 10 ? "HONG" : "YAFANG";
 		break;
+	case ITEM_TTS_HAN_FALLBACK:
+		val_str = l->config_tts_han_fallbacks[val];
+		break;
 	case ITEM_TTS_RATE:
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
@@ -493,6 +502,7 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 	case ITEM_TTS_VOLUME: name = l->config_tts_volume; break;
 	case ITEM_TTS_VOICE: name = l->config_tts_voice; break;
 	case ITEM_TTS_EMOTION: name = l->config_tts_emotion; break;
+	case ITEM_TTS_HAN_FALLBACK: name = l->config_tts_han_fallback; break;
 #endif
 	default: assert(false);
 	}
@@ -520,6 +530,9 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 #if CPYMO_SW_TTS_SETTINGS
 	case ITEM_TTS_VOICE:
 		val_str = val == 10 ? "HONG" : "YAFANG";
+		break;
+	case ITEM_TTS_HAN_FALLBACK:
+		val_str = l->config_tts_han_fallbacks[val];
 		break;
 	case ITEM_TTS_RATE:
 	case ITEM_TTS_PITCH:
@@ -578,6 +591,9 @@ static error_t cpymo_config_ui_set_value(
 	case ITEM_TTS_VOICE:
 		val_str = val == 10 ? "HONG" : "YAFANG";
 		break;
+	case ITEM_TTS_HAN_FALLBACK:
+		val_str = l->config_tts_han_fallbacks[val];
+		break;
 	case ITEM_TTS_RATE:
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
@@ -634,6 +650,7 @@ JUST_REFRESH:
 	case ITEM_TTS_VOLUME:
 	case ITEM_TTS_VOICE:
 	case ITEM_TTS_EMOTION:
+	case ITEM_TTS_HAN_FALLBACK:
 		cpymo_switch_accessibility_tts_item_set(item_index - ITEM_TTS_RATE, val);
 		break;
 #endif

@@ -30,14 +30,15 @@ typedef enum {
     CPYMO_SWITCH_TTS_INTERRUPT = 2
 } cpymo_switch_tts_mode;
 
-/* 语音参数。默认值与 mac 版预言机一致（language=10 → D32-YAFANG） */
+/* 语音参数。 */
 typedef struct {
-    int voice;   /* language id，默认 10 */
+    int voice;   /* 中文音库 id，默认 11 */
     int pitch;   /* 默认 150 */
     int rate;    /* 默认 135 */
-    int volume;  /* 0..100，默认 90 */
+    int volume;  /* 0..1000，默认 90 */
     char emotion_category[32]; /* 默认 "happiness" */
     int emotion_level;         /* 默认 1，0 表示不加 emotion 标签 */
+    int han_fallback;          /* 0 中文，1 日文 */
 } cpymo_switch_tts_params;
 
 typedef enum {

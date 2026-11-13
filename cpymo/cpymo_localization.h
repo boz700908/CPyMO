@@ -37,6 +37,8 @@ typedef struct {
 		*config_tts_volume,
 		*config_tts_voice,
 		*config_tts_emotion,
+		*config_tts_han_fallback,
+		*config_tts_han_fallbacks[2],
 		*config_tts_emotions[6];
 
 	error_t (*save_already_save_to)(char **out_str, int save_id);

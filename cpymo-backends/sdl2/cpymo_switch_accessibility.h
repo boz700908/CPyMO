@@ -56,7 +56,8 @@ const char *cpymo_switch_accessibility_last_error(void);
 #define CPYMO_SW_TTS_ITEM_VOLUME  2   /* 音量 0..1000，默认 90  */
 #define CPYMO_SW_TTS_ITEM_VOICE   3   /* 中文音库：10 HONG，11 YAFANG */
 #define CPYMO_SW_TTS_ITEM_EMOTION 4   /* 情绪等级 0..4，0 表示关闭 */
-#define CPYMO_SW_TTS_ITEM_COUNT   5
+#define CPYMO_SW_TTS_ITEM_HAN_FALLBACK 5 /* 汉字歧义：0 中文，1 日文 */
+#define CPYMO_SW_TTS_ITEM_COUNT   6
 #define CPYMO_SW_TTS_EMOTION_MAX  4
 
 int cpymo_switch_accessibility_tts_item_get(int item);

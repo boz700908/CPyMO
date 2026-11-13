@@ -102,6 +102,8 @@ const cpymo_localization chs = {
 	"音量",
 	"音色",
 	"情绪等级",
+	"汉字歧义语言",
+	{ "中文", "日文" },
 	{ "关闭", "中性", "高兴", "悲伤", "生气", "兴奋" },
 
 	&F(chs, save_already_save_to),
@@ -171,6 +173,8 @@ const cpymo_localization cht = {
 	"音量",
 	"音色",
 	"情緒等級",
+	"漢字歧義語言",
+	{ "中文", "日文" },
 	{ "關閉", "中性", "高興", "悲傷", "生氣", "興奮" },
 
 	&F(cht, save_already_save_to),
@@ -238,6 +242,8 @@ const cpymo_localization enu = {
 	"TTS Volume",
 	"TTS Voice",
 	"TTS Emotion",
+	"Ambiguous Han Language",
+	{ "Chinese", "Japanese" },
 	{ "Off", "Neutral", "Happy", "Sad", "Angry", "Excited" },
 
 	&F(enu, save_already_save_to),

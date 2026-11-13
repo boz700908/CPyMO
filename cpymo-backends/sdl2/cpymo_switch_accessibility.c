@@ -159,7 +159,7 @@ const char *cpymo_switch_accessibility_last_error(void)
 #define SW_TTS_CONF_PATH "sdmc:/pymogames/tts.conf"
 
 /* 与 CPYMO_SW_TTS_ITEM_* 顺序一致；默认值与引擎 params_default 对齐 */
-static int g_items[CPYMO_SW_TTS_ITEM_COUNT] = { 135, 150, 90, 11, 1 };
+static int g_items[CPYMO_SW_TTS_ITEM_COUNT] = { 135, 150, 90, 11, 1, 0 };
 
 static int sw_item_min(int item)
 {
@@ -179,6 +179,7 @@ static int sw_item_max(int item)
         case CPYMO_SW_TTS_ITEM_PITCH:  return 1000;
         case CPYMO_SW_TTS_ITEM_VOLUME: return 1000;
         case CPYMO_SW_TTS_ITEM_VOICE:  return 11;
+        case CPYMO_SW_TTS_ITEM_HAN_FALLBACK: return 1;
         default:                       return CPYMO_SW_TTS_EMOTION_MAX;
     }
 }
@@ -201,6 +202,7 @@ static void sw_items_apply(void)
     p.voice = g_items[CPYMO_SW_TTS_ITEM_VOICE];
 
     p.emotion_level = g_items[CPYMO_SW_TTS_ITEM_EMOTION];
+    p.han_fallback = g_items[CPYMO_SW_TTS_ITEM_HAN_FALLBACK];
 
     cpymo_switch_tts_set_params(&p);
     CPYMO_DIAG("[a11y] TTS 参数：rate=%d pitch=%d volume=%d voice=%d emotion=%d\n",
@@ -229,6 +231,7 @@ static void sw_items_load(void)
         else if (!strcmp(line, "volume"))   key = CPYMO_SW_TTS_ITEM_VOLUME;
         else if (!strcmp(line, "voice"))    key = CPYMO_SW_TTS_ITEM_VOICE;
         else if (!strcmp(line, "emotion_level"))  key = CPYMO_SW_TTS_ITEM_EMOTION;
+        else if (!strcmp(line, "han_fallback")) key = CPYMO_SW_TTS_ITEM_HAN_FALLBACK;
         else continue;
 
         sw_item_clamp(key, &val);
@@ -245,12 +248,13 @@ static void sw_items_save(void)
         CPYMO_DIAG("[a11y] 无法写入 %s\n", SW_TTS_CONF_PATH);
         return;
     }
-    fprintf(f, "rate=%d\npitch=%d\nvolume=%d\nvoice=%d\nemotion_level=%d\n",
+    fprintf(f, "rate=%d\npitch=%d\nvolume=%d\nvoice=%d\nemotion_level=%d\nhan_fallback=%d\n",
             g_items[CPYMO_SW_TTS_ITEM_RATE],
             g_items[CPYMO_SW_TTS_ITEM_PITCH],
             g_items[CPYMO_SW_TTS_ITEM_VOLUME],
             g_items[CPYMO_SW_TTS_ITEM_VOICE],
-            g_items[CPYMO_SW_TTS_ITEM_EMOTION]);
+            g_items[CPYMO_SW_TTS_ITEM_EMOTION],
+            g_items[CPYMO_SW_TTS_ITEM_HAN_FALLBACK]);
     fclose(f);
 }
 

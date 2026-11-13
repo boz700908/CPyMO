@@ -982,11 +982,15 @@ static void tt_engine_loop(void)
         }
         if (text[0]) {
             static const int voices[CPYMO_TTS_LANG_COUNT] = { 11, 0, 9, 1 };
+            cpymo_switch_tts_params request_params;
+            cpymo_tts_language fallback;
             size_t pos = 0, len = strlen(text);
+            cpymo_switch_tts_get_params(&request_params);
+            fallback = request_params.han_fallback ? CPYMO_TTS_LANG_JA : CPYMO_TTS_LANG_ZH;
             while (pos < len && __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen &&
                    !__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) {
                 cpymo_tts_segment seg;
-                size_t n = cpymo_tts_next_segment(text + pos, len - pos, CPYMO_TTS_LANG_ZH, &seg);
+                size_t n = cpymo_tts_next_segment(text + pos, len - pos, fallback, &seg);
                 char saved;
                 cpymo_tts_language lang;
                 int voice;
@@ -1632,6 +1636,7 @@ void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
     if (g_params.volume > 1000) g_params.volume = 1000;
     if (g_params.emotion_level < 0) g_params.emotion_level = 0;
     if (g_params.emotion_level > 4) g_params.emotion_level = 4;
+    if (g_params.han_fallback != 1) g_params.han_fallback = 0;
     g_params.emotion_category[sizeof(g_params.emotion_category) - 1] = 0;
     mutexUnlock(&g_params_mutex);
 }
