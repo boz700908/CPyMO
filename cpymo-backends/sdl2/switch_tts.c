@@ -278,13 +278,11 @@ static bool     g_boot_done;
 static int64_t  g_boot_result;
 static bool     g_quit;
 
-/* 无锁请求环（主线程 → 引擎线程） */
+/* 请求环由短时互斥锁保护；不在音频回调中访问。 */
 static char     g_req_text[TT_REQ_SLOTS][TT_TEXT_MAX];
-static uint32_t g_req_kind[TT_REQ_SLOTS];   /* 0=append 1=replace 2=interrupt */
 static uint32_t g_req_head;
 static uint32_t g_req_tail;
-static uint32_t g_req_reset_gen;
-static uint32_t g_req_reset_seen;
+static Mutex g_req_mutex;
 
 /* 无锁 PCM 环（引擎线程 → 音频回调） */
 static uint8_t  g_ring[TT_RING_BYTES];
@@ -836,11 +834,10 @@ static size_t tt_build_input(const char *text, const cpymo_switch_tts_params *pa
     return n;
 }
 
-static bool tt_synth(const char *text)
+static bool tt_synth(const char *text, uint32_t abort_gen)
 {
     uintptr_t sp = ((uintptr_t)g_cstack + g_cstack_size - 0x100) & ~(uintptr_t)0xF;
     uint8_t *frame = (uint8_t *)sp;
-    uint32_t abort_gen = __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE);
     uint32_t step = 0;
     size_t in_len;
     cpymo_switch_tts_params snapshot;
@@ -914,29 +911,26 @@ static void tt_engine_loop(void)
     char text[TT_TEXT_MAX];
 
     for (;;) {
-        uint32_t head = __atomic_load_n(&g_req_head, __ATOMIC_ACQUIRE);
-        uint32_t tail = g_req_tail;
-        uint32_t gen = __atomic_load_n(&g_req_reset_gen, __ATOMIC_ACQUIRE);
-        uint32_t slot;
+        uint32_t abort_gen;
+        bool have_request = false;
 
-        if (gen != g_req_reset_seen) {
-            g_req_reset_seen = gen;
-            if (head > tail + 1) tail = head - 1;   /* 只保留最新一条 */
+        mutexLock(&g_req_mutex);
+        if (g_req_tail != g_req_head) {
+            uint32_t slot = g_req_tail % TT_REQ_SLOTS;
+            memcpy(text, g_req_text[slot], TT_TEXT_MAX);
+            text[TT_TEXT_MAX - 1] = 0;
+            g_req_tail++;
+            abort_gen = __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE);
+            have_request = true;
         }
-
-        if (tail == head) {
-            eventWait(&g_cmd_event, UINT64_MAX);
-            if (__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) break;
-            continue;
-        }
-
-        slot = tail % TT_REQ_SLOTS;
-        memcpy(text, g_req_text[slot], TT_TEXT_MAX);
-        text[TT_TEXT_MAX - 1] = 0;
-        __atomic_store_n(&g_req_tail, tail + 1, __ATOMIC_RELEASE);
+        mutexUnlock(&g_req_mutex);
 
         if (__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) break;
-        if (text[0]) tt_synth(text);
+        if (!have_request) {
+            eventWait(&g_cmd_event, UINT64_MAX);
+            continue;
+        }
+        if (text[0]) tt_synth(text, abort_gen);
     }
 }
 
@@ -1373,28 +1367,26 @@ static bool tt_audio_init(void)
 
 static void tt_push(const char *utf8, cpymo_switch_tts_mode mode)
 {
-    uint32_t head = g_req_head;
-    uint32_t tail = __atomic_load_n(&g_req_tail, __ATOMIC_ACQUIRE);
     uint32_t slot;
     size_t len = strlen(utf8);
 
     if (len >= TT_TEXT_MAX) len = TT_TEXT_MAX - 1;
-
+    mutexLock(&g_req_mutex);
     if (mode != CPYMO_SWITCH_TTS_APPEND) {
-        if (head > tail) head = tail;              /* 丢掉积压（可能丢掉正在读的那条，可接受） */
-        __atomic_add_fetch(&g_req_reset_gen, 1, __ATOMIC_RELEASE);
+        g_req_tail = g_req_head;
         __atomic_add_fetch(&g_abort_gen, 1, __ATOMIC_RELEASE);
         if (mode == CPYMO_SWITCH_TTS_INTERRUPT)
             __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
-    } else if (head - tail >= TT_REQ_SLOTS) {
-        return;                                    /* 队列满：宁可不读，也不阻塞主线程 */
+    } else if (g_req_head - g_req_tail >= TT_REQ_SLOTS) {
+        mutexUnlock(&g_req_mutex);
+        return;
     }
 
-    slot = head % TT_REQ_SLOTS;
+    slot = g_req_head % TT_REQ_SLOTS;
     memcpy(g_req_text[slot], utf8, len);
     g_req_text[slot][len] = 0;
-    __atomic_store_n(&g_req_kind[slot], (uint32_t)mode, __ATOMIC_RELEASE);
-    __atomic_store_n(&g_req_head, head + 1, __ATOMIC_RELEASE);
+    g_req_head++;
+    mutexUnlock(&g_req_mutex);
     eventFire(&g_cmd_event);
 }
 
@@ -1498,11 +1490,11 @@ void cpymo_switch_tts_speak(const char *utf8_text, cpymo_switch_tts_mode mode)
 void cpymo_switch_tts_stop(void)
 {
     if (g_state != CPYMO_SWITCH_TTS_STATE_READY) return;
-    __atomic_add_fetch(&g_req_reset_gen, 1, __ATOMIC_RELEASE);
+    mutexLock(&g_req_mutex);
+    g_req_tail = g_req_head;
     __atomic_add_fetch(&g_abort_gen, 1, __ATOMIC_RELEASE);
     __atomic_add_fetch(&g_flush_gen, 1, __ATOMIC_RELEASE);
-    __atomic_store_n(&g_req_head, __atomic_load_n(&g_req_tail, __ATOMIC_ACQUIRE),
-                     __ATOMIC_RELEASE);
+    mutexUnlock(&g_req_mutex);
 }
 
 void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
