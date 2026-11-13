@@ -23,7 +23,6 @@ env:
   HOMEBREW_NO_REQUIRE_TAP_TRUST: 1
   # 安装包（NSP）的 title id：固定常量，不随机、不随构建变化。
   # 末尾 0594d4f = "PyMO" 的 ASCII（50 79 4d 4f），因此不会与别家 homebrew 撞车。
-  CPYMO_TITLE_ID: '0100000050594d4f'
 
 jobs:
   build-switch:
@@ -123,81 +122,6 @@ jobs:
       with:
         name: CPyMO for Nintendo Switch (Accessibility)
         path: ./cpymo-backends/sdl2/dist
-
-    - name: Make exefs, NPDM and control
-      shell: bash
-      run: |
-        set -euxo pipefail
-        test "$CPYMO_TITLE_ID" = "0100000050594d4f" || { echo "NSP 的 title id 必须固定为 0100000050594d4f，不允许随构建变化"; exit 1; }
-        cd ./cpymo-backends/sdl2
-        mkdir -p /tmp/pkg/exefs /tmp/pkg/control
-        cp build.Switch/cpymo.elf /tmp/pkg/
-        elf2nso /tmp/pkg/cpymo.elf /tmp/pkg/exefs/main
-        # NPDM 字段取值依据：title id 范围收窄到本程序自身；权限位与内核能力取
-        # devkitPro/libnx homebrew 的常规值；service_access 只列 CPyMO(SDL2) 实际会用到的
-        # 服务名（均在 libnx 源码中出现，长度 1..8，符合 NPDM 的 SACP 编码限制）。
-        # 版本字段与 control.nacp 的 1.0.0 保持一致（NPDM 是 u32，semver 打包为 major<<16）。
-        cat > /tmp/pkg/npdm.json <<JSON
-        {
-          "name": "CPyMO",
-          "title_id": "0x$CPYMO_TITLE_ID",
-          "program_id": "0x$CPYMO_TITLE_ID",
-          "title_id_range_min": "0x$CPYMO_TITLE_ID",
-          "title_id_range_max": "0x$CPYMO_TITLE_ID",
-          "program_id_range_min": "0x$CPYMO_TITLE_ID",
-          "program_id_range_max": "0x$CPYMO_TITLE_ID",
-          "version": "0x00010000",
-          "system_resource_size": "0x0",
-          "main_thread_stack_size": "0x00100000",
-          "main_thread_priority": 44,
-          "default_cpu_id": 0,
-          "process_category": 0,
-          "is_retail": true,
-          "pool_partition": 0,
-          "is_64_bit": true,
-          "address_space_type": 3,
-          "optimize_memory_allocation": false,
-          "disable_device_address_space_merge": false,
-          "signature_key_generation": 0,
-          "filesystem_access": { "permissions": "0xFFFFFFFFFFFFFFFF" },
-          "service_access": ["appletAE", "appletOE", "hid", "hid:sys", "audout:u", "audren:u",
-                             "vi:m", "nvdrv", "nvdrv:a", "fsp-srv", "fsp-ldr", "ldr:ro",
-                             "set", "set:sys", "time:u", "time:s", "apm", "psc:m",
-                             "spsm", "pcv", "spl:", "acc:u0", "nifm:u"],
-          "kernel_capabilities": [
-            { "type": "kernel_flags", "value": { "highest_thread_priority": 63, "lowest_thread_priority": 24, "highest_cpu_id": 3, "lowest_cpu_id": 0 } }
-          ]
-        }
-        JSON
-        npdmtool /tmp/pkg/npdm.json /tmp/pkg/exefs/main.npdm
-        nacptool --create "CPyMO" "boz700908" "1.0.0" /tmp/pkg/control/control.nacp --titleid=0x$CPYMO_TITLE_ID
-        ls -l /tmp/pkg/exefs /tmp/pkg/control
-
-    - name: Upload exefs
-      uses: actions/upload-artifact@v6.0.0
-      with:
-        name: CPyMO for Nintendo Switch (exefs)
-        path: |
-          /tmp/pkg/exefs
-          /tmp/pkg/control
-        if-no-files-found: error
-
-  build-switch-nsp:
-    name: 'Nintendo Switch (NSP)'
-    needs: build-switch
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-
-    steps:
-    - uses: actions/checkout@v4.4.0
-
-    - name: Download exefs
-      uses: actions/download-artifact@v6.0.0
-      with:
-        name: CPyMO for Nintendo Switch (exefs)
-        path: /tmp/pkg
 
   build-3ds:
     name: 'Nintendo 3DS'
@@ -841,27 +765,29 @@ jobs:
         VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
       run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
 
-    - name: Configure CMake
+    # 与 build-macos / build-switch 同一模式：一个 job 内先出普通版再出无障碍版。
+    # 两版用不同构建目录（build / build-a11y），互不复用产物，无需 clean。
+    - name: Configure CMake (普通版)
       run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
 
-    - name: Build
+    - name: Build (普通版)
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
-    - name: Strip
+    - name: Strip (普通版)
       if: ${{ runner.os != 'Windows' }}
       run: |
         strip ./build/build/cpymo
         strip ./build/build/cpymo-tool
 
-    - name: Package (Linux)
+    - name: Package (普通版 Linux)
       if: ${{ runner.os == 'Linux' }}
       run: ./scripts/package-linux.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
 
-    - name: Package (macOS)
+    - name: Package (普通版 macOS)
       if: ${{ runner.os == 'macOS' }}
       run: ./scripts/package-macos.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
 
-    - name: Package (Windows)
+    - name: Package (普通版 Windows)
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
@@ -871,169 +797,47 @@ jobs:
           if (Test-Path build/build/Release/cpymo-tool.exe) { Copy-Item build/build/Release/cpymo-tool.exe dist/cpymo-tool.exe }
         Get-ChildItem dist
 
-    - name: Upload
+    - name: Upload (普通版)
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for ${{ matrix.package-name }}
         path: ./dist/*
         if-no-files-found: error
 
-  build-desktop-accessibility:
-    name: 'Desktop (Accessibility)'
-    runs-on: ${{ matrix.os }}
+    - name: Configure CMake (无障碍版)
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }} -DENABLE_ACCESSIBILITY=ON
 
-    strategy:
-      matrix:
-        tuple: [ linux-x64, win-x86, win-x64, win-arm64, win-arm64ec ]
+    - name: Build (无障碍版)
+      run: cmake --build ${{github.workspace}}/build-a11y --config ${{env.BUILD_TYPE}}
 
-        include:
-          - tuple: win-x64
-            os: windows-latest
-            triplet: x64-windows-static
-            arch: x64
-            package-name: "Windows x64 (Accessibility)"
-            cmake-flags: "-A x64 -DCMAKE_GENERATOR_PLATFORM=x64 -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: win-x86
-            os: windows-latest
-            triplet: x86-windows-static
-            arch: x86
-            package-name: "Windows x86 (Accessibility)"
-            cmake-flags: "-A Win32 -DCMAKE_GENERATOR_PLATFORM=Win32 -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: win-arm64
-            os: windows-latest
-            triplet: arm64-windows-static
-            arch: amd64_arm64
-            package-name: "Windows ARM64 (Accessibility)"
-            cmake-flags: "-A arm64 -DCMAKE_GENERATOR_PLATFORM=arm64 -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: win-arm64ec
-            os: windows-latest
-            # SDL2/FFmpeg have no arm64ec build. Arm64EC cannot link Arm64 libraries, but it
-            # can link x64 ones (that x64 code then runs under the built-in x64 emulation),
-            # so reuse the static x64 libraries the other Windows jobs already build.
-            triplet: x64-windows-static
-            arch: amd64_arm64
-            package-name: "Windows ARM64EC (Accessibility)"
-            cmake-flags: "-A arm64ec -DCMAKE_GENERATOR_PLATFORM=arm64ec -DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "D:/a/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          - tuple: linux-x64
-            os: ubuntu-latest
-            triplet: x64-linux
-            package-name: "Linux x64 (Accessibility)"
-            cmake-flags: "-DENABLE_ACCESSIBILITY=ON"
-            vcpkg-path: "/home/runner/work/CPyMO/CPyMO/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-    steps:
-    - uses: actions/checkout@v4.4.0
-      with:
-        submodules: 'recursive'
-
-    - uses: ilammy/msvc-dev-cmd@v1.13.0
-      if: ${{ runner.os == 'Windows' }}
-      with:
-        arch: ${{ matrix.arch }}
-
-    - name: Setup NASM
-      uses: ilammy/setup-nasm@v1.3.1
+    - name: Strip (无障碍版)
       if: ${{ runner.os != 'Windows' }}
+      run: |
+        strip ./build-a11y/build/cpymo
+        strip ./build-a11y/build/cpymo-tool
 
-    - name: Setup Dependents for MacOS
-      if: ${{ runner.os == 'macOS' }}
-      run: brew install pkg-config autoconf autoconf-archive automake libtool
-
-    - name: Setup Dependents for Ubuntu
+    - name: Package (无障碍版 Linux)
       if: ${{ runner.os == 'Linux' }}
-      run: |
-        sudo apt-get update
-        sudo apt install -y \
-          autoconf \
-          autoconf-archive \
-          automake \
-          libtool \
-          libltdl-dev \
-          libx11-dev \
-          libibus-1.0-dev \
-          libxft-dev \
-          libxext-dev \
-          libwayland-dev \
-          libxkbcommon-dev \
-          libegl1-mesa-dev
+      run: ./scripts/package-linux.sh ./build-a11y/build/cpymo ./dist-a11y "${{ matrix.package-name }} (Accessibility)"
 
-    - name: Restore vcpkg binary cache
-      uses: actions/cache@v4
-      with:
-        # 只缓存二进制产物。vcpkg/downloads 一旦进缓存，恢复时会把 vcpkg/ 目录一并建出来，
-        # 紧接的 git clone 就撞上「目标已存在」而失败（Windows 上必现）。
-        path: |
-          ${{ github.workspace }}/.vcpkg-binary-cache
-        key: vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-${{ github.run_id }}
-        restore-keys: |
-          vcpkg-bin-${{ runner.os }}-${{ matrix.triplet || 'uwp' }}-
-
-    - name: Download vcpkg
-      run: git clone --depth 1 --branch 2026.10.16 -- https://github.com/microsoft/vcpkg
-
-    - name: Bootstrap vcpkg
-      run: |
-        mkdir -p ~/.vcpkg
-        touch ~/.vcpkg/vcpkg.path.txt
-        ./vcpkg/bootstrap-vcpkg.sh
-        ./vcpkg/vcpkg integrate install
-      if: ${{ runner.os != 'Windows' }}
-
-    - name: Bootstrap vcpkg (Windows)
-      run: |
-        ./vcpkg/bootstrap-vcpkg.bat
-        ./vcpkg/vcpkg integrate install
-      if: ${{ runner.os == 'Windows' }}
-
-    - name: Install SDL2
-      env:
-        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
-      run: ./vcpkg/vcpkg install sdl2:${{ matrix.triplet }}
-
-    - name: Install FFMPEG
-      env:
-        VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/.vcpkg-binary-cache,readwrite
-      run: ./vcpkg/vcpkg install ffmpeg:${{ matrix.triplet }}
-
-    - name: Configure CMake
-      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-    - name: Strip
-      if: ${{ runner.os != 'Windows' }}
-      run: |
-        strip ./build/build/cpymo
-        strip ./build/build/cpymo-tool
-
-    - name: Package (Linux)
-      if: ${{ runner.os == 'Linux' }}
-      run: ./scripts/package-linux.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
-
-    - name: Package (macOS)
+    - name: Package (无障碍版 macOS)
       if: ${{ runner.os == 'macOS' }}
-      run: ./scripts/package-macos.sh ./build/build/cpymo ./dist "${{ matrix.package-name }}"
+      run: ./scripts/package-macos.sh ./build-a11y/build/cpymo ./dist-a11y "${{ matrix.package-name }} (Accessibility)"
 
-    - name: Package (Windows)
+    - name: Package (无障碍版 Windows)
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        # 资源与 Tolk 运行时都已编进 exe，这里只发这一个文件。
-        New-Item -ItemType Directory -Force -Path dist | Out-Null
-        Copy-Item build/build/Release/cpymo.exe dist/cpymo.exe
-          if (Test-Path build/build/Release/cpymo-tool.exe) { Copy-Item build/build/Release/cpymo-tool.exe dist/cpymo-tool.exe }
-        Get-ChildItem dist
+        New-Item -ItemType Directory -Force -Path dist-a11y | Out-Null
+        Copy-Item build-a11y/build/Release/cpymo.exe dist-a11y/cpymo.exe
+          if (Test-Path build-a11y/build/Release/cpymo-tool.exe) { Copy-Item build-a11y/build/Release/cpymo-tool.exe dist-a11y/cpymo-tool.exe }
+        Get-ChildItem dist-a11y
 
-    - name: Upload
+    - name: Upload (无障碍版)
       uses: actions/upload-artifact@v6.0.0
       with:
-        name: CPyMO for ${{ matrix.package-name }}
-        path: ./dist/*
+        name: CPyMO for ${{ matrix.package-name }} (Accessibility)
+        path: ./dist-a11y/*
         if-no-files-found: error
 
   build-macos:
