@@ -76,7 +76,10 @@ jobs:
         for name in rtld main sdk; do
           test "$(head -c 4 "tts-assets/$name.bin")" = NSO0 || { echo "$name.bin 不是 NSO0"; exit 1; }
         done
-        test -s tts-assets/D32-YAFANG.vtdb2 || { echo "缺少音库"; exit 1; }
+        for name in HIKARI ASHLEY GLORIA LENA ROXANE ELISA LOLA ANNE CHLOE HYERYUN HONG YAFANG; do
+          test -s "tts-assets/D32-$name.vtdb2" || { echo "缺少音库 $name"; exit 1; }
+        done
+        (cd tts-assets && sha256sum -c SHA256SUMS)
         mkdir -p cpymo-backends/sdl2/romfs/tts
         cp tts-assets/*.bin tts-assets/*.vtdb2 cpymo-backends/sdl2/romfs/tts/
         cp cpymo-backends/sdl2/*.wav cpymo-backends/sdl2/romfs/
@@ -220,7 +223,10 @@ jobs:
         for name in rtld main sdk; do
           test "$(head -c 4 "tts-assets/$name.bin")" = NSO0 || { echo "$name.bin 不是 NSO0"; exit 1; }
         done
-        test -s tts-assets/D32-YAFANG.vtdb2 || { echo "缺少音库"; exit 1; }
+        for name in HIKARI ASHLEY GLORIA LENA ROXANE ELISA LOLA ANNE CHLOE HYERYUN HONG YAFANG; do
+          test -s "tts-assets/D32-$name.vtdb2" || { echo "缺少音库 $name"; exit 1; }
+        done
+        (cd tts-assets && sha256sum -c SHA256SUMS)
         mkdir -p /tmp/pkg/romfs/tts
         cp tts-assets/*.bin tts-assets/*.vtdb2 /tmp/pkg/romfs/tts/
         cp cpymo-backends/sdl2/*.wav /tmp/pkg/romfs/
