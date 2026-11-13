@@ -860,6 +860,8 @@ static bool tt_synth(const char *text, uint32_t abort_gen, int voice)
     if (!g_inbuf || !g_outbuf || !g_cstack) return false;
     cpymo_switch_tts_get_params(&snapshot);
     snapshot.voice = voice;
+    /* Upstream does not enable emotion tags for these voices. */
+    if (voice == 0 || voice == 8 || voice == 9) snapshot.emotion_level = 0;
     in_len = tt_build_input(text, params);
     if (in_len == 0) return false;
 
