@@ -649,9 +649,13 @@ JUST_REFRESH:
 static error_t cpymo_config_ui_item_inc(cpymo_engine *e, cpymo_config_ui *ui, int item_index)
 {
 	cpymo_config_ui_item *item = ui->items + item_index;
-	int new_val = item->value + 1;
+	int step = 1;
+#if CPYMO_SW_TTS_SETTINGS
+	if (item_index == ITEM_TTS_RATE || item_index == ITEM_TTS_PITCH) step = 10;
+#endif
+	int new_val = item->value >= item->max_value ? item->min_value : item->value + step;
 	if (new_val > item->max_value)
-		new_val = item->min_value;
+		new_val = item->max_value;
 
 	if (new_val != item->value) {
 		error_t err = cpymo_config_ui_set_value(e, ui, item_index, new_val, false);
@@ -664,9 +668,13 @@ static error_t cpymo_config_ui_item_inc(cpymo_engine *e, cpymo_config_ui *ui, in
 static error_t cpymo_config_ui_item_dec(cpymo_engine *e, cpymo_config_ui *ui, int item_index)
 {
 	cpymo_config_ui_item *item = ui->items + item_index;
-	int new_val = item->value - 1;
+	int step = 1;
+#if CPYMO_SW_TTS_SETTINGS
+	if (item_index == ITEM_TTS_RATE || item_index == ITEM_TTS_PITCH) step = 10;
+#endif
+	int new_val = item->value <= item->min_value ? item->max_value : item->value - step;
 	if (new_val < item->min_value)
-		new_val = item->max_value;
+		new_val = item->min_value;
 
 	if (new_val != item->value) {
 		error_t err = cpymo_config_ui_set_value(e, ui, item_index, new_val, false);

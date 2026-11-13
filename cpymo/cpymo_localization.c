@@ -101,7 +101,7 @@ const cpymo_localization chs = {
 	"音高",
 	"音量",
 	"音色",
-	"情感",
+	"情绪",
 	{ "关闭", "中性", "高兴", "悲伤", "生气", "兴奋" },
 
 	&F(chs, save_already_save_to),
@@ -170,7 +170,7 @@ const cpymo_localization cht = {
 	"音高",
 	"音量",
 	"音色",
-	"情感",
+	"情緒",
 	{ "關閉", "中性", "高興", "悲傷", "生氣", "興奮" },
 
 	&F(cht, save_already_save_to),
