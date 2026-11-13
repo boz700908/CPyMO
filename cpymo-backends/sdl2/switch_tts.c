@@ -655,6 +655,13 @@ static void shim_rng(tt_regs *r)
     r->x[0] = 0;
 }
 
+/* rtld 入口插桩：确认 rtld 确实开始执行（stage=3） */
+static void shim_rtld_entry(tt_regs *r)
+{
+    tt_note_lr(r);
+    __atomic_store_n(&g_boot_stage, 3, __ATOMIC_RELAXED);
+}
+
 /* ------------------------------------------------------------------ */
 /* trampoline 池与补丁                                                 */
 /* ------------------------------------------------------------------ */
@@ -1450,6 +1457,15 @@ static bool tt_apply_patches(void)
     t_boot = tt_add_tramp(tt_boot_hook, 0);
     if (!t_rng || !t_boot) return tt_fail0("trampoline 池分配失败");
 
+    /* rtld 入口插桩：首条指令 b #0xc 只跳过两个 udf 字，无寄存器副作用，
+       换成经 trampoline 的等价跳转并记 stage=3，continuation 落回 +0xc。 */
+    {
+        uint32_t t_entry = tt_add_tramp(shim_rtld_entry,
+                                        g_img_off[TT_IMG_RTLD] + 0x0c);
+        if (!t_entry || !tt_patch_branch("rtld 入口", TT_IMG_RTLD, 0x0,
+                                         0x14000003u, t_entry, false)) return false;
+    }
+
     /* 随机数：填零即可（只用于密钥材料，TTS 不走网络） */
     if (!tt_patch_branch("RNG", TT_IMG_SDK, 0xa7b50, 0xD10183FFu, t_rng, false)) return false;
 
@@ -1581,6 +1597,17 @@ void cpymo_switch_tts_params_default(cpymo_switch_tts_params *params)
 static const char *tt_async_err_msg(uint32_t code);
 static void tt_fmt_guest_addr(uint64_t va, char *buf, size_t cap);
 
+/* 追加式 sdmc 日志在 Eden 上写到 ~12KB 后会静默失败；
+   boot 轨迹改用独立小文件，每次截断重写。 */
+static void tt_boot_file_write(const char *line)
+{
+    FILE *f = fopen("sdmc:/cpymo-tts-boot.txt", "w");
+    if (f) {
+        fputs(line, f);
+        fclose(f);
+    }
+}
+
 bool cpymo_switch_tts_init(const char *assets_dir)
 {
     if (g_state == CPYMO_SWITCH_TTS_STATE_READY) return true;
@@ -1617,10 +1644,12 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     Result boot_wait = eventWait(&g_boot_event, 30000000000ull);
     {
         /* 无论成败都转储一次引导轨迹；这些计数只由 guest 线程写，此处只读 */
-        char lr_buf[48];
+        char lr_buf[48], line[640];
         tt_fmt_guest_addr(__atomic_load_n(&g_boot_lr, __ATOMIC_RELAXED),
                           lr_buf, sizeof(lr_buf));
-        CPYMO_DIAG("[tts] boot trace: wait=0x%08x stage=%u heap=%u perm=%u attr=%u query=%u info=%u rng=%u last_query=0x%llx last_svc=%s\n",
+        uint32_t err = __atomic_load_n(&g_async_err, __ATOMIC_ACQUIRE);
+        snprintf(line, sizeof(line),
+            "[tts] boot trace: wait=0x%08x stage=%u heap=%u perm=%u attr=%u query=%u info=%u rng=%u last_query=0x%llx last_svc=%s err=%u\n",
             (unsigned)boot_wait,
             (unsigned)__atomic_load_n(&g_boot_stage, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_HEAP], __ATOMIC_RELAXED),
@@ -1630,8 +1659,9 @@ bool cpymo_switch_tts_init(const char *assets_dir)
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_INFO], __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_RNG], __ATOMIC_RELAXED),
             (unsigned long long)__atomic_load_n(&g_boot_query_addr, __ATOMIC_RELAXED),
-            lr_buf);
-        uint32_t err = __atomic_load_n(&g_async_err, __ATOMIC_ACQUIRE);
+            lr_buf, err);
+        CPYMO_DIAG("%s", line);
+        tt_boot_file_write(line);
         const char *msg = tt_async_err_msg(err);
         if (msg) CPYMO_DIAG("[tts] guest 侧事件：%s\n", msg);
     }
