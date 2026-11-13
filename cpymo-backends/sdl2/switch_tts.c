@@ -560,61 +560,31 @@ static void shim_set_mem_attr(tt_regs *r)
 
 static bool tt_region_of(uintptr_t a, tt_meminfo *m)
 {
-    struct {
-        uintptr_t base;
-        size_t size;
-        uint32_t type;
-        uint32_t perm;
-    } tbl[8];
-    int n = 0, i;
+    uintptr_t main_base = g_img_va[TT_IMG_MAIN];
+    uintptr_t sdk_base = g_img_va[TT_IMG_SDK];
+    uintptr_t end = sdk_base + g_img_size[TT_IMG_SDK];
 
     memset(m, 0, sizeof(*m));
-
-    if (g_rx && a >= (uintptr_t)g_rx && a < (uintptr_t)g_rx + g_window_size) {
-        tbl[n].base = (uintptr_t)g_rx; tbl[n].size = g_window_size;
-        tbl[n].type = TT_MT_CODE_STATIC; tbl[n].perm = TT_PM_R | TT_PM_X; n++;
+    if (a < main_base) {
+        m->base = 0;
+        m->size = main_base;
+        m->type = 16; /* reserved */
+    } else if (a < sdk_base) {
+        m->base = main_base;
+        m->size = sdk_base - main_base;
+        m->type = 3; /* code */
+        m->perm = TT_PM_R | TT_PM_X;
+    } else if (a < end) {
+        m->base = sdk_base;
+        m->size = end - sdk_base;
+        m->type = 3;
+        m->perm = TT_PM_R | TT_PM_X;
+    } else {
+        m->base = end;
+        m->size = (uint64_t)0 - (uint64_t)end;
+        m->type = 16;
     }
-    if (g_heap_mem && a >= (uintptr_t)g_heap_mem && a < (uintptr_t)g_heap_mem + g_heap_size) {
-        tbl[n].base = (uintptr_t)g_heap_mem; tbl[n].size = g_heap_size;
-        tbl[n].type = TT_MT_HEAP; tbl[n].perm = TT_PM_R | TT_PM_W; n++;
-    }
-    if (g_vstack && a >= (uintptr_t)g_vstack && a < (uintptr_t)g_vstack + g_vstack_size) {
-        tbl[n].base = (uintptr_t)g_vstack; tbl[n].size = g_vstack_size;
-        tbl[n].type = TT_MT_NORMAL; tbl[n].perm = TT_PM_R | TT_PM_W; n++;
-    }
-    if (g_cstack && a >= (uintptr_t)g_cstack && a < (uintptr_t)g_cstack + g_cstack_size) {
-        tbl[n].base = (uintptr_t)g_cstack; tbl[n].size = g_cstack_size;
-        tbl[n].type = TT_MT_NORMAL; tbl[n].perm = TT_PM_R | TT_PM_W; n++;
-    }
-    if (g_inbuf && a >= (uintptr_t)g_inbuf && a < (uintptr_t)g_inbuf + g_inbuf_size) {
-        tbl[n].base = (uintptr_t)g_inbuf; tbl[n].size = g_inbuf_size;
-        tbl[n].type = TT_MT_NORMAL; tbl[n].perm = TT_PM_R | TT_PM_W; n++;
-    }
-    if (g_outbuf && a >= (uintptr_t)g_outbuf && a < (uintptr_t)g_outbuf + g_outbuf_size) {
-        tbl[n].base = (uintptr_t)g_outbuf; tbl[n].size = g_outbuf_size;
-        tbl[n].type = TT_MT_NORMAL; tbl[n].perm = TT_PM_R | TT_PM_W; n++;
-    }
-    if (g_vtdb && a >= (uintptr_t)g_vtdb && a < (uintptr_t)g_vtdb + g_vtdb_len) {
-        tbl[n].base = (uintptr_t)g_vtdb; tbl[n].size = g_vtdb_len;
-        tbl[n].type = TT_MT_NORMAL; tbl[n].perm = TT_PM_R | TT_PM_W; n++;
-    }
-
-    for (i = 0; i < n; i++) {
-        if (a >= tbl[i].base && a < tbl[i].base + tbl[i].size) {
-            uintptr_t pg = a & ~(uintptr_t)0xFFF;
-            m->base = pg;
-            m->size = (tbl[i].base + tbl[i].size) - pg;
-            m->type = tbl[i].type;
-            m->perm = tbl[i].perm;
-            return true;
-        }
-    }
-
-    m->base = a & ~(uintptr_t)0xFFF;
-    m->size = 0x1000;
-    m->type = 0;
-    m->perm = TT_PM_R;
-    return false;
+    return m->type == 3;
 }
 
 static void shim_query_memory(tt_regs *r)
