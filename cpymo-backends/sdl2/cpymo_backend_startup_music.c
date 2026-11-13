@@ -78,8 +78,32 @@ static void cpymo_backend_startup_music_callback(void *userdata, Uint8 *stream, 
 	}
 }
 
-#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
+#if defined(__SWITCH__)
+#include <switch.h>
+#ifdef ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY
 #include "cpymo_switch_accessibility.h"
+#endif
+
+/* Switch 单文件分发：资源在 nro 自带 romfs 里。无障碍层会先挂载；
+ * 这里对普通版兜底挂载一次，重复挂载失败时直接探测 romfs 里有没有文件。 */
+static int cpymo_sw_romfs_ready(void)
+{
+	static int ready, tried;
+	if (!tried) {
+		tried = 1;
+#ifdef ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY
+		if (cpymo_switch_accessibility_romfs_ready()) ready = 1;
+#endif
+		if (!ready) {
+			if (R_SUCCEEDED(romfsMountSelf("romfs"))) ready = 1;
+			else {
+				FILE *probe = fopen("romfs:/startup.wav", "rb");
+				if (probe) { fclose(probe); ready = 1; }
+			}
+		}
+	}
+	return ready;
+}
 #endif
 
 static int cpymo_backend_startup_music_load(SDL_AudioSpec *out_spec)
@@ -108,9 +132,9 @@ static int cpymo_backend_startup_music_load(SDL_AudioSpec *out_spec)
 	startup_music_pcm = NULL;
 	startup_music_len = 0;
 
-#if defined(__SWITCH__) && defined(ENABLE_TEXT_EXTRACT_SWITCH_ACCESSIBILITY)
-	/* Switch 单文件分发：启动音乐在 nro / NSP 自带 romfs 的根目录 */
-	if (cpymo_switch_accessibility_romfs_ready()
+#if defined(__SWITCH__)
+	/* Switch 单文件分发：启动音乐在 nro 自带 romfs 的根目录 */
+	if (cpymo_sw_romfs_ready()
 			&& SDL_LoadWAV("romfs:/startup.wav", out_spec,
 				&startup_music_pcm, &startup_music_len) != NULL)
 		return 1;

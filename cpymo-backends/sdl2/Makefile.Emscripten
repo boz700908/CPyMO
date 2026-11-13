@@ -38,6 +38,7 @@ CFLAGS += -DENABLE_TEXT_EXTRACT
 LDFLAGS += --preload-file enter.wav --preload-file menu.wav --preload-file select.wav
 endif
 
+# 单文件分发：SINGLE_FILE 把 wasm 与预载资源全部内联进输出 js/html。
 LDFLAGS := \
 	--preload-file startup.wav \
 	$(EM_FLAGS) \
@@ -47,7 +48,8 @@ LDFLAGS := \
 	-s FORCE_FILESYSTEM=1 \
 	-s WASM=$(WASM) \
 	-s EXPORTED_RUNTIME_METHODS=['ccall'] \
-	-s ALLOW_MEMORY_GROWTH=1
+	-s ALLOW_MEMORY_GROWTH=1 \
+	-s SINGLE_FILE=1
 
 ifeq ($(AUDIO_BACKEND), ffmpeg)
 

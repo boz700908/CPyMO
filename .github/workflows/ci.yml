@@ -40,6 +40,15 @@ jobs:
         submodules: true
 
     # 与 build-macos 同一模式：一个 job 内按序产出普通版、无障碍版与 exefs。
+    - name: Stage startup music into romfs (普通版)
+      shell: bash
+      run: |
+        set -e
+        cd ./cpymo-backends/sdl2
+        test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
+        mkdir -p romfs
+        cp startup.wav romfs/
+
     - name: Build (普通版)
       shell: bash
       run: |
@@ -52,12 +61,11 @@ jobs:
       run: |
         set -e
         cd ./cpymo-backends/sdl2
+        # 单文件分发：资源已打进 nro 的 romfs，不再外带文件。
         mkdir -p dist
         test -f build.Switch/cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
         cp build.Switch/cpymo.nro dist/
-        test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
-        cp startup.wav dist/
-        ls -R dist
+        ls -l dist
 
     - name: Upload (普通版)
       uses: actions/upload-artifact@v6.0.0
@@ -103,19 +111,12 @@ jobs:
       run: |
         set -e
         cd ./cpymo-backends/sdl2
+        # 单文件分发：语音引擎、音库、音效与启动音乐均已打进 nro 的 romfs，
+        # 不再外带任何文件（外置 sdmc:/switch/tts 覆盖仍然可用）。
         mkdir -p dist
         test -f build.Switch/cpymo.nro || { echo "没有生成 cpymo.nro"; exit 1; }
         cp build.Switch/cpymo.nro dist/
-        cp enter.wav menu.wav select.wav dist/ 2>/dev/null || true
-        test -f startup.wav || { echo "缺少 startup.wav（启动音乐）"; exit 1; }
-        cp startup.wav dist/
-        test -d ../../tts-assets || { echo "缺少 tts-assets（语音资源必须随包发布）"; exit 1; }
-        mkdir -p dist/tts
-        cp ../../tts-assets/*.bin dist/tts/ 2>/dev/null || true
-        cp ../../tts-assets/*.vtdb2 dist/tts/ 2>/dev/null || true
-        test -f dist/tts/rtld.bin && test -f dist/tts/main.bin && test -f dist/tts/sdk.bin \
-          || { echo "tts 资源不完整（需要 rtld/main/sdk）"; exit 1; }
-        ls -R dist
+        ls -l dist
 
     - name: Upload (无障碍版)
       uses: actions/upload-artifact@v6.0.0
@@ -359,9 +360,9 @@ jobs:
         cd cpymo-backends/sdl2
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten -j
+        # SINGLE_FILE：wasm 与预载资源都内联在 cpymo.js 里，单文件分发。
         mkdir -p ../../artifacts/web
         cp cpymo.js ../../artifacts/web/
-        cp cpymo.wasm cpymo.data ../../artifacts/web/ 2>/dev/null || true
 
     - name: Build (Accessibility)
       run: |
@@ -369,9 +370,9 @@ jobs:
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten clean
         make -f Makefile.Emscripten -j ENABLE_ACCESSIBILITY=1
+        # SINGLE_FILE：wasm 与预载资源都内联在 cpymo.js 里，单文件分发。
         mkdir -p ../../artifacts/web-accessibility
         cp cpymo.js ../../artifacts/web-accessibility/
-        cp cpymo.wasm cpymo.data ../../artifacts/web-accessibility/ 2>/dev/null || true
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
@@ -395,8 +396,9 @@ jobs:
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten clean
         make -f Makefile.Emscripten -j BUILD_GAME_DIR=game WASM=$([ "${{ inputs.web_build_type }}" = "wasm" ] && echo 1 || echo 0)
+        # SINGLE_FILE：整包游戏内联进单个 cpymo.html。
         mkdir -p ../../artifacts/web-game
-        cp cpymo.html cpymo.js cpymo.data ../../artifacts/web-game/
+        cp cpymo.html ../../artifacts/web-game/
         cp cpymo.wasm ../../artifacts/web-game/ 2>/dev/null || true
 
     - name: Upload packaged game
@@ -556,7 +558,14 @@ jobs:
       uses: actions/upload-artifact@v6.0.0
       with:
         name: CPyMO for Universal Windows Platform
-        path: ./cpymo-backends/uwp/AppPackages/CPyMO/
+        path: |
+          ./cpymo-backends/uwp/AppPackages/CPyMO/*.msix
+          ./cpymo-backends/uwp/AppPackages/CPyMO/*.appx
+          ./cpymo-backends/uwp/AppPackages/CPyMO/*.msixbundle
+          ./cpymo-backends/uwp/AppPackages/CPyMO/*.appxbundle
+          ./cpymo-backends/uwp/AppPackages/CPyMO/*.msixupload
+          ./cpymo-backends/uwp/AppPackages/CPyMO/*.appxupload
+        if-no-files-found: error
 
   build-SDL1-windows:
     name: 'Windows (SDL 1.2)'
