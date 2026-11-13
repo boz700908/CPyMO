@@ -96,6 +96,10 @@ void cpymo_backend_audio_init()
 			SDL_CloseAudio();
 
 			if (SDL_OpenAudio(&want, NULL) == 0) {
+				have = want;
+				audio_info.freq = want.freq;
+				audio_info.channels = want.channels;
+				audio_info.format = SDL2_AUDIO_DEFAULT_FORMAT_CPYMO;
 				audio_enabled = true;
 			}
 			else {
