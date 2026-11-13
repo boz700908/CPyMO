@@ -976,7 +976,7 @@ static void tt_boot_hook(tt_regs *r)
     cpymo_sw_tts_call_guest(&c);
 
     g_boot_result = (int64_t)(int32_t)c.result;
-    g_engine_ok = (g_boot_result >= 0);
+    g_engine_ok = (g_boot_result == 0);
     g_boot_done = true;
     if (!g_engine_ok) g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
     CPYMO_DIAG("[tts] 引擎 init -> %lld\n", (long long)g_boot_result);
