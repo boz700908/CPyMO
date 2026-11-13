@@ -285,6 +285,12 @@ static Event    g_cmd_event;
 static Event    g_boot_event;
 static bool     g_boot_done;
 static int64_t  g_boot_result;
+/* Guest-thread counters sampled by the host on boot timeout. */
+static uint32_t g_boot_stage;
+enum { TT_TRACE_HEAP, TT_TRACE_PERM, TT_TRACE_ATTR, TT_TRACE_QUERY,
+       TT_TRACE_INFO, TT_TRACE_RNG, TT_TRACE_COUNT };
+static uint32_t g_boot_trace[TT_TRACE_COUNT];
+static uint64_t g_boot_query_addr;
 static bool     g_quit;
 
 /* 请求环由短时互斥锁保护；不在音频回调中访问。 */
@@ -527,6 +533,7 @@ static void shim_set_heap_size(tt_regs *r)
      * 大小时只能记日志，引擎越界与否不由我们控制。
      */
     uint64_t want = r->x[1];
+    __atomic_add_fetch(&g_boot_trace[TT_TRACE_HEAP], 1, __ATOMIC_RELAXED);
 
     if (!g_heap_mem) {
         size_t min_sz = (size_t)32 << 20;
@@ -555,12 +562,14 @@ static void shim_set_heap_size(tt_regs *r)
 
 static void shim_set_mem_perm(tt_regs *r)
 {
+    __atomic_add_fetch(&g_boot_trace[TT_TRACE_PERM], 1, __ATOMIC_RELAXED);
     (void)r;
     r->x[0] = 0;
 }
 
 static void shim_set_mem_attr(tt_regs *r)
 {
+    __atomic_add_fetch(&g_boot_trace[TT_TRACE_ATTR], 1, __ATOMIC_RELAXED);
     (void)r;
     r->x[0] = 0;
 }
@@ -599,6 +608,8 @@ static void shim_query_memory(tt_regs *r)
     /* svcQueryMemory(MemoryInfo *out, u32 *page_info, u64 addr) */
     void *out = (void *)(uintptr_t)r->x[0];
     uintptr_t addr = (uintptr_t)r->x[2];
+    __atomic_add_fetch(&g_boot_trace[TT_TRACE_QUERY], 1, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_boot_query_addr, (uint64_t)addr, __ATOMIC_RELAXED);
     if (out) tt_region_of(addr, (tt_meminfo *)out);
     r->x[0] = 0;
     r->x[1] = 0;
@@ -609,6 +620,7 @@ static void shim_get_info(tt_regs *r)
     /* Kernel SVC ABI returns the value in x1. */
     uint64_t id = r->x[1];
     uint64_t v = 0;
+    __atomic_add_fetch(&g_boot_trace[TT_TRACE_INFO], 1, __ATOMIC_RELAXED);
 
     switch (id) {
         case 21: v = (uint64_t)g_heap_va + (uint64_t)g_heap_size; break;
@@ -624,6 +636,7 @@ static void shim_rng(tt_regs *r)
     /* nn::crypto::GenerateCryptographicallyRandomBytes(buf, len) */
     void *buf = (void *)(uintptr_t)r->x[0];
     size_t len = (size_t)r->x[1];
+    __atomic_add_fetch(&g_boot_trace[TT_TRACE_RNG], 1, __ATOMIC_RELAXED);
     if (buf && len) memset(buf, 0, len);
     r->x[0] = 0;
 }
@@ -1038,6 +1051,7 @@ static void tt_boot_hook(tt_regs *r)
     tt_call c;
 
     (void)r;
+    __atomic_store_n(&g_boot_stage, 2, __ATOMIC_RELAXED);
     CPYMO_DIAG("[tts] nnMain 入口钩子命中\n");
 
     memset(&c, 0, sizeof(c));
@@ -1100,6 +1114,7 @@ static void tt_boot_hook(tt_regs *r)
 static void tt_guest_thread_main(void *arg)
 {
     (void)arg;
+    __atomic_store_n(&g_boot_stage, 1, __ATOMIC_RELAXED);
     cpymo_sw_tts_enter_guest((uint64_t)g_img_va[TT_IMG_RTLD],
                              (uint64_t)(uintptr_t)(g_vstack + g_vstack_size),
                              0, 1);
@@ -1538,6 +1553,10 @@ bool cpymo_switch_tts_init(const char *assets_dir)
 
     g_state = CPYMO_SWITCH_TTS_STATE_LOADING;
     g_error[0] = 0;
+    __atomic_store_n(&g_boot_stage, 0, __ATOMIC_RELAXED);
+    for (int i = 0; i < TT_TRACE_COUNT; ++i)
+        __atomic_store_n(&g_boot_trace[i], 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&g_boot_query_addr, 0, __ATOMIC_RELAXED);
     mutexLock(&g_params_mutex);
     if (g_params.voice == 0) cpymo_switch_tts_params_default(&g_params);
     mutexUnlock(&g_params_mutex);
@@ -1558,8 +1577,20 @@ bool cpymo_switch_tts_init(const char *assets_dir)
     if (R_FAILED(threadStart(&g_thread))) return tt_fail0("threadStart 失败");
     g_thread_started = true;
 
-    if (R_FAILED(eventWait(&g_boot_event, 30000000000ull)))
+    Result boot_wait = eventWait(&g_boot_event, 30000000000ull);
+    if (R_FAILED(boot_wait)) {
+        CPYMO_DIAG("[tts] boot trace: wait=0x%08x stage=%u heap=%u perm=%u attr=%u query=%u info=%u rng=%u last_query=0x%llx\n",
+            (unsigned)boot_wait,
+            (unsigned)__atomic_load_n(&g_boot_stage, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_HEAP], __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_PERM], __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_ATTR], __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_QUERY], __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_INFO], __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&g_boot_trace[TT_TRACE_RNG], __ATOMIC_RELAXED),
+            (unsigned long long)__atomic_load_n(&g_boot_query_addr, __ATOMIC_RELAXED));
         return tt_fail0("等待引擎初始化事件失败或超时（30s）");
+    }
     if (!g_boot_done || !g_engine_ok) {
         char buf[96];
         snprintf(buf, sizeof(buf), "引擎 init 返回 0x%llx",
