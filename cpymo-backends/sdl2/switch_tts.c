@@ -7,7 +7,7 @@
  *
  *   1) 三个 NSO 镜像（rtld / main / sdk）解压后按相对顺序铺进一块 RWX 区域
  *   2) 7 个补丁字：把 5 个内存类 svc、RNG、以及 nnMain 的入口改道到自己的 shim
- *   3) 两个入口：main+0x519440 = 引擎 init，main+0x519aa0 = 分块合成
+ *   3) 两个入口：main+0x519620 = 引擎 init，main+0x519c80 = 分块合成
  *   4) 一个 0x70 字节的调用帧
  *
  * 其余（模拟器内核、stage-2 映射、dynarmic、brk 捕获、mini-rtld、导出表、FLAC 打包）
@@ -52,11 +52,15 @@
 #define TT_IMG_SDK       2
 
 /* 引擎关键偏移（相对各镜像基址，定稿见 /memories/cpymo-switch-a11y.md） */
-#define OFF_MAIN_BOOT        0x6080    /* nnMain 序言，整函数换成 b tramp_boot */
-#define OFF_MAIN_INIT        0x519440  /* 引擎 init(language, ?, vtdb, len, 0, 0) */
-#define OFF_MAIN_SYNTH       0x519aa0  /* 分块合成 */
-#define OFF_MAIN_HEAP_GLOBAL 0x10ba098 /* 源：全局堆指针 */
-#define OFF_MAIN_HEAP_SLOT   0x110c638 /* 目标：引擎期望的堆指针落点 */
+#define OFF_MAIN_BOOT        0x66e0    /* nnMain 序言，整函数换成 b tramp_boot */
+#define OFF_MAIN_INIT        0x519620  /* 引擎 init(language, ?, vtdb, len, 0, 0) */
+#define OFF_MAIN_SYNTH       0x519c80  /* 分块合成 */
+#define OFF_MAIN_HEAP_OBJECT 0x1106588
+#define OFF_MAIN_HEAP_CTOR   0x5144c0
+#define OFF_MAIN_HEAP_INIT   0x514590
+#define OFF_MAIN_HEAP_SET    0x4dfda0
+#define OFF_MAIN_HEAP_NAME   0xaa3f8b
+#define TT_ENGINE_HEAP_SIZE  (32u << 20)
 #define OFF_SDK_RNG          0xa7b50   /* GenerateCryptographicallyRandomBytes */
 #define OFF_SDK_INIT_MODULE  0x11c010  /* nninitInitializeSdkModule → 直接 ret */
 
@@ -247,6 +251,7 @@ static uint32_t g_tramp_off;     /* trampoline 池在窗口内的偏移 */
 static uint32_t g_tramp_slot;
 
 /* guest 侧各块内存 */
+static uint8_t  *g_engine_heap;
 static uint8_t  *g_heap_mem;
 static size_t    g_heap_size;
 static uintptr_t g_heap_va;
@@ -961,8 +966,8 @@ static void tt_engine_loop(void)
 }
 
 /*
- * nnMain 入口钩子：main+0x6080 被换成 b 到这里。
- * 原来那句函数体（全局堆指针拷贝）由 C 复刻，然后调引擎 init，
+ * nnMain 入口钩子：main+0x66e0 被换成 b 到这里。
+ * 按模组顺序构造并注册独立堆，然后调引擎 init，
  * 之后这条 guest 线程就变成 TTS 引擎线程，永不返回。
  */
 static void tt_boot_hook(tt_regs *r)
@@ -973,11 +978,20 @@ static void tt_boot_hook(tt_regs *r)
     (void)r;
     CPYMO_DIAG("[tts] nnMain 入口钩子命中\n");
 
-    {
-        uint64_t v = *(uint64_t *)(void *)(m + OFF_MAIN_HEAP_GLOBAL);
-        *(uint64_t *)(void *)(m + OFF_MAIN_HEAP_SLOT) = v;
-        CPYMO_DIAG("[tts] 全局堆指针 = 0x%llx\n", (unsigned long long)v);
-    }
+    memset(&c, 0, sizeof(c));
+    c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
+    c.fn = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_CTOR);
+    c.x[0] = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_OBJECT);
+    cpymo_sw_tts_call_guest(&c);
+    c.fn = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_INIT);
+    c.x[0] = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_OBJECT);
+    c.x[1] = (uint64_t)(uintptr_t)g_engine_heap;
+    c.x[2] = TT_ENGINE_HEAP_SIZE;
+    c.x[3] = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_NAME);
+    cpymo_sw_tts_call_guest(&c);
+    c.fn = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_SET);
+    c.x[0] = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_OBJECT);
+    cpymo_sw_tts_call_guest(&c);
 
     memset(&c, 0, sizeof(c));
     c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_INIT;
@@ -1253,11 +1267,12 @@ static bool tt_alloc_regions(void)
     g_inbuf_size = 2u << 20;
     g_outbuf_size = 0x10000;
 
+    g_engine_heap = (uint8_t *)tt_alloc(TT_ENGINE_HEAP_SIZE);
     g_vstack = (uint8_t *)tt_alloc(g_vstack_size);
     g_cstack = (uint8_t *)tt_alloc(g_cstack_size);
     g_inbuf = (uint8_t *)tt_alloc(g_inbuf_size);
     g_outbuf = (uint8_t *)tt_alloc(g_outbuf_size);
-    if (!g_vstack || !g_cstack || !g_inbuf || !g_outbuf)
+    if (!g_engine_heap || !g_vstack || !g_cstack || !g_inbuf || !g_outbuf)
         return tt_fail0("guest 内存分配失败");
 
     memset(g_vstack, 0, g_vstack_size);
@@ -1302,7 +1317,7 @@ static bool tt_apply_patches(void)
                        0xA9BF7BFDu, 0xD65F03C0u)) return false;
 
     /* nnMain 入口：整个序言一起跳过，跳到我们的钩子 */
-    if (!tt_patch_branch("nnMain 入口", TT_IMG_MAIN, 0x6080, 0xD10083FFu, t_boot, false)) return false;
+    if (!tt_patch_branch("nnMain 入口", TT_IMG_MAIN, 0x66e0, 0xD10083FFu, t_boot, false)) return false;
 
     return true;
 }
