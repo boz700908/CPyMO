@@ -79,6 +79,7 @@ typedef struct {
 
 extern const char cpymo_sw_tts_tramp_start[];
 extern const char cpymo_sw_tts_tramp_end[];
+extern const char cpymo_sw_tts_tramp_return[];
 extern void cpymo_sw_tts_call_guest(tt_call *spec);
 extern void cpymo_sw_tts_enter_guest(uint64_t pc, uint64_t sp,
                                      uint64_t a0, uint64_t a1);
@@ -95,7 +96,8 @@ __asm__(
     ".p2align 4\n"
     ".global cpymo_sw_tts_tramp_start\n"
     "cpymo_sw_tts_tramp_start:\n"
-    "    sub  sp, sp, #0xA0\n"
+    "    sub  sp, sp, #0x2D0\n"
+    "    str  x30, [sp, #0xA0]\n"
     "    stp  x0,  x1,  [sp, #0x00]\n"
     "    stp  x2,  x3,  [sp, #0x10]\n"
     "    stp  x4,  x5,  [sp, #0x20]\n"
@@ -106,11 +108,55 @@ __asm__(
     "    stp  x14, x15, [sp, #0x70]\n"
     "    stp  x16, x17, [sp, #0x80]\n"
     "    str  x18,      [sp, #0x90]\n"
-    "    add  x9, sp, #0xA0\n"
+    "    add  x9, sp, #0x2D0\n"
     "    str  x9,       [sp, #0x98]\n"
+    "    stp  q0, q1, [sp, #0xB0]\n"
+    "    stp  q2, q3, [sp, #0xD0]\n"
+    "    stp  q4, q5, [sp, #0xF0]\n"
+    "    stp  q6, q7, [sp, #0x110]\n"
+    "    stp  q8, q9, [sp, #0x130]\n"
+    "    stp  q10, q11, [sp, #0x150]\n"
+    "    stp  q12, q13, [sp, #0x170]\n"
+    "    stp  q14, q15, [sp, #0x190]\n"
+    "    stp  q16, q17, [sp, #0x1B0]\n"
+    "    stp  q18, q19, [sp, #0x1D0]\n"
+    "    stp  q20, q21, [sp, #0x1F0]\n"
+    "    stp  q22, q23, [sp, #0x210]\n"
+    "    stp  q24, q25, [sp, #0x230]\n"
+    "    stp  q26, q27, [sp, #0x250]\n"
+    "    stp  q28, q29, [sp, #0x270]\n"
+    "    stp  q30, q31, [sp, #0x290]\n"
+    "    mrs  x9, nzcv\n"
+    "    str  x9, [sp, #0x2B0]\n"
+    "    mrs  x9, fpcr\n"
+    "    str  x9, [sp, #0x2B8]\n"
+    "    mrs  x9, fpsr\n"
+    "    str  x9, [sp, #0x2C0]\n"
     "    mov  x0, sp\n"
     "    ldr  x16, 1f\n"
     "    blr  x16\n"
+    "    ldr  x9, [sp, #0x2B0]\n"
+    "    msr  nzcv, x9\n"
+    "    ldr  x9, [sp, #0x2B8]\n"
+    "    msr  fpcr, x9\n"
+    "    ldr  x9, [sp, #0x2C0]\n"
+    "    msr  fpsr, x9\n"
+    "    ldp  q0, q1, [sp, #0xB0]\n"
+    "    ldp  q2, q3, [sp, #0xD0]\n"
+    "    ldp  q4, q5, [sp, #0xF0]\n"
+    "    ldp  q6, q7, [sp, #0x110]\n"
+    "    ldp  q8, q9, [sp, #0x130]\n"
+    "    ldp  q10, q11, [sp, #0x150]\n"
+    "    ldp  q12, q13, [sp, #0x170]\n"
+    "    ldp  q14, q15, [sp, #0x190]\n"
+    "    ldp  q16, q17, [sp, #0x1B0]\n"
+    "    ldp  q18, q19, [sp, #0x1D0]\n"
+    "    ldp  q20, q21, [sp, #0x1F0]\n"
+    "    ldp  q22, q23, [sp, #0x210]\n"
+    "    ldp  q24, q25, [sp, #0x230]\n"
+    "    ldp  q26, q27, [sp, #0x250]\n"
+    "    ldp  q28, q29, [sp, #0x270]\n"
+    "    ldp  q30, q31, [sp, #0x290]\n"
     "    ldp  x0,  x1,  [sp, #0x00]\n"
     "    ldp  x2,  x3,  [sp, #0x10]\n"
     "    ldp  x4,  x5,  [sp, #0x20]\n"
@@ -121,7 +167,10 @@ __asm__(
     "    ldp  x14, x15, [sp, #0x70]\n"
     "    ldp  x16, x17, [sp, #0x80]\n"
     "    ldr  x18,      [sp, #0x90]\n"
-    "    add  sp, sp, #0xA0\n"
+    "    ldr  x30, [sp, #0xA0]\n"
+    "    add  sp, sp, #0x2D0\n"
+    ".global cpymo_sw_tts_tramp_return\n"
+    "cpymo_sw_tts_tramp_return:\n"
     "    ret\n"
     "    .balign 8\n"
     "1:  .quad 0\n"
@@ -135,8 +184,9 @@ __asm__(
     ".p2align 4\n"
     ".global cpymo_sw_tts_call_guest\n"
     "cpymo_sw_tts_call_guest:\n"
-    "    stp  x19, x20, [sp, #-32]!\n"
+    "    stp  x19, x20, [sp, #-48]!\n"
     "    stp  x21, x22, [sp, #16]\n"
+    "    str  x30, [sp, #32]\n"
     "    mov  x19, x0\n"
     "    ldr  x21, [x19, #0x00]\n"
     "    ldr  x20, [x19, #0x08]\n"
@@ -149,8 +199,9 @@ __asm__(
     "    blr  x21\n"
     "    mov  sp, x22\n"
     "    str  x0, [x19, #0x50]\n"
+    "    ldr  x30, [sp, #32]\n"
     "    ldp  x21, x22, [sp, #16]\n"
-    "    ldp  x19, x20, [sp], #32\n"
+    "    ldp  x19, x20, [sp], #48\n"
     "    ret\n"
 );
 
@@ -463,7 +514,7 @@ static void shim_set_heap_size(tt_regs *r)
      * 引擎要多大就给多大（按 1MB 对齐），拿不到就逐级减半；给不出请求的
      * 大小时只能记日志，引擎越界与否不由我们控制。
      */
-    uint64_t want = r->x[0];
+    uint64_t want = r->x[1];
 
     if (!g_heap_mem) {
         size_t min_sz = (size_t)32 << 20;
@@ -573,8 +624,7 @@ static void shim_query_memory(tt_regs *r)
 
 static void shim_get_info(tt_regs *r)
 {
-    /* svcGetInfo(u64 *out, InfoType id, Handle handle, u64 subtype) */
-    uint64_t *out = (uint64_t *)(uintptr_t)r->x[0];
+    /* Kernel SVC ABI returns the value in x1. */
     uint64_t id = r->x[1];
     uint64_t v = 0;
 
@@ -583,7 +633,7 @@ static void shim_get_info(tt_regs *r)
         case 22: v = (uint64_t)g_heap_va; break;
         default: v = 0; break;
     }
-    if (out) *out = v;
+    r->x[1] = v;
     r->x[0] = 0;
 }
 
@@ -600,18 +650,25 @@ static void shim_rng(tt_regs *r)
 /* trampoline 池与补丁                                                 */
 /* ------------------------------------------------------------------ */
 
-#define TT_TRAMP_STRIDE 0x80   /* 模板 120 字节，留余量 */
+#define TT_TRAMP_STRIDE 0x200
 
-static uint32_t tt_add_tramp(void (*fn)(tt_regs *))
+static uint32_t tt_add_tramp(void (*fn)(tt_regs *), uint32_t continuation)
 {
     size_t len = (size_t)(cpymo_sw_tts_tramp_end - cpymo_sw_tts_tramp_start);
     uint8_t *slot = g_rw + g_tramp_off + (size_t)g_tramp_slot * TT_TRAMP_STRIDE;
     uint64_t addr = (uint64_t)(uintptr_t)fn;
     uint32_t off = g_tramp_off + g_tramp_slot * TT_TRAMP_STRIDE;
 
-    if (len > TT_TRAMP_STRIDE) return 0;        /* 理论上不会发生 */
+    if (len > TT_TRAMP_STRIDE || (size_t)(g_tramp_slot + 1) * TT_TRAMP_STRIDE > 0x2000) return 0;        /* 理论上不会发生 */
     memcpy(slot, cpymo_sw_tts_tramp_start, len);
     memcpy(slot + len - 8, &addr, 8);
+    if (continuation) {
+        size_t ret_off = (size_t)(cpymo_sw_tts_tramp_return - cpymo_sw_tts_tramp_start);
+        int64_t delta = (int64_t)continuation - (int64_t)(off + ret_off);
+        uint32_t branch = 0x14000000u | ((uint32_t)(delta >> 2) & 0x03ffffffu);
+        if ((delta & 3) || delta < -(1ll << 27) || delta >= (1ll << 27)) return 0;
+        memcpy(slot + ret_off, &branch, sizeof(branch));
+    }
     g_tramp_slot++;
     CPYMO_DIAG("[tts] tramp #%u for %p\n", g_tramp_slot - 1, (void *)fn);
     return off;
@@ -1210,32 +1267,35 @@ static bool tt_alloc_regions(void)
 
 static bool tt_apply_patches(void)
 {
-    uint32_t t_heap, t_perm, t_attr, t_query, t_info, t_rng, t_boot;
-
-    t_heap = tt_add_tramp(shim_set_heap_size);
-    t_perm = tt_add_tramp(shim_set_mem_perm);
-    t_attr = tt_add_tramp(shim_set_mem_attr);
-    t_query = tt_add_tramp(shim_query_memory);
-    t_info = tt_add_tramp(shim_get_info);
-    t_rng = tt_add_tramp(shim_rng);
-    t_boot = tt_add_tramp(tt_boot_hook);
-    if (!t_heap || !t_perm || !t_attr || !t_query || !t_info || !t_rng || !t_boot)
-        return tt_fail0("trampoline 池分配失败");
-
-    /* sdk 的 nn::svc::aarch64::* 包装表：只改会伤到我们自己的那几个 */
-    if (!tt_patch_branch("svc#1 SetHeapSize", TT_IMG_SDK, 0x18220c, 0xD4000021u, t_heap, true)) return false;
-    if (!tt_patch_branch("svc#2 SetMemoryPermission", TT_IMG_SDK, 0x182220, 0xD4000041u, t_perm, true)) return false;
-    if (!tt_patch_branch("svc#3 SetMemoryAttribute", TT_IMG_SDK, 0x182228, 0xD4000061u, t_attr, true)) return false;
-    if (!tt_patch_branch("svc#6 QueryMemory", TT_IMG_SDK, 0x182244, 0xD40000C1u, t_query, true)) return false;
-    if (!tt_patch_branch("svc#41 GetInfo", TT_IMG_SDK, 0x1823d4, 0xD4000521u, t_info, true)) return false;
-
-    /* rtld 自己也查一次内存上限 */
-    if (!tt_patch_branch("rtld svc#2", TT_IMG_RTLD, 0x1d18, 0xD4000041u, t_perm, true)) return false;
-    if (!tt_patch_branch("rtld svc#3", TT_IMG_RTLD, 0x1d20, 0xD4000061u, t_attr, true)) return false;
-    if (!tt_patch_branch("rtld svc#6", TT_IMG_RTLD, 0x1d2c, 0xD40000C1u, t_query, true)) return false;
+    static const struct {
+        const char *name;
+        int img;
+        uint32_t off, opcode;
+        void (*handler)(tt_regs *);
+    } patches[] = {
+        {"svc#1 SetHeapSize", TT_IMG_SDK, 0x18220c, 0xD4000021u, shim_set_heap_size},
+        {"svc#2 SetMemoryPermission", TT_IMG_SDK, 0x182220, 0xD4000041u, shim_set_mem_perm},
+        {"svc#3 SetMemoryAttribute", TT_IMG_SDK, 0x182228, 0xD4000061u, shim_set_mem_attr},
+        {"svc#6 QueryMemory", TT_IMG_SDK, 0x182244, 0xD40000C1u, shim_query_memory},
+        {"svc#41 GetInfo", TT_IMG_SDK, 0x1823d4, 0xD4000521u, shim_get_info},
+        {"rtld svc#2", TT_IMG_RTLD, 0x1d18, 0xD4000041u, shim_set_mem_perm},
+        {"rtld svc#3", TT_IMG_RTLD, 0x1d20, 0xD4000061u, shim_set_mem_attr},
+        {"rtld svc#6", TT_IMG_RTLD, 0x1d2c, 0xD40000C1u, shim_query_memory},
+    };
+    uint32_t t_rng, t_boot;
+    size_t i;
+    for (i = 0; i < sizeof(patches) / sizeof(patches[0]); i++) {
+        uint32_t next = g_img_off[patches[i].img] + patches[i].off + 4;
+        uint32_t tramp = tt_add_tramp(patches[i].handler, next);
+        if (!tramp || !tt_patch_branch(patches[i].name, patches[i].img,
+                patches[i].off, patches[i].opcode, tramp, false)) return false;
+    }
+    t_rng = tt_add_tramp(shim_rng, 0);
+    t_boot = tt_add_tramp(tt_boot_hook, 0);
+    if (!t_rng || !t_boot) return tt_fail0("trampoline 池分配失败");
 
     /* 随机数：填零即可（只用于密钥材料，TTS 不走网络） */
-    if (!tt_patch_branch("RNG", TT_IMG_SDK, 0xa7b50, 0xD10183FFu, t_rng, true)) return false;
+    if (!tt_patch_branch("RNG", TT_IMG_SDK, 0xa7b50, 0xD10183FFu, t_rng, false)) return false;
 
     /* nninitInitializeSdkModule → 直接 ret */
     if (!tt_patch_word("nninitInitializeSdkModule", TT_IMG_SDK, 0x11c010,
@@ -1266,7 +1326,7 @@ static bool tt_prepare(const char *dir)
         off += info[i].need;
     }
     g_tramp_off = off;
-    g_window_size = (size_t)(off + 0x1000 + 0xFFF) & ~(size_t)0xFFF;
+    g_window_size = (size_t)(off + 0x2000 + 0xFFF) & ~(size_t)0xFFF;
     CPYMO_DIAG("[tts] 窗口: rtld=0x%x main=0x%x sdk=0x%x tramp=0x%x total=0x%zx\n",
            g_img_off[0], g_img_off[1], g_img_off[2], g_tramp_off, g_window_size);
 
