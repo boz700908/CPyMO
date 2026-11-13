@@ -273,6 +273,8 @@ static size_t    g_vtdb_len;
 static uint8_t *g_voice_data[CPYMO_TTS_LANG_COUNT];
 static size_t g_voice_size[CPYMO_TTS_LANG_COUNT];
 static int g_active_voice = -1;
+static uint8_t *g_hong;
+static size_t g_hong_size;
 
 /* 引擎线程 */
 static Thread g_thread;
@@ -934,14 +936,16 @@ static bool tt_select_language(cpymo_tts_language lang, int voice)
 {
     tt_call c;
     if (g_active_voice == voice) return true;
-    if (!g_voice_data[lang]) return false;
+    uint8_t *data = voice == 10 ? g_hong : g_voice_data[lang];
+    size_t size = voice == 10 ? g_hong_size : g_voice_size[lang];
+    if (!data) return false;
     memset(&c, 0, sizeof(c));
     c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_INIT;
     c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
     c.x[0] = (uint64_t)voice;
     c.x[1] = 0xffffffffull;
-    c.x[2] = (uint64_t)(uintptr_t)g_voice_data[lang];
-    c.x[3] = (uint64_t)g_voice_size[lang];
+    c.x[2] = (uint64_t)(uintptr_t)data;
+    c.x[3] = (uint64_t)size;
     cpymo_sw_tts_call_guest(&c);
     if ((int32_t)c.result != 0) {
         g_active_voice = -1;
@@ -987,13 +991,18 @@ static void tt_engine_loop(void)
                 cpymo_tts_language lang;
                 int voice;
                 bool selected;
+                cpymo_switch_tts_params params;
                 if (!n) break;
                 lang = g_voice_data[seg.language] ? seg.language : CPYMO_TTS_LANG_ZH;
                 voice = voices[lang];
+                if (lang == CPYMO_TTS_LANG_ZH) {
+                    cpymo_switch_tts_get_params(&params);
+                    if (params.voice == 10 && g_hong) voice = 10;
+                }
                 saved = text[pos + n];
                 text[pos + n] = 0;
                 selected = tt_select_language(lang, voice);
-                if (!selected && lang != CPYMO_TTS_LANG_ZH &&
+                if (!selected && voice != 11 &&
                     __atomic_load_n(&g_abort_gen, __ATOMIC_ACQUIRE) == abort_gen &&
                     !__atomic_load_n(&g_quit, __ATOMIC_ACQUIRE)) {
                     lang = CPYMO_TTS_LANG_ZH;
@@ -1023,10 +1032,8 @@ static void tt_boot_hook(tt_regs *r)
 {
     uint8_t *m = (uint8_t *)g_img_va[TT_IMG_MAIN];
     tt_call c;
-    cpymo_switch_tts_params params;
 
     (void)r;
-    cpymo_switch_tts_get_params(&params);
     CPYMO_DIAG("[tts] nnMain 入口钩子命中\n");
 
     memset(&c, 0, sizeof(c));
@@ -1058,7 +1065,7 @@ static void tt_boot_hook(tt_regs *r)
     memset(&c, 0, sizeof(c));
     c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_INIT;
     c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
-    c.x[0] = (uint64_t)params.voice;
+    c.x[0] = 11; /* g_vtdb always contains YAFANG. */
     c.x[1] = 0xffffffffull;
     c.x[2] = (uint64_t)(uintptr_t)g_vtdb;
     c.x[3] = (uint64_t)g_vtdb_len;
@@ -1070,7 +1077,7 @@ static void tt_boot_hook(tt_regs *r)
     g_engine_ok = (g_boot_result == 0);
     g_boot_done = true;
     if (!g_engine_ok) g_state = CPYMO_SWITCH_TTS_STATE_FAILED;
-    if (g_engine_ok) g_active_voice = params.voice;
+    if (g_engine_ok) g_active_voice = 11;
     CPYMO_DIAG("[tts] 引擎 init -> %lld\n", (long long)g_boot_result);
     eventFire(&g_boot_event);
 
@@ -1184,6 +1191,9 @@ static void tt_load_language_voices(const char *dir)
     int i;
     g_voice_data[CPYMO_TTS_LANG_ZH] = g_vtdb;
     g_voice_size[CPYMO_TTS_LANG_ZH] = g_vtdb_len;
+    if (snprintf(path, sizeof(path), "%s/D32-HONG.vtdb2", dir) < (int)sizeof(path))
+        g_hong = tt_read_file(path, &g_hong_size);
+    if (!g_hong) CPYMO_DIAG("[tts] 简中 HONG 音库不可用，使用 YAFANG\n");
     for (i = 1; i < CPYMO_TTS_LANG_COUNT; ++i) {
         if (snprintf(path, sizeof(path), "%s/%s", dir, names[i]) >= (int)sizeof(path)) continue;
         g_voice_data[i] = tt_read_file(path, &g_voice_size[i]);
@@ -1613,7 +1623,7 @@ void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
     if (!params) return;
     mutexLock(&g_params_mutex);
     g_params = *params;
-    g_params.voice = 11; /* 目前只加载 D32-YAFANG 音库 */
+    if (g_params.voice != 10 && g_params.voice != 11) g_params.voice = 11;
     if (g_params.pitch < 1) g_params.pitch = 1;
     if (g_params.rate < 1) g_params.rate = 1;
     if (g_params.pitch > 1000) g_params.pitch = 1000;

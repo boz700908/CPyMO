@@ -54,7 +54,7 @@ const char *cpymo_switch_accessibility_last_error(void);
 #define CPYMO_SW_TTS_ITEM_RATE    0   /* 语速 1..1000，默认 135 */
 #define CPYMO_SW_TTS_ITEM_PITCH   1   /* 音高 1..1000，默认 150 */
 #define CPYMO_SW_TTS_ITEM_VOLUME  2   /* 音量 0..1000，默认 90  */
-#define CPYMO_SW_TTS_ITEM_VOICE   3   /* 音色固定 11（D32-YAFANG） */
+#define CPYMO_SW_TTS_ITEM_VOICE   3   /* 中文音库：10 HONG，11 YAFANG */
 #define CPYMO_SW_TTS_ITEM_EMOTION 4   /* 情绪等级 0..4，0 表示关闭 */
 #define CPYMO_SW_TTS_ITEM_COUNT   5
 #define CPYMO_SW_TTS_EMOTION_MAX  4

@@ -402,7 +402,7 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_VOLUME), true);
 
 	INIT_ITEM(
-		ITEM_TTS_VOICE, l->config_tts_voice, 1, 20,
+		ITEM_TTS_VOICE, l->config_tts_voice, 10, 11,
 		cpymo_switch_accessibility_tts_item_get(CPYMO_SW_TTS_ITEM_VOICE), true);
 
 	INIT_ITEM(
@@ -462,10 +462,12 @@ static void cpymo_config_ui_extract_setting_value(cpymo_engine *e, int item_inde
 		val_str = l->config_skip_modes[val];
 		break;
 #if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_VOICE:
+		val_str = val == 10 ? "HONG" : "YAFANG";
+		break;
 	case ITEM_TTS_RATE:
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
-	case ITEM_TTS_VOICE:
 	case ITEM_TTS_EMOTION:
 		sprintf(val_str_buf, "%d", val);
 		break;
@@ -516,10 +518,12 @@ static void cpymo_config_ui_extract_setting_name_and_value(cpymo_engine *e, int 
 		val_str = l->config_skip_modes[val];
 		break;
 #if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_VOICE:
+		val_str = val == 10 ? "HONG" : "YAFANG";
+		break;
 	case ITEM_TTS_RATE:
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
-	case ITEM_TTS_VOICE:
 	case ITEM_TTS_EMOTION:
 		sprintf(val_str_buf, "%d", val);
 		break;
@@ -571,10 +575,12 @@ static error_t cpymo_config_ui_set_value(
 		val_str = l->config_skip_modes[val];
 		break;
 #if CPYMO_SW_TTS_SETTINGS
+	case ITEM_TTS_VOICE:
+		val_str = val == 10 ? "HONG" : "YAFANG";
+		break;
 	case ITEM_TTS_RATE:
 	case ITEM_TTS_PITCH:
 	case ITEM_TTS_VOLUME:
-	case ITEM_TTS_VOICE:
 	case ITEM_TTS_EMOTION:
 		sprintf(val_str_buf, "%d", val);
 		break;

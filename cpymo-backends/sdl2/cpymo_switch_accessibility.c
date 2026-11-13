@@ -167,7 +167,7 @@ static int sw_item_min(int item)
         case CPYMO_SW_TTS_ITEM_RATE:
         case CPYMO_SW_TTS_ITEM_PITCH:  return 1;
         case CPYMO_SW_TTS_ITEM_VOLUME: return 0;
-        case CPYMO_SW_TTS_ITEM_VOICE:  return 11;
+        case CPYMO_SW_TTS_ITEM_VOICE:  return 10;
         default:                       return 0;
     }
 }
