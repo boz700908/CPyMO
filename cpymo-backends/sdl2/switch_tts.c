@@ -60,6 +60,8 @@
 #define OFF_MAIN_HEAP_INIT   0x4dfe90
 #define OFF_MAIN_HEAP_SET    0x4dfda0
 #define OFF_MAIN_HEAP_NAME   0xaa3f8b
+#define OFF_MAIN_TTS_HEAP_GOT 0xda3d00
+#define OFF_MAIN_TTS_HEAP_PTR 0x110e7c8
 #define TT_ENGINE_HEAP_SIZE  (32u << 20)
 #define OFF_SDK_RNG          0xa7b50   /* GenerateCryptographicallyRandomBytes */
 #define OFF_SDK_INIT_MODULE  0x11c010  /* nninitInitializeSdkModule → 直接 ret */
@@ -978,6 +980,17 @@ static void tt_boot_hook(tt_regs *r)
     c.x[0] = (uint64_t)(uintptr_t)(m + OFF_MAIN_HEAP_OBJECT);
     cpymo_sw_tts_call_guest(&c);
 
+    if (*(uintptr_t *)(void *)(m + OFF_MAIN_TTS_HEAP_GOT) !=
+        (uintptr_t)(m + OFF_MAIN_TTS_HEAP_PTR)) {
+        tt_fail0("TTS 堆指针重定位不匹配");
+        g_boot_result = -1;
+        g_engine_ok = false;
+        g_boot_done = true;
+        eventFire(&g_boot_event);
+        svcExitThread();
+        for (;;) svcSleepThread(100000000ull);
+    }
+    *(uintptr_t *)(void *)(m + OFF_MAIN_TTS_HEAP_PTR) = (uintptr_t)(m + OFF_MAIN_HEAP_OBJECT);
     memset(&c, 0, sizeof(c));
     c.fn = (uint64_t)g_img_va[TT_IMG_MAIN] + OFF_MAIN_INIT;
     c.sp = ((uint64_t)(uintptr_t)g_cstack + g_cstack_size - 0x100) & ~15ull;
