@@ -1510,7 +1510,7 @@ void cpymo_switch_tts_set_params(const cpymo_switch_tts_params *params)
     if (g_params.rate > 1000) g_params.rate = 1000;
     if (g_params.volume > 1000) g_params.volume = 1000;
     if (g_params.emotion_level < 0) g_params.emotion_level = 0;
-    if (g_params.emotion_level > 10) g_params.emotion_level = 10;
+    if (g_params.emotion_level > 4) g_params.emotion_level = 4;
     g_params.emotion_category[sizeof(g_params.emotion_category) - 1] = 0;
     mutexUnlock(&g_params_mutex);
 }
