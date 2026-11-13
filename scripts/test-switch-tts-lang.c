@@ -19,6 +19,9 @@ int main(void)
     expect("你好 hello!", CPYMO_TTS_LANG_ZH, "你好", CPYMO_TTS_LANG_ZH);
     expect(" hello!", CPYMO_TTS_LANG_ZH, " hello!", CPYMO_TTS_LANG_LATIN);
     expect("漢字です。", CPYMO_TTS_LANG_ZH, "漢字です。", CPYMO_TTS_LANG_JA);
+    expect("你好 hello 漢字です。", CPYMO_TTS_LANG_ZH, "你好", CPYMO_TTS_LANG_ZH);
+    expect(" 漢字です。", CPYMO_TTS_LANG_ZH, " 漢字です。", CPYMO_TTS_LANG_JA);
+    expect("かな漢字。", CPYMO_TTS_LANG_ZH, "かな漢字。", CPYMO_TTS_LANG_JA);
     expect("漢字。", CPYMO_TTS_LANG_JA, "漢字。", CPYMO_TTS_LANG_JA);
     expect("漢字。", CPYMO_TTS_LANG_ZH, "漢字。", CPYMO_TTS_LANG_ZH);
     expect("𠀀你好", CPYMO_TTS_LANG_ZH, "𠀀你好", CPYMO_TTS_LANG_ZH);

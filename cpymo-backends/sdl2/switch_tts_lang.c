@@ -46,26 +46,41 @@ static int sentence_break(uint32_t c)
            c == 0x3002 || c == 0xff01 || c == 0xff1f;
 }
 
+static int han_language(const char *text, size_t len, int current,
+                        cpymo_tts_language fallback)
+{
+    size_t pos = 0;
+    uint32_t c;
+    if (current == CPYMO_TTS_LANG_JA) return CPYMO_TTS_LANG_JA;
+    while (pos < len) {
+        int type;
+        pos += decode((const unsigned char *)text + pos, len - pos, &c);
+        type = classify(c);
+        if (type == CPYMO_TTS_LANG_JA) return CPYMO_TTS_LANG_JA;
+        if (type == CPYMO_TTS_LANG_KO || type == CPYMO_TTS_LANG_LATIN ||
+            sentence_break(c)) break;
+    }
+    return fallback == CPYMO_TTS_LANG_JA ? CPYMO_TTS_LANG_JA : CPYMO_TTS_LANG_ZH;
+}
+
 size_t cpymo_tts_next_segment(const char *text, size_t length,
                               cpymo_tts_language fallback, cpymo_tts_segment *out)
 {
     size_t pos = 0, end = 0, step, neutral = 0;
-    int current = NEUTRAL, han_lang = CPYMO_TTS_LANG_ZH;
+    int current = NEUTRAL;
     uint32_t c;
     if (!text || !out || !length) return 0;
     if (fallback < 0 || fallback >= CPYMO_TTS_LANG_COUNT) fallback = CPYMO_TTS_LANG_ZH;
-    if (fallback == CPYMO_TTS_LANG_JA) han_lang = CPYMO_TTS_LANG_JA;
     while (end < length) {
         step = decode((const unsigned char *)text + end, length - end, &c);
         end += step;
-        if (classify(c) == CPYMO_TTS_LANG_JA) han_lang = CPYMO_TTS_LANG_JA;
         if (sentence_break(c)) break;
     }
     while (pos < end) {
         int type;
         step = decode((const unsigned char *)text + pos, end - pos, &c);
         type = classify(c);
-        if (type == HAN) type = han_lang;
+        if (type == HAN) type = han_language(text + pos + step, end - pos - step, current, fallback);
         if (type != NEUTRAL) {
             if (current != NEUTRAL && type != current) {
                 out->text = text;
