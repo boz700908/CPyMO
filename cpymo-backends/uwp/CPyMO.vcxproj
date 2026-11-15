@@ -300,6 +300,8 @@
     <ClCompile Include="..\..\cpymo\cpymo_text.c" />
     <ClCompile Include="..\..\cpymo\cpymo_textbox.c" />
     <ClCompile Include="..\..\cpymo\cpymo_ui.c" />
+    <ClCompile Include="..\..\cpymo\cpymo_ui_extra.c" />
+    <ClCompile Include="..\..\cpymo\cpymo_ui_patch.c" />
     <ClCompile Include="..\..\cpymo\cpymo_utils.c" />
     <ClCompile Include="..\..\cpymo\cpymo_vars.c" />
     <ClCompile Include="..\..\cpymo\cpymo_wait.c" />
