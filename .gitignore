@@ -3,3 +3,5 @@
 /.vscode
 /.mscbackup
 .claude
+core
+core.*
