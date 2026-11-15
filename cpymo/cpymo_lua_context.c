@@ -175,6 +175,12 @@ static int cpymo_lua_api_cpymo_serialize(lua_State *l)
     return 1;
 }
 
+static int cpymo_lua_api_cpymo_timer(lua_State *l);
+static int cpymo_lua_api_cpymo_yield(lua_State *l);
+static int cpymo_lua_api_cpymo_wait(lua_State *l);
+static int cpymo_lua_api_cpymo_every(lua_State *l);
+static int cpymo_lua_api_cpymo_timer_cancel(lua_State *l);
+
 static error_t cpymo_lua_context_create_cpymo_package(
     cpymo_lua_context *ctx, cpymo_engine *e)
 {
@@ -201,6 +207,11 @@ static error_t cpymo_lua_context_create_cpymo_package(
         { "serialize", &cpymo_lua_api_cpymo_serialize },
         { "deserialize", &cpymo_lua_api_cpymo_deserialize },
         { "exit", &cpymo_lua_api_cpymo_exit },
+        { "timer", &cpymo_lua_api_cpymo_timer },
+        { "every", &cpymo_lua_api_cpymo_every },
+        { "timer_cancel", &cpymo_lua_api_cpymo_timer_cancel },
+        { "yield", &cpymo_lua_api_cpymo_yield },
+        { "wait", &cpymo_lua_api_cpymo_wait },
         { NULL, NULL }
     };
     luaL_setfuncs(l, cpymo_funcs, 0);
@@ -386,6 +397,87 @@ static int cpymo_lua_api_os_exit_disabled(lua_State *l)
         "os.exit() is disabled in CPyMO scripts; use cpymo.exit() instead.");
 }
 
+static int cpymo_lua_api_blocking_disabled(lua_State *l)
+{
+    const char *name = lua_tostring(l, lua_upvalueindex(1));
+
+    return luaL_error(
+        l,
+        "%s() is disabled in CPyMO scripts: it blocks the frame. Use "
+        "cpymo.wait(seconds) or cpymo.yield() to hand the frame back to the "
+        "engine.",
+        name ? name : "this call");
+}
+
+static int cpymo_lua_api_debug_sethook_disabled(lua_State *l)
+{
+    (void)l;
+    return luaL_error(
+        l,
+        "debug.sethook() is reserved by CPyMO: the engine installs the hook "
+        "that stops runaway scripts.");
+}
+
+static void cpymo_lua_context_disable_call(
+    lua_State *l, const char *lib, const char *field)
+{
+    int lib_index;
+
+    lua_getglobal(l, lib);
+    if (!lua_istable(l, -1)) {
+        lua_pop(l, 1);
+        return;
+    }
+
+    lib_index = lua_gettop(l);
+    lua_getfield(l, lib_index, field);
+    if (lua_isfunction(l, -1)) {
+        /* the name becomes the closure upvalue and is consumed */
+        lua_pushstring(l, field);
+        lua_pushcclosure(l, cpymo_lua_api_blocking_disabled, 1);
+        lua_setfield(l, lib_index, field);
+    }
+
+    lua_settop(l, lib_index - 1);
+}
+
+/* io.lines() without a file name reads stdin, which never returns in a game.
+   Keep the ordinary form working. */
+static int cpymo_lua_api_io_lines(lua_State *l)
+{
+    if (lua_isnoneornil(l, 1))
+        return luaL_error(
+            l,
+            "io.lines() without a file name reads stdin and would block the "
+            "frame; pass a file name.");
+
+    lua_pushvalue(l, lua_upvalueindex(1));
+    lua_insert(l, 1);
+    lua_call(l, lua_gettop(l) - 1, LUA_MULTRET);
+    return lua_gettop(l);
+}
+
+static void cpymo_lua_context_wrap_io_lines(lua_State *l)
+{
+    int io_index;
+
+    lua_getglobal(l, "io");
+    if (!lua_istable(l, -1)) {
+        lua_pop(l, 1);
+        return;
+    }
+
+    io_index = lua_gettop(l);
+    lua_getfield(l, io_index, "lines");
+    if (lua_isfunction(l, -1)) {
+        /* the stock lines() becomes the wrapper upvalue */
+        lua_pushcclosure(l, cpymo_lua_api_io_lines, 1);
+        lua_setfield(l, io_index, "lines");
+    }
+
+    lua_settop(l, io_index - 1);
+}
+
 static void cpymo_lua_context_harden_stdlib(lua_State *l)
 {
     lua_getglobal(l, "os");
@@ -394,7 +486,351 @@ static void cpymo_lua_context_harden_stdlib(lua_State *l)
         lua_setfield(l, -2, "exit");
     }
     lua_pop(l, 1);
+
+    lua_getglobal(l, "debug");
+    if (lua_istable(l, -1)) {
+        lua_pushcfunction(l, cpymo_lua_api_debug_sethook_disabled);
+        lua_setfield(l, -2, "sethook");
+    }
+    lua_pop(l, 1);
+
+    /* Everything below can stall a frame for ever; each replacement explains
+       the frame-friendly alternative. */
+    cpymo_lua_context_disable_call(l, "os", "execute");
+    cpymo_lua_context_disable_call(l, "io", "read");
+    cpymo_lua_context_disable_call(l, "io", "popen");
+
+    cpymo_lua_context_wrap_io_lines(l);
 }
+
+/* ---------------------------------------------------------------- timers */
+/*
+ * A timer is a Lua function plus its arguments, fired once the game clock
+ * reaches trigger_at. `interval > 0` makes it repeat. The clock only advances
+ * while the engine runs the script branch of cpymo_engine_update, so menus,
+ * and file loading pause timers for free. Callbacks run inside the normal
+ * frame update, use the same traceback handler and instruction budget as a
+ * #lua block, and a failing callback only prints: the game keeps going.
+ */
+
+typedef struct cpymo_lua_timer {
+    struct cpymo_lua_timer *next;
+    int id;
+    int func_ref;
+    int args_ref;
+    double trigger_at;
+    double interval;      /* 0 for a one-shot timer */
+    bool cancelled;
+} cpymo_lua_timer;
+
+static void cpymo_lua_timer_unref(cpymo_lua_context *l, cpymo_lua_timer *t)
+{
+    if (t->func_ref != LUA_NOREF && t->func_ref != LUA_REFNIL)
+        luaL_unref(l->lua_state, LUA_REGISTRYINDEX, t->func_ref);
+    if (t->args_ref != LUA_NOREF && t->args_ref != LUA_REFNIL)
+        luaL_unref(l->lua_state, LUA_REGISTRYINDEX, t->args_ref);
+    t->func_ref = LUA_NOREF;
+    t->args_ref = LUA_NOREF;
+}
+
+/* cpymo.timer(delay, fn, ...) / cpymo.every(interval, fn, ...) */
+static int cpymo_lua_timer_register(lua_State *l, double interval)
+{
+    cpymo_lua_context *ctx = cpymo_lua_state_get_lua_context(l);
+
+    luaL_checktype(l, 1, LUA_TNUMBER);
+    luaL_checktype(l, 2, LUA_TFUNCTION);
+
+    double delay = (double)lua_tonumber(l, 1);
+    if (!(delay >= 0.0))
+        return luaL_error(l, "cpymo.timer: delay must be a non-negative number.");
+    if (delay > 86400.0)
+        return luaL_error(l, "cpymo.timer: delay must not exceed one day.");
+
+    lua_pushvalue(l, 2);
+    int func_ref = luaL_ref(l, LUA_REGISTRYINDEX);
+
+    int nargs = lua_gettop(l) - 2;
+    int args_ref = LUA_NOREF;
+    if (nargs > 0) {
+        lua_createtable(l, nargs, 0);
+        for (int i = 1; i <= nargs; ++i) {
+            lua_pushvalue(l, i + 2);
+            lua_rawseti(l, -2, i);
+        }
+        args_ref = luaL_ref(l, LUA_REGISTRYINDEX);
+    }
+
+    cpymo_lua_timer *t = (cpymo_lua_timer *)malloc(sizeof(*t));
+    if (t == NULL) {
+        luaL_unref(l, LUA_REGISTRYINDEX, func_ref);
+        if (args_ref != LUA_NOREF) luaL_unref(l, LUA_REGISTRYINDEX, args_ref);
+        return luaL_error(l, "cpymo.timer: out of memory.");
+    }
+
+    t->id = ctx->timer_next_id++;
+    t->func_ref = func_ref;
+    t->args_ref = args_ref;
+    t->interval = interval;
+    t->trigger_at = ctx->timer_clock + delay;
+    t->cancelled = false;
+    t->next = ctx->timers;
+    ctx->timers = t;
+
+    lua_pushinteger(l, t->id);
+    return 1;
+}
+
+static int cpymo_lua_api_cpymo_timer(lua_State *l)
+{ return cpymo_lua_timer_register(l, 0.0); }
+
+static int cpymo_lua_api_cpymo_every(lua_State *l)
+{
+    luaL_checktype(l, 1, LUA_TNUMBER);
+    double interval = (double)lua_tonumber(l, 1);
+    if (!(interval > 0.0))
+        return luaL_error(l, "cpymo.every: interval must be greater than 0.");
+    if (interval > 86400.0)
+        return luaL_error(l, "cpymo.every: interval must not exceed one day.");
+    return cpymo_lua_timer_register(l, interval);
+}
+
+static int cpymo_lua_api_cpymo_timer_cancel(lua_State *l)
+{
+    cpymo_lua_context *ctx = cpymo_lua_state_get_lua_context(l);
+    int id = (int)luaL_checkinteger(l, 1);
+
+    /* A repeating timer that is firing right now has already left the list,
+       so the running slot has to be checked as well. */
+    if (ctx->timer_running && ctx->timer_running->id == id) {
+        ctx->timer_running->cancelled = true;
+        lua_pushboolean(l, 1);
+        return 1;
+    }
+
+    for (cpymo_lua_timer *t = ctx->timers; t; t = t->next) {
+        if (t->id == id) {
+            t->cancelled = true;
+            lua_pushboolean(l, 1);
+            return 1;
+        }
+    }
+
+    lua_pushboolean(l, 0);
+    return 1;
+}
+
+static void cpymo_lua_timer_invoke(cpymo_lua_context *l, cpymo_lua_timer *t)
+{
+    lua_State *L = l->lua_state;
+    int base = lua_gettop(L);
+
+    lua_pushcfunction(L, cpymo_lua_traceback);
+    int msgh = base + 1;
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, t->func_ref);
+
+    int nargs = 0;
+    if (t->args_ref != LUA_NOREF && t->args_ref != LUA_REFNIL) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, t->args_ref);
+        int argtab = lua_gettop(L);
+        nargs = (int)lua_rawlen(L, argtab);
+        for (int i = 1; i <= nargs; ++i)
+            lua_rawgeti(L, argtab, i);
+        lua_remove(L, argtab);
+    }
+
+    if (l->instruction_budget > 0)
+        lua_sethook(
+            L, cpymo_lua_instruction_hook,
+            LUA_MASKCOUNT, l->instruction_budget);
+
+    int status = lua_pcall(L, nargs, 0, msgh);
+
+    lua_sethook(L, NULL, 0, 0);
+
+    if (status != LUA_OK) {
+        const char *msg = lua_tostring(L, -1);
+        printf("[lua] timer %d failed: %s\n", t->id, msg ? msg : "(unknown)");
+    }
+
+    lua_settop(L, base);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Suspended #lua blocks                                                    */
+/* ------------------------------------------------------------------------ */
+
+static void cpymo_lua_block_abort(cpymo_lua_context *l)
+{
+    if (l->block_co_ref > 0 && l->lua_state != NULL)
+        luaL_unref(l->lua_state, LUA_REGISTRYINDEX, l->block_co_ref);
+    l->block_co_ref = 0;
+    l->block_resume_at = 0.0;
+}
+
+static void cpymo_lua_block_resume(cpymo_lua_context *l)
+{
+    lua_State *L = l->lua_state;
+    if (L == NULL || l->block_co_ref <= 0) return;
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, l->block_co_ref);
+    lua_State *co = lua_tothread(L, -1);
+    lua_pop(L, 1);
+
+    if (co == NULL) {
+        cpymo_lua_block_abort(l);
+        return;
+    }
+
+    if (l->instruction_budget > 0)
+        lua_sethook(
+            co,
+            cpymo_lua_instruction_hook,
+            LUA_MASKCOUNT,
+            l->instruction_budget);
+
+    int nresults = 0;
+    int status = lua_resume(co, L, 0, &nresults);
+
+    lua_sethook(co, NULL, 0, 0);
+
+    if (status == LUA_YIELD) {
+        /* cpymo.wait(sec) yields one number; cpymo.yield() yields nothing
+           and simply continues on the next frame. */
+        double delay = 0.0;
+        if (nresults >= 1 && lua_isnumber(co, -1))
+            delay = (double)lua_tonumber(co, -1);
+        if (!(delay > 0.0)) delay = 0.0;
+
+        l->block_resume_at = l->timer_clock + delay;
+        lua_settop(co, 0);
+        return;
+    }
+
+    if (status != LUA_OK) {
+        const char *msg = lua_tostring(co, -1);
+        luaL_traceback(L, co, msg ? msg : "(error)", 1);
+        cpymo_lua_report_error(
+            l->block_chunkname + 1, l->block_line, lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
+
+    cpymo_lua_block_abort(l);
+}
+
+static int cpymo_lua_api_cpymo_yield(lua_State *l)
+{
+    if (!lua_isyieldable(l))
+        return luaL_error(
+            l,
+            "cpymo.yield() only suspends a #lua block; a timer callback must "
+            "return to the engine instead.");
+
+    return lua_yield(l, 0);
+}
+
+static int cpymo_lua_api_cpymo_wait(lua_State *l)
+{
+    lua_Number sec;
+
+    if (!lua_isyieldable(l))
+        return luaL_error(
+            l,
+            "cpymo.wait() only suspends a #lua block; a timer callback must "
+            "return to the engine instead.");
+
+    sec = luaL_checknumber(l, 1);
+    if (!(sec >= 0.0))
+        return luaL_error(l, "cpymo.wait: seconds must not be negative.");
+
+    lua_pushnumber(l, sec);
+    return lua_yield(l, 1);
+}
+
+error_t cpymo_lua_block_update(cpymo_lua_context *l)
+{
+    if (l->lua_state == NULL) return CPYMO_ERR_SUCC;
+    if (l->block_co_ref <= 0) return CPYMO_ERR_SUCC;
+    if (l->timer_clock < l->block_resume_at) return CPYMO_ERR_SUCC;
+    cpymo_lua_block_resume(l);
+    return CPYMO_ERR_SUCC;
+}
+
+error_t cpymo_lua_timers_update(cpymo_lua_context *l, float delta_time)
+{
+    if (l->lua_state == NULL) return CPYMO_ERR_SUCC;
+
+    double dt = (double)delta_time;
+    if (dt < 0.0) dt = 0.0;
+    l->timer_clock += dt;
+
+    /* Reap the timers cancelled since the last frame. */
+    cpymo_lua_timer **pp = &l->timers;
+    while (*pp) {
+        if ((*pp)->cancelled) {
+            cpymo_lua_timer *dead = *pp;
+            *pp = dead->next;
+            cpymo_lua_timer_unref(l, dead);
+            free(dead);
+        }
+        else pp = &(*pp)->next;
+    }
+
+    if (dt <= 0.0) return CPYMO_ERR_SUCC;
+
+    /* Detach everything that is due before running anything, so a callback
+       may register or cancel timers without disturbing this walk. */
+    cpymo_lua_timer *due = NULL;
+    pp = &l->timers;
+    while (*pp) {
+        cpymo_lua_timer *t = *pp;
+        if (t->trigger_at <= l->timer_clock) {
+            *pp = t->next;
+            t->next = due;
+            due = t;
+        }
+        else pp = &t->next;
+    }
+
+    while (due) {
+        cpymo_lua_timer *t = due;
+        due = t->next;
+        t->next = NULL;
+
+        if (!t->cancelled) {
+            l->timer_running = t;
+            cpymo_lua_timer_invoke(l, t);
+            l->timer_running = NULL;
+        }
+
+        if (t->cancelled || t->interval <= 0.0) {
+            cpymo_lua_timer_unref(l, t);
+            free(t);
+        }
+        else {
+            t->trigger_at = l->timer_clock + t->interval;
+            t->next = l->timers;
+            l->timers = t;
+        }
+    }
+
+    return CPYMO_ERR_SUCC;
+}
+
+void cpymo_lua_timers_free(cpymo_lua_context *l)
+{
+    cpymo_lua_timer *t = l->timers;
+    while (t) {
+        cpymo_lua_timer *next = t->next;
+        if (l->lua_state) cpymo_lua_timer_unref(l, t);
+        free(t);
+        t = next;
+    }
+    l->timers = NULL;
+    l->timer_running = NULL;
+}
+
 
 error_t cpymo_lua_context_execute_script_block(
     cpymo_lua_context *l,
@@ -435,46 +871,36 @@ error_t cpymo_lua_context_execute_script_block(
         return CPYMO_ERR_SUCC;
     }
 
+    /* Run the block inside a coroutine of its own, so that cpymo.yield() and
+       cpymo.wait() can hand the frame back and continue later. */
+    cpymo_lua_block_abort(l);
+
+    lua_State *co = lua_newthread(L);
+    l->block_co_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    l->block_line = l->pending_line;
+    snprintf(
+        l->block_chunkname, sizeof(l->block_chunkname), "%s", l->pending_chunkname);
+
     int status = luaL_loadbuffer(
-        L, l->pending_code, l->pending_len, l->pending_chunkname);
+        co, l->pending_code, l->pending_len, l->pending_chunkname);
 
     if (status != LUA_OK) {
-        const char *msg = lua_tostring(L, -1);
+        const char *msg = lua_tostring(co, -1);
 
         if (status == LUA_ERRSYNTAX && cpymo_lua_message_is_incomplete(msg)) {
-            lua_pop(L, 1);
+            cpymo_lua_block_abort(l);
             return CPYMO_ERR_SUCC; /* wait for the rest of the block */
         }
 
-        cpymo_lua_report_error(script_name, l->pending_line, msg);
-        lua_pop(L, 1);
+        cpymo_lua_report_error(l->block_chunkname + 1, l->block_line, msg);
+        cpymo_lua_block_abort(l);
         cpymo_lua_context_discard_pending(l);
         return CPYMO_ERR_SUCC; /* soft failure: keep playing */
     }
 
-    int base = lua_gettop(L);
-    lua_pushcfunction(L, cpymo_lua_traceback);
-    lua_insert(L, base);
-
-    if (l->instruction_budget > 0)
-        lua_sethook(
-            L,
-            cpymo_lua_instruction_hook,
-            LUA_MASKCOUNT,
-            l->instruction_budget);
-
-    status = lua_pcall(L, 0, 0, base);
-
-    lua_sethook(L, NULL, 0, 0);
-
-    if (status != LUA_OK) {
-        cpymo_lua_report_error(
-            script_name, l->pending_line, lua_tostring(L, -1));
-        lua_pop(L, 1);
-    }
-
-    lua_remove(L, base);
     cpymo_lua_context_discard_pending(l);
+
+    cpymo_lua_block_resume(l);
     return CPYMO_ERR_SUCC;
 }
 
@@ -486,6 +912,11 @@ error_t cpymo_lua_context_init(cpymo_lua_context *l, cpymo_engine *e)
     l->pending_chunkname[0] = '\0';
     l->pending_line = 0;
     l->instruction_budget = CPYMO_LUA_DEFAULT_INSTRUCTION_BUDGET;
+
+    l->timers = NULL;
+    l->timer_running = NULL;
+    l->timer_next_id = 1;
+    l->timer_clock = 0.0;
 
     if (e->feature_level < 1) {
         l->lua_state = NULL;
@@ -527,6 +958,7 @@ void cpymo_lua_context_free(cpymo_lua_context *l)
     }
 
     if (l->lua_state) {
+        cpymo_lua_timers_free(l);
         cpymo_lua_get_main_actor(l);
         cpymo_lua_actor_free(l);
         lua_close(l->lua_state);
@@ -708,6 +1140,11 @@ error_t cpymo_lua_actor_update_main(
     float delta_time)
 {
     if (l->lua_state == NULL) return CPYMO_ERR_SUCC;
+
+    error_t timer_err = cpymo_lua_timers_update(l, delta_time);
+    cpymo_lua_block_update(l);
+    CPYMO_THROW(timer_err);
+
     cpymo_lua_get_main_actor(l);
     error_t err = cpymo_lua_actor_update(l, delta_time);
     #ifdef LEAKCHECK

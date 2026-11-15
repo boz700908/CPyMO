@@ -29,6 +29,19 @@ typedef struct {
 
     /* Instruction budget for one #lua block; 0 disables the watchdog. */
     int instruction_budget;
+
+    /* Frame-driven timers registered from Lua (cpymo.timer / cpymo.every).
+       They advance on game time, so opening the menu pauses them too. */
+    struct cpymo_lua_timer *timers;
+    struct cpymo_lua_timer *timer_running;
+    int timer_next_id;
+    double timer_clock;
+
+    /* Suspended #lua block. 0 means no block is waiting. */
+    int block_co_ref;
+    int block_line;
+    double block_resume_at;
+    char block_chunkname[160];
 } cpymo_lua_context;
 
 error_t cpymo_lua_context_init(
@@ -96,6 +109,16 @@ void cpymo_lua_get_main_actor(const cpymo_lua_context *l);
 error_t cpymo_lua_actor_update_main(
     cpymo_lua_context *l,
     float delta_time);
+
+/* Advances the timer clock by one frame and runs whatever is due. */
+error_t cpymo_lua_timers_update(
+    cpymo_lua_context *l,
+    float delta_time);
+
+/* Releases every pending timer; call before the Lua state is closed. */
+void cpymo_lua_timers_free(cpymo_lua_context *l);
+
+error_t cpymo_lua_block_update(cpymo_lua_context *l);
     
 void cpymo_lua_actor_draw_main(
     const cpymo_lua_context *l);
