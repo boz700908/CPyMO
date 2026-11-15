@@ -20,6 +20,16 @@ endif
 
 LDFLAGS += -O3 -lm
 
+# 本后端不实现 cpymo_backend_input_text_{begin,end,poll}，引擎侧靠符号地址为 NULL
+# 判定「后端不支持文本输入」。ELF 的 ld 接受弱声明但从未定义的符号，ld64 不接受，
+# 因此 macOS 上显式允许这三个可选钩子未定义（与 ELF 语义一致，地址解析为 0）。
+ifeq ($(shell uname -s),Darwin)
+LDFLAGS += \
+	-Wl,-U,_cpymo_backend_input_text_begin \
+	-Wl,-U,_cpymo_backend_input_text_end \
+	-Wl,-U,_cpymo_backend_input_text_poll
+endif
+
 ifeq ($(OS), Windows_NT)
 OBJS += $(BUILD_DIR)/cpymo.res
 LDFLAGS += --static -lmingw32

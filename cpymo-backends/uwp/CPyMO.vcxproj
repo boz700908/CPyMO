@@ -278,6 +278,7 @@
     <ClCompile Include="..\..\cpymo\cpymo_gameconfig.c" />
     <ClCompile Include="..\..\cpymo\cpymo_game_selector.c" />
     <ClCompile Include="..\..\cpymo\cpymo_hash_flags.c" />
+    <ClCompile Include="..\..\cpymo\cpymo_input_text.c" />
     <ClCompile Include="..\..\cpymo\cpymo_interpreter.c" />
     <ClCompile Include="..\..\cpymo\cpymo_list_ui.c" />
     <ClCompile Include="..\..\cpymo\cpymo_localization.c" />

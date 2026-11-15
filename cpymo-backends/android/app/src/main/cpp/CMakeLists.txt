@@ -60,6 +60,8 @@ option(ENABLE_LUA "Enable CPyMO HD feature level 1 (Lua scripting)" OFF)
 if (ENABLE_LUA)
 	add_definitions (-DCPYMO_FEATURE_LEVEL=1)
 	add_definitions (-DLINK_WITH_ONELUA)
+	# bionic 在 API 26 以下没有 localeconv，Lua 只用它取小数点；用 -include 提供替代。
+	add_definitions (-include "${CMAKE_CURRENT_SOURCE_DIR}/lua_android_compat.h")
 	include_directories ("../../../../../../lua/")
 endif ()
 
