@@ -70,4 +70,34 @@ static inline float cpymo_tween_value_after(const cpymo_tween *tween, float afte
 static inline void cpymo_tween_finish(cpymo_tween *tween)
 { tween->current_time = tween->all_time; }
 
+/* 缓动曲线。纯函数，不参与 cpymo_tween 的状态，现有补间行为一处未改。*/
+typedef enum {
+	cpymo_tween_ease_linear = 0,
+	cpymo_tween_ease_in,
+	cpymo_tween_ease_out,
+	cpymo_tween_ease_in_out
+} cpymo_tween_ease;
+
+static inline float cpymo_tween_ease_apply(cpymo_tween_ease ease, float progress)
+{
+	switch (ease) {
+	case cpymo_tween_ease_in:
+		return progress * progress;
+	case cpymo_tween_ease_out:
+		return -progress * (progress - 2.0f);
+	case cpymo_tween_ease_in_out:
+		if (progress < 0.5f) return 2.0f * progress * progress;
+		return -2.0f * progress * progress + 4.0f * progress - 1.0f;
+	default:
+		return progress;
+	}
+}
+
+static inline float cpymo_tween_value_eased(const cpymo_tween *tween, cpymo_tween_ease ease)
+{
+	return cpymo_utils_lerp(
+		tween->begin_value, tween->end_value,
+		cpymo_tween_ease_apply(ease, cpymo_tween_progress(tween)));
+}
+
 #endif

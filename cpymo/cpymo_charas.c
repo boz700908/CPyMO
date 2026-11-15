@@ -52,16 +52,19 @@ static bool cpymo_charas_wait_all_tween(cpymo_engine *e, float delta_time)
 			cpymo_tween_finish(&pcur->pos_x);
 			cpymo_tween_finish(&pcur->pos_y);
 			cpymo_tween_finish(&pcur->alpha);
+			cpymo_tween_finish(&pcur->scale);
 		}
 
 		if (!cpymo_tween_finished(&pcur->pos_x)
 			|| !cpymo_tween_finished(&pcur->pos_y)
-			|| !cpymo_tween_finished(&pcur->alpha))
+			|| !cpymo_tween_finished(&pcur->alpha)
+			|| !cpymo_tween_finished(&pcur->scale))
 			waiting = true;
 
 		cpymo_tween_update(&pcur->pos_x, delta_time);
 		cpymo_tween_update(&pcur->pos_y, delta_time);
 		cpymo_tween_update(&pcur->alpha, delta_time);
+		cpymo_tween_update(&pcur->scale, delta_time);
 
 		pcur = pcur->next;
 	}
@@ -90,11 +93,28 @@ void cpymo_charas_draw(const cpymo_engine *e)
 			anime_offset_y = c->anime_pos[c->anime_pos_current * 2 + 1] * (float)e->gameconfig.imagesize_h / 360.0f;
 		}
 
+		float draw_x = cpymo_tween_value(&pcur->pos_x) + anime_offset_x;
+		float draw_y = cpymo_tween_value(&pcur->pos_y) + anime_offset_y;
+		float draw_w = (float)pcur->img_w;
+		float draw_h = (float)pcur->img_h;
+
+		/* 缩放以立绘中心为锚点。scale 恰为 1 时上面四个量就是原来的表达式，
+		 * 不额外做任何加减，旧脚本不会出现亚像素位移。*/
+		float scale = cpymo_tween_value(&pcur->scale);
+		if (scale != 1.0f) {
+			float scaled_w = draw_w * scale;
+			float scaled_h = draw_h * scale;
+			draw_x += (draw_w - scaled_w) * 0.5f;
+			draw_y += (draw_h - scaled_h) * 0.5f;
+			draw_w = scaled_w;
+			draw_h = scaled_h;
+		}
+
 		cpymo_backend_image_draw(
-			cpymo_tween_value(&pcur->pos_x) + anime_offset_x,
-			cpymo_tween_value(&pcur->pos_y) + anime_offset_y,
-			(float)pcur->img_w,
-			(float)pcur->img_h,
+			draw_x,
+			draw_y,
+			draw_w,
+			draw_h,
 			pcur->img,
 			0,
 			0,
@@ -198,6 +218,7 @@ error_t cpymo_charas_new_chara(
 	cpymo_tween_assign(&ch->pos_x, x);
 	cpymo_tween_assign(&ch->pos_y, y);
 	cpymo_tween_assign(&ch->alpha, begin_alpha);
+	cpymo_tween_assign(&ch->scale, 1.0f);
 #ifdef LOW_FRAME_RATE
 	cpymo_tween_assign(&ch->alpha, 1.0f);
 #else
@@ -279,6 +300,7 @@ static void cpymo_charas_stop_all_tween(cpymo_engine *e)
 		cpymo_tween_finish(&chara->pos_x);
 		cpymo_tween_finish(&chara->pos_y);
 		cpymo_tween_finish(&chara->alpha);
+		cpymo_tween_finish(&chara->scale);
 		chara = chara->next;
 	}
 
@@ -447,3 +469,18 @@ void cpymo_charas_play_anime(
 		&cpymo_charas_anime_finished_callback);
 }
 
+error_t cpymo_charas_scale(cpymo_engine *e, int chara_id, float scale, float time)
+{
+	struct cpymo_chara *c = NULL;
+	error_t err = cpymo_charas_find(&e->charas, &c, chara_id);
+	CPYMO_THROW(err);
+
+	if (scale <= 0.0f) scale = 1.0f;
+
+	if (time > 0.0f) cpymo_tween_to(&c->scale, scale, time);
+	else cpymo_tween_assign(&c->scale, scale);
+
+	cpymo_engine_request_redraw(e);
+
+	return CPYMO_ERR_SUCC;
+}

@@ -431,6 +431,22 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		return CPYMO_ERR_SUCC;
 	}
 
+	D("chara_scale") {
+		POP_ARG(id_str); ENSURE(id_str);
+		POP_ARG(scale_str); ENSURE(scale_str);
+		POP_ARG(time_str);
+
+		int id = cpymo_str_atoi(id_str);
+		float scale = cpymo_str_atof(scale_str);
+		float time = IS_EMPTY(time_str) ? 0.0f : cpymo_str_atof(time_str);
+
+		err = cpymo_charas_scale(engine, id, scale, time);
+		CPYMO_THROW(err);
+
+		if (time > 0.0f) cpymo_charas_wait(engine);
+		return CPYMO_ERR_SUCC;
+	}
+
 	D("chara_pos") {
 		POP_ARG(id_str); ENSURE(id_str);
 		POP_ARG(x_str); ENSURE(x_str);

@@ -13,6 +13,7 @@ struct cpymo_chara {
 	cpymo_backend_image img;
 	bool alive;
 	cpymo_tween pos_x, pos_y, alpha;
+	cpymo_tween scale;
 	int img_w, img_h;
 
 	bool play_anime;
@@ -73,6 +74,12 @@ void cpymo_charas_wait(struct cpymo_engine *);
 void cpymo_charas_kill_all(struct cpymo_engine *, float time);
 
 void cpymo_charas_fast_kill_all(cpymo_charas *c);
+
+error_t cpymo_charas_scale(
+	struct cpymo_engine *,
+	int chara_id,
+	float scale,
+	float time);
 
 error_t cpymo_charas_pos(
 	struct cpymo_engine *,
