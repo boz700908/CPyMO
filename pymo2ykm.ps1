@@ -40,6 +40,15 @@ for ($line_index = 0; $line_index -lt $lines.Length; $line_index += 1) {
 
     if ($line.StartsWith("#")) {
         $line = $line.Substring(1)
+
+        # #lua: body is raw Lua code -- do not cut at ';' (comment) or ',' (arg sep)
+        if ($line -match '^lua(\s+(.*))?$') {
+            $lua_code = $Matches[2]
+            if ($lua_code -eq $null) { $lua_code = "" }
+            $parsed_lines += @{ Cmd = "lua"; Args = @($lua_code); Comment = $null; LineNumber = $line_index }
+            continue
+        }
+
         $comment = $null
         $comment_split = $line.IndexOf(";")
         if ($comment_split -gt 0) {
@@ -740,6 +749,15 @@ function Gen-Ykm($pymo) {
 
         "config" { $ret += "@config"; break }
 
+
+        # 6. Lua (CPyMO Feature Level 1)
+        "lua" {
+            $code = ""
+            if ($pymo.Args.Length -ge 1) { $code = [string]$pymo.Args[0] }
+            $code = $code.Replace('\', '\\').Replace('"', '\"')
+            $ret += "@lua `"$code`""
+            break
+        }
 
         default {
             Write-Host "Warning: In line $($pymo.LineNumber), $($pymo.Cmd) is not supported."
