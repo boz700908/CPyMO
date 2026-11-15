@@ -5,8 +5,16 @@
 #include "cpymo_parser.h"
 #include "cpymo_accessibility.h"
 #include "../cpymo-backends/include/cpymo_backend_text.h"
+#include "cpymo_ui_patch.h"
+#include "cpymo_ui_extra.h"
 #include <assert.h>
 #include <stdlib.h>
+
+#if CPYMO_FEATURE_LEVEL >= 1
+#define CPYMO_MUSIC_BOX_UI_PATCH(e) ((e)->feature_level >= 1 ? &(e)->lua.ui_patch : NULL)
+#else
+#define CPYMO_MUSIC_BOX_UI_PATCH(e) NULL
+#endif
 
 typedef struct {
 	char *music_list;
@@ -45,23 +53,96 @@ static void cpymo_music_box_deleter(cpymo_engine *e, void *ui_)
 static void *cpymo_music_box_get_next(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
 	cpymo_music_box *box = (cpymo_music_box *)ui_data;
-	uintptr_t index = cpymo_list_ui_encode_uint_node_dec(cur) + 1;
-	if (index >= box->music_count) return NULL;
-	else return cpymo_list_ui_encode_uint_node_enc(index);
+	const cpymo_ui_patch *patch = CPYMO_MUSIC_BOX_UI_PATCH(e);
+	uintptr_t index = cpymo_list_ui_encode_uint_node_dec(cur);
+
+	/* 追加项接在最后一个曲目之后。 */
+	if (index >= box->music_count) {
+		uintptr_t k = index - box->music_count + 1;
+		if (k < cpymo_ui_patch_extra_count(
+			patch, CPYMO_UI_PATCH_PAGE_MUSIC))
+			return cpymo_list_ui_encode_uint_node_enc(
+				box->music_count + k);
+		return NULL;
+	}
+
+	for (uintptr_t n = 0; n < box->music_count; ++n) {
+		if (++index >= box->music_count) break;
+		if (cpymo_ui_patch_hidden(
+			patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)index))
+			continue;
+		return cpymo_list_ui_encode_uint_node_enc(index);
+	}
+
+	if (cpymo_ui_patch_extra_count(patch, CPYMO_UI_PATCH_PAGE_MUSIC) > 0)
+		return cpymo_list_ui_encode_uint_node_enc(box->music_count);
+
+	return NULL;
 }
 
 static void *cpymo_music_box_get_prev(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
+	cpymo_music_box *box = (cpymo_music_box *)ui_data;
+	const cpymo_ui_patch *patch = CPYMO_MUSIC_BOX_UI_PATCH(e);
 	uintptr_t index = cpymo_list_ui_encode_uint_node_dec(cur);
-	if (index == 0) return NULL;
-	else return cpymo_list_ui_encode_uint_node_enc(index - 1);
+
+	if (index >= box->music_count) {
+		if (index > box->music_count)
+			return cpymo_list_ui_encode_uint_node_enc(index - 1);
+
+		/* 追加项第一条之前是最后一个可见曲目。 */
+		for (uintptr_t n = box->music_count; n > 0; --n) {
+			uintptr_t i = n - 1;
+			if (cpymo_ui_patch_hidden(
+				patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)i))
+				continue;
+			return cpymo_list_ui_encode_uint_node_enc(i);
+		}
+		return NULL;
+	}
+
+	for (uintptr_t n = 0; n < box->music_count; ++n) {
+		if (index == 0) return NULL;
+		--index;
+		if (cpymo_ui_patch_hidden(
+			patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)index))
+			continue;
+		return cpymo_list_ui_encode_uint_node_enc(index);
+	}
+
+	return NULL;
 }
 
 static void cpymo_musicbox_draw_node(const cpymo_engine *e, const void *node_to_draw, float y)
 {
 	uintptr_t node_index = cpymo_list_ui_encode_uint_node_dec(node_to_draw);
 	const cpymo_music_box *box = (cpymo_music_box *)cpymo_list_ui_data_const(e);
-	
+	const cpymo_ui_patch *patch = CPYMO_MUSIC_BOX_UI_PATCH(e);
+
+	if (node_index >= box->music_count) {
+		int extra = cpymo_ui_patch_extra_index(
+			patch, CPYMO_UI_PATCH_PAGE_MUSIC,
+			box->music_count, node_index);
+		if (extra >= 0) {
+			const char *extra_text = cpymo_ui_patch_extra_text(
+				patch, CPYMO_UI_PATCH_PAGE_MUSIC, (size_t)extra);
+			cpymo_ui_extra_draw_text(extra_text, 0, y, box->font_size);
+		}
+		return;
+	}
+
+	if (cpymo_ui_patch_hidden(
+		patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)node_index))
+		return;
+
+	/* 条目改写：补丁文本优先，命中时不再绘制原曲目名。 */
+	const char *patched = cpymo_ui_patch_text(
+		patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)node_index, NULL);
+	if (patched && *patched) {
+		cpymo_ui_extra_draw_text(patched, 0, y, box->font_size);
+		return;
+	}
+
 	cpymo_backend_text text = box->music_title[node_index];
 	cpymo_backend_text_draw(
 		text, 0, y + box->font_size, cpymo_color_white, 1.0f, 
@@ -73,9 +154,21 @@ static error_t cpymo_musicbox_ok(struct cpymo_engine *e, void *selected)
 	const cpymo_music_box *box = (cpymo_music_box *)cpymo_list_ui_data_const(e);
 
 	uintptr_t node_index = cpymo_list_ui_encode_uint_node_dec(selected);
+
+	/* 追加项不是曲目，点击只派发给 Lua 回调。 */
+	if (node_index >= box->music_count) {
+#if CPYMO_FEATURE_LEVEL >= 1
+		cpymo_lua_ui_page_click(
+			&e->lua, CPYMO_UI_PATCH_PAGE_MUSIC,
+			(int)(node_index - box->music_count));
+#endif
+		return CPYMO_ERR_SUCC;
+	}
+
 	error_t err = cpymo_audio_bgm_play(e, box->music_filename[node_index], true);
-	if (err == CPYMO_ERR_SUCC)
+	if (err == CPYMO_ERR_SUCC) {
 		cpymo_accessibility_play_sound(SOUND_ENTER);
+	}
 	return err;
 }
 
@@ -83,12 +176,31 @@ static error_t cpymo_musicbox_ok(struct cpymo_engine *e, void *selected)
 static error_t cpymo_musicbox_visual_help_selection_change(cpymo_engine *e, void *selected)
 {
 	const cpymo_music_box *box = (cpymo_music_box *)cpymo_list_ui_data_const(e);
+	const cpymo_ui_patch *patch = CPYMO_MUSIC_BOX_UI_PATCH(e);
 	
-	if (box->music_title_text) {
-		uintptr_t node_index = cpymo_list_ui_encode_uint_node_dec(selected);
-		if (box->music_title_text[node_index])
-			cpymo_a11y_speak(box->music_title_text[node_index]);
+	uintptr_t node_index = cpymo_list_ui_encode_uint_node_dec(selected);
+
+	if (node_index >= box->music_count) {
+		int extra = cpymo_ui_patch_extra_index(
+			patch, CPYMO_UI_PATCH_PAGE_MUSIC,
+			box->music_count, node_index);
+		if (extra >= 0) {
+			const char *t = cpymo_ui_patch_extra_text(
+				patch, CPYMO_UI_PATCH_PAGE_MUSIC, (size_t)extra);
+			if (t && *t) cpymo_a11y_speak(t);
+		}
+		return CPYMO_ERR_SUCC;
 	}
+
+	if (cpymo_ui_patch_hidden(
+		patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)node_index))
+		return CPYMO_ERR_SUCC;
+
+	const char *patched = cpymo_ui_patch_text(
+		patch, CPYMO_UI_PATCH_PAGE_MUSIC, (int)node_index, NULL);
+	if (patched && *patched) cpymo_a11y_speak(patched);
+	else if (box->music_title_text && box->music_title_text[node_index])
+		cpymo_a11y_speak(box->music_title_text[node_index]);
 
 	return CPYMO_ERR_SUCC;
 }

@@ -3,6 +3,7 @@
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
 #include "cpymo_ui_patch.h"
+#include "cpymo_ui_extra.h"
 #include "cpymo_save_global.h"
 #include "cpymo_localization.h"
 #include "cpymo_accessibility.h"
@@ -65,7 +66,8 @@ static void *cpymo_config_ui_get_next_item(const cpymo_engine *e, const void *ui
 	const cpymo_ui_patch *patch = CPYMO_CONFIG_UI_PATCH(e);
 
 	/* 跳过被隐藏的条目；没有补丁时行为与逐项 +1 完全一致。 */
-	for (uintptr_t i = x + 1; i < CONFIG_ITEMS; ++i) {
+	for (uintptr_t i = x + 1; i < cpymo_ui_patch_total(
+			patch, CPYMO_UI_PATCH_PAGE_CONFIG, CONFIG_ITEMS); ++i) {
 		if (!cpymo_ui_patch_hidden(patch, CPYMO_UI_PATCH_PAGE_CONFIG, (int)i))
 			return cpymo_list_ui_encode_uint_node_enc(i);
 	}
@@ -117,7 +119,8 @@ static inline float cpymo_config_ui_row_y(const cpymo_engine *e, float i)
 {
 	float top, usable_h;
 	cpymo_config_ui_safe_insets(e, &top, &usable_h);
-	return top + usable_h / (float)CONFIG_ITEMS * i;
+	return top + cpymo_list_ui_scroll_y(e) +
+		usable_h / (float)CONFIG_ITEMS * i;
 }
 
 static inline void cpymo_config_ui_calc_layout(
@@ -197,16 +200,35 @@ static void cpymo_config_ui_draw_node(const cpymo_engine *e, const void *node_to
 
 	size_t item_index = cpymo_list_ui_encode_uint_node_dec(node_to_draw);
 
-	/* 设置页整屏刚好排满 CONFIG_ITEMS 行，没有多余行可放追加项；
-	 * 越界节点不绘制，隐藏项留空位（不重排，避免行高与高亮错位）。 */
-	if (item_index >= CONFIG_ITEMS) return;
+	/* 有追加项时列表会滚动/翻页，list_ui 给的 y 以「当前首项」为基准，
+	 * 与 cpymo_config_ui_row_y（绝对行号）不再等价；此时统一改用 row_y，
+	 * 让绘制、鼠标命中、导航三者同源。无追加项时仍走原 y，像素不变。 */
+	float draw_y = y;
+	if (cpymo_ui_patch_extra_count(
+		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG) > 0)
+		draw_y = cpymo_config_ui_row_y(e, (float)item_index);
+
+	/* 整屏恰好 CONFIG_ITEMS 行，追加项原本落在屏外；开启滚动后由滚动偏移带入视野。
+	 * 隐藏项留空位（不重排，避免行高与高亮错位）。 */
+	if (item_index >= CONFIG_ITEMS) {
+		int ex = cpymo_ui_patch_extra_index(
+			CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG,
+			CONFIG_ITEMS, item_index);
+		if (ex >= 0)
+			cpymo_ui_extra_draw_text(
+				cpymo_ui_patch_extra_text(
+					CPYMO_CONFIG_UI_PATCH(e),
+					CPYMO_UI_PATCH_PAGE_CONFIG, (size_t)ex),
+				side_padding, draw_y, ui->font_size);
+		return;
+	}
 	if (cpymo_ui_patch_hidden(
 		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG, (int)item_index))
 		return;
 
 	cpymo_config_ui_calc_layout(
 		e, ui, 
-		item_index, y,
+		item_index, draw_y,
 		&item,
 		&text_y,
 		&value_display_x,
@@ -214,7 +236,15 @@ static void cpymo_config_ui_draw_node(const cpymo_engine *e, const void *node_to
 		&dec_btn_x,
 		&inc_dec_btn_symbol_y);
 
-	if (item->show_name) {
+	const char *patched_name = cpymo_ui_patch_text(
+		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG,
+		(int)item_index, NULL);
+
+	if (patched_name && *patched_name) {
+		cpymo_ui_extra_draw_text(
+			patched_name, side_padding, text_y - ui->font_size, ui->font_size);
+	}
+	else if (item->show_name) {
 		cpymo_backend_text_draw(
 			item->show_name, side_padding, text_y, cpymo_color_white, 1.0f,
 			cpymo_backend_image_draw_type_ui_element);
@@ -741,7 +771,8 @@ static error_t cpymo_config_ui_update(cpymo_engine *e, float dt, void *sel)
 	cpymo_key_pluse_update(&ui->mouse_button, dt, e->input.mouse_button);
 
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
-	if (i < 0 || i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
+	if (i < 0) return CPYMO_ERR_SUCC;
+	if (i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
 
 	if (ui->items[i].show_inc_dec_button)
 	{
@@ -818,7 +849,19 @@ static error_t cpymo_config_ui_ok(cpymo_engine *e, void *sel)
 {
 	cpymo_config_ui *ui = (cpymo_config_ui *)cpymo_list_ui_data(e);
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
-	if (i < 0 || i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
+	if (i < 0) return CPYMO_ERR_SUCC;
+
+	int extra = cpymo_ui_patch_extra_index(
+		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG,
+		CONFIG_ITEMS, (size_t)i);
+	if (extra >= 0) {
+#if CPYMO_FEATURE_LEVEL >= 1
+		cpymo_lua_ui_page_click(&e->lua, CPYMO_UI_PATCH_PAGE_CONFIG, extra);
+#endif
+		return CPYMO_ERR_SUCC;
+	}
+
+	if (i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
 
 	return ui->items[i].show_inc_dec_button ?
 		CPYMO_ERR_SUCC :
@@ -831,7 +874,19 @@ static error_t cpymo_config_ui_visual_im_help_selection_changed_callback(cpymo_e
 {
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
 	cpymo_config_ui *ui = (cpymo_config_ui *)cpymo_list_ui_data(e);
-	if (i < 0 || i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
+	if (i < 0) return CPYMO_ERR_SUCC;
+
+	int extra = cpymo_ui_patch_extra_index(
+		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG,
+		CONFIG_ITEMS, (size_t)i);
+	if (extra >= 0) {
+		const char *t = cpymo_ui_patch_extra_text(
+			CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG, (size_t)extra);
+		if (t) cpymo_a11y_speak(t);
+		return CPYMO_ERR_SUCC;
+	}
+
+	if (i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
 
 	cpymo_config_ui_extract_setting_name_and_value(e, i, ui->items[i].value);
 
@@ -897,6 +952,8 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 		&cpymo_config_ui_get_next_item,
 		&cpymo_config_ui_get_prev_item,
 		false,
+		/* nodes_per_screen 必须保持 CONFIG_ITEMS：行高 = usable_h / 该值，
+		 * 与 cpymo_config_ui_row_y 的行坐标一致；追加项靠滚动进入视野。 */
 		CONFIG_ITEMS);
 	CPYMO_THROW(err);
 
@@ -909,9 +966,15 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_config_ui_visual_im_help_selection_changed_callback);
 #endif
 
-	cpymo_list_ui_set_scroll_enabled(e, false);
+	/* 整屏恰好 CONFIG_ITEMS 行，追加项在屏外，必须开启滚动才可见。 */
+	cpymo_list_ui_set_scroll_enabled(
+		e, cpymo_ui_patch_extra_count(
+			CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG) > 0);
 	cpymo_list_ui_set_custom_update(e, &cpymo_config_ui_update);
-	cpymo_list_ui_enable_loop(e);
+	/* 环回与滚动共存会绕回屏外行，有追加项时只走单向列表。 */
+	if (cpymo_ui_patch_extra_count(
+			CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG) == 0)
+		cpymo_list_ui_enable_loop(e);
 	cpymo_list_ui_set_mouse_button_just_hold_callback(
 		e, &cpymo_config_ui_mouse_button_just_hold);
 

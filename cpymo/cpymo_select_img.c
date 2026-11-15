@@ -294,7 +294,7 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 
 	assert(sel->selections);
 	assert(sel->all_selections);
-	assert(sel->current_selection == sel->all_selections);
+	assert(sel->current_selection == (int)sel->all_selections);
 
 	sel->current_selection = init_position >= 0 ? init_position : 0;
 	sel->save_enabled = init_position == -1;
@@ -408,6 +408,22 @@ static void cpymo_select_img_move(cpymo_select_img *o, int move) {
 
 static error_t cpymo_select_img_ok(cpymo_engine *e, int sel, uint64_t hash, cpymo_select_img *o)
 {
+	/* 追加项不是脚本选项，没有 hash，点击只派发给 Lua 回调。 */
+	int extra_n = 0;
+	if (o->patch && o->patch_page)
+		extra_n = (int)cpymo_ui_patch_extra_count(o->patch, o->patch_page);
+
+	if (extra_n > 0 && sel >= (int)o->all_selections - extra_n) {
+		cpymo_select_img_reset(o);
+#if CPYMO_FEATURE_LEVEL >= 1
+		cpymo_lua_ui_page_click(
+			&e->lua, o->patch_page,
+			sel - ((int)o->all_selections - extra_n));
+#endif
+		cpymo_engine_request_redraw(e);
+		return CPYMO_ERR_SUCC;
+	}
+
 	bool save_enabled = o->save_enabled;
 	cpymo_select_img_reset(o);
 
@@ -703,6 +719,55 @@ void cpymo_select_img_configuare_select_text_hint_pic(cpymo_engine * engine, cpy
 void cpymo_select_img_configuare_end_select_text(
 	cpymo_select_img *sel, cpymo_wait *waiter, cpymo_engine *e, float x1, float y1, float x2, float y2, cpymo_color col, int init_pos, bool show_option_background)
 {
+	/* 文本型菜单可以追加条目：扩容 selections 后接在脚本选项之后。 */
+	{
+		const int extra_n = (sel->patch && sel->patch_page)
+			? (int)cpymo_ui_patch_extra_count(sel->patch, sel->patch_page)
+			: 0;
+		if (extra_n > 0) {
+			const size_t base_n = sel->all_selections;
+			cpymo_select_img_selection *grown =
+				(cpymo_select_img_selection *)realloc(sel->selections,
+					sizeof(cpymo_select_img_selection)
+						* (base_n + (size_t)extra_n));
+			if (grown) {
+				sel->selections = grown;
+				memset(grown + base_n, 0,
+					sizeof(cpymo_select_img_selection)
+						* (size_t)extra_n);
+				for (int k = 0; k < extra_n; ++k) {
+					cpymo_select_img_selection *s =
+						&sel->selections[base_n + (size_t)k];
+					const char *t = cpymo_ui_patch_extra_text(
+						sel->patch, sel->patch_page, (size_t)k);
+					float w = 0;
+					s->image = NULL;
+					s->or_text = NULL;
+					s->w = 1;
+					s->h = (int)e->gameconfig.fontsize + 1;
+					s->enabled = true;
+					s->hash = 0;
+					s->has_selected = false;
+					s->hint_state = 0;
+					if (t && *t) {
+						if (cpymo_backend_text_create(
+							&s->or_text, &w,
+							cpymo_str_pure(t), (float)e->gameconfig.fontsize)
+							== CPYMO_ERR_SUCC)
+							s->w = (int)w + 1;
+						else s->or_text = NULL;
+					}
+#ifdef ENABLE_TEXT_EXTRACT
+					s->original_text =
+						cpymo_str_copy_malloc(
+							cpymo_str_pure(t ? t : ""));
+#endif
+				}
+				sel->all_selections += (size_t)extra_n;
+			}
+		}
+	}
+
 	float box_w = x2 - x1;
 	float y = y1;
 	for (size_t i = 0; i < sel->all_selections; ++i) {

@@ -72,4 +72,21 @@ size_t cpymo_ui_patch_extra_count(const cpymo_ui_patch *patch, const char *page)
 
 const char *cpymo_ui_patch_extra_text(const cpymo_ui_patch *patch, const char *page, size_t n);
 
+/* 页面节点总数 = 自带条目数 + 该页追加项数。 */
+static inline size_t cpymo_ui_patch_total(
+    const cpymo_ui_patch *patch, const char *page, size_t base)
+{
+    return base + cpymo_ui_patch_extra_count(patch, page);
+}
+
+/* index 落在追加项区间时返回其序号（从 0 起），否则返回 -1。 */
+static inline int cpymo_ui_patch_extra_index(
+    const cpymo_ui_patch *patch, const char *page, size_t base, size_t index)
+{
+    if (index < base) return -1;
+    size_t n = cpymo_ui_patch_extra_count(patch, page);
+    if (index - base >= n) return -1;
+    return (int)(index - base);
+}
+
 #endif

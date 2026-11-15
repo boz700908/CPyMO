@@ -3,6 +3,8 @@
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
 #include "cpymo_accessibility.h"
+#include "cpymo_ui_patch.h"
+#include "cpymo_ui_extra.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stddef.h>
@@ -10,6 +12,12 @@
 
 #ifndef CPYMO_BACKLOG_MAX_RECORDS
 #define CPYMO_BACKLOG_MAX_RECORDS 64
+#endif
+
+#if CPYMO_FEATURE_LEVEL >= 1
+#define CPYMO_BACKLOG_UI_PATCH(e) ((e)->feature_level >= 1 ? &(e)->lua.ui_patch : NULL)
+#else
+#define CPYMO_BACKLOG_UI_PATCH(e) NULL
 #endif
 
 typedef struct cpymo_backlog_record {
@@ -210,8 +218,29 @@ error_t cpymo_backlog_record_restore(
 
 static void cpymo_backlog_ui_draw_node(const cpymo_engine *e, const void *node_to_draw, float y)
 {
-	const cpymo_backlog_record *rec = &e->backlog.records[
-		cpymo_list_ui_encode_uint_node_dec(node_to_draw)];
+	const cpymo_ui_patch *patch = CPYMO_BACKLOG_UI_PATCH(e);
+	const size_t node_index = cpymo_list_ui_encode_uint_node_dec(node_to_draw);
+
+	/* 追加项：序号从 CPYMO_BACKLOG_MAX_RECORDS 起算，排在最旧一条记录之后。 */
+	if (node_index >= CPYMO_BACKLOG_MAX_RECORDS) {
+		int extra = cpymo_ui_patch_extra_index(
+			patch, CPYMO_UI_PATCH_PAGE_BACKLOG,
+			CPYMO_BACKLOG_MAX_RECORDS, node_index);
+		if (extra >= 0) {
+			const char *extra_text = cpymo_ui_patch_extra_text(
+				patch, CPYMO_UI_PATCH_PAGE_BACKLOG, (size_t)extra);
+			const float extra_size =
+				cpymo_gameconfig_font_size(&e->gameconfig);
+			cpymo_ui_extra_draw_text(extra_text, 0, y, extra_size);
+		}
+		return;
+	}
+
+	if (cpymo_ui_patch_hidden(
+		patch, CPYMO_UI_PATCH_PAGE_BACKLOG, (int)node_index))
+		return;
+
+	const cpymo_backlog_record *rec = &e->backlog.records[node_index];
 
 	const float font_size = rec->font_size;
 	y += font_size;
@@ -221,6 +250,14 @@ static void cpymo_backlog_ui_draw_node(const cpymo_engine *e, const void *node_t
 			1.0, cpymo_backend_image_draw_type_ui_element);
 
 		y += font_size;
+	}
+
+	/* 条目改写：补丁文本优先，命中时不再绘制原文本。 */
+	const char *patched = cpymo_ui_patch_text(
+		patch, CPYMO_UI_PATCH_PAGE_BACKLOG, (int)node_index, NULL);
+	if (patched && *patched) {
+		cpymo_ui_extra_draw_text(patched, 0, y - font_size, font_size);
+		return;
 	}
 
 	if (rec->text_render == NULL) {
@@ -246,40 +283,113 @@ static void cpymo_backlog_ui_draw_node(const cpymo_engine *e, const void *node_t
 
 static error_t cpymo_backlog_ui_ok(struct cpymo_engine *e, void *selected)
 {
-	const cpymo_backlog_record *rec = &e->backlog.records[
-		cpymo_list_ui_encode_uint_node_dec(selected)];
+	const size_t node_index = cpymo_list_ui_encode_uint_node_dec(selected);
+
+	/* 追加项没有历史记录，点击只派发给 Lua 回调。 */
+	if (node_index >= CPYMO_BACKLOG_MAX_RECORDS) {
+#if CPYMO_FEATURE_LEVEL >= 1
+		cpymo_lua_ui_page_click(
+			&e->lua, CPYMO_UI_PATCH_PAGE_BACKLOG,
+			(int)(node_index - CPYMO_BACKLOG_MAX_RECORDS));
+#endif
+		return CPYMO_ERR_SUCC;
+	}
+
+	const cpymo_backlog_record *rec = &e->backlog.records[node_index];
 	if (rec->vo_filename[0]) {
 		error_t err = cpymo_audio_vo_play(e, cpymo_str_pure(rec->vo_filename));
-		if (err == CPYMO_ERR_SUCC)
+		if (err == CPYMO_ERR_SUCC) {
 			cpymo_accessibility_play_sound(SOUND_ENTER);
+		}
 		return err;
 	}
 
 	return CPYMO_ERR_SUCC;
 }
 
+/* 最旧一条可见记录的索引；没有可用记录时返回越界哨兵。 */
+static size_t cpymo_backlog_ui_oldest_index(const cpymo_engine *e)
+{
+	const cpymo_ui_patch *patch = CPYMO_BACKLOG_UI_PATCH(e);
+	size_t index = e->backlog.next_record_to_write;
+
+	for (size_t n = 0; n < CPYMO_BACKLOG_MAX_RECORDS; ++n) {
+		index = (index + 1) % CPYMO_BACKLOG_MAX_RECORDS;
+		if (index == e->backlog.next_record_to_write) break;
+		if (e->backlog.records[index].text == NULL) break;
+		if (cpymo_ui_patch_hidden(
+			patch, CPYMO_UI_PATCH_PAGE_BACKLOG, (int)index))
+			continue;
+		return index;
+	}
+
+	return CPYMO_BACKLOG_MAX_RECORDS;
+}
+
 static void *cpymo_backlog_ui_get_next(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
+	const cpymo_ui_patch *patch = CPYMO_BACKLOG_UI_PATCH(e);
 	size_t index = (size_t)cpymo_list_ui_encode_uint_node_dec(cur);
-	if (index) index--;
-	else index = CPYMO_BACKLOG_MAX_RECORDS - 1;
 
-	if (index == e->backlog.next_record_to_write) return NULL;
-	if (e->backlog.records[index].text == NULL) return NULL;
+	/* 追加项内部按序号递增。 */
+	if (index >= CPYMO_BACKLOG_MAX_RECORDS) {
+		size_t k = index - CPYMO_BACKLOG_MAX_RECORDS + 1;
+		if (k < cpymo_ui_patch_extra_count(
+			patch, CPYMO_UI_PATCH_PAGE_BACKLOG))
+			return cpymo_list_ui_encode_uint_node_enc(
+				CPYMO_BACKLOG_MAX_RECORDS + k);
+		return NULL;
+	}
 
-	return cpymo_list_ui_encode_uint_node_enc(index);
+	for (size_t n = 0; n < CPYMO_BACKLOG_MAX_RECORDS; ++n) {
+		if (index) index--;
+		else index = CPYMO_BACKLOG_MAX_RECORDS - 1;
+
+		if (index == e->backlog.next_record_to_write) break;
+		if (e->backlog.records[index].text == NULL) break;
+		if (cpymo_ui_patch_hidden(
+			patch, CPYMO_UI_PATCH_PAGE_BACKLOG, (int)index))
+			continue;
+
+		return cpymo_list_ui_encode_uint_node_enc(index);
+	}
+
+	/* 走到最旧一条之后接追加项；没有追加项就到底。 */
+	if (cpymo_ui_patch_extra_count(patch, CPYMO_UI_PATCH_PAGE_BACKLOG) > 0)
+		return cpymo_list_ui_encode_uint_node_enc(CPYMO_BACKLOG_MAX_RECORDS);
+
+	return NULL;
 }
 
 static void *cpymo_backlog_ui_get_prev(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
+	const cpymo_ui_patch *patch = CPYMO_BACKLOG_UI_PATCH(e);
 	size_t index = (size_t)cpymo_list_ui_encode_uint_node_dec(cur);
-	if (index >= CPYMO_BACKLOG_MAX_RECORDS - 1) index = 0;
-	else index++;
 
-	if (index == e->backlog.next_record_to_write) return NULL;
-	if (e->backlog.records[index].text == NULL) return NULL;
+	if (index >= CPYMO_BACKLOG_MAX_RECORDS) {
+		if (index > CPYMO_BACKLOG_MAX_RECORDS)
+			return cpymo_list_ui_encode_uint_node_enc(index - 1);
 
-	return cpymo_list_ui_encode_uint_node_enc(index);
+		/* 追加项第一条之前是最旧的一条记录。 */
+		index = cpymo_backlog_ui_oldest_index(e);
+		if (index >= CPYMO_BACKLOG_MAX_RECORDS) return NULL;
+		return cpymo_list_ui_encode_uint_node_enc(index);
+	}
+
+	for (size_t n = 0; n < CPYMO_BACKLOG_MAX_RECORDS; ++n) {
+		if (index >= CPYMO_BACKLOG_MAX_RECORDS - 1) index = 0;
+		else index++;
+
+		if (index == e->backlog.next_record_to_write) return NULL;
+		if (e->backlog.records[index].text == NULL) return NULL;
+		if (cpymo_ui_patch_hidden(
+			patch, CPYMO_UI_PATCH_PAGE_BACKLOG, (int)index))
+			continue;
+
+		return cpymo_list_ui_encode_uint_node_enc(index);
+	}
+
+	return NULL;
 }
 
 typedef struct {
@@ -305,10 +415,16 @@ static error_t cpymo_backlog_ui_update(cpymo_engine *e, float dt, void *selected
 		size_t index = (size_t)cpymo_list_ui_encode_uint_node_dec(selected);
 		if (index != ui->last_played_index) {
 			ui->last_played_index = index;
-			const cpymo_backlog_record *rec = &e->backlog.records[index];
-			if (rec->vo_filename[0])
-				cpymo_audio_vo_play(e, cpymo_str_pure(rec->vo_filename));
-			else cpymo_audio_vo_stop(e);
+			/* 追加项没有记录，不要索引 records[]。 */
+			if (index >= CPYMO_BACKLOG_MAX_RECORDS) cpymo_audio_vo_stop(e);
+			else {
+				const cpymo_backlog_record *rec =
+					&e->backlog.records[index];
+				if (rec->vo_filename[0])
+					cpymo_audio_vo_play(
+						e, cpymo_str_pure(rec->vo_filename));
+				else cpymo_audio_vo_stop(e);
+			}
 		}
 	}
 
@@ -333,7 +449,9 @@ static error_t cpymo_backlog_ui_selection_changed(cpymo_engine *e, void *selecte
 {
 	if (selected) {
 		size_t index = (size_t)cpymo_list_ui_encode_uint_node_dec(selected);
-		cpymo_backlog_ui_extract_text(e, index);
+		/* 追加项的序号超出 records 范围。 */
+		if (index < CPYMO_BACKLOG_MAX_RECORDS)
+			cpymo_backlog_ui_extract_text(e, index);
 	}
 	return CPYMO_ERR_SUCC;
 }

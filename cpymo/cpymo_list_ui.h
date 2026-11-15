@@ -39,6 +39,9 @@ void cpymo_list_ui_set_selection_changed_callback(struct cpymo_engine *e, cpymo_
 
 void cpymo_list_ui_set_scroll_enabled(struct cpymo_engine *e, bool allow_scroll);
 
+/* 当前滚动偏移（像素）。开启滚动后调用方自绘内容需叠加此偏移。 */
+float cpymo_list_ui_scroll_y(const struct cpymo_engine *e);
+
 void cpymo_list_ui_set_custom_update(struct cpymo_engine *e, cpymo_list_ui_custom_update update);
 
 void *cpymo_list_ui_data(struct cpymo_engine *e);
