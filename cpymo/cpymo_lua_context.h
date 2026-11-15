@@ -62,7 +62,9 @@ void cpymo_lua_context_free(cpymo_lua_context *l);
 
 /* 派发页面追加条目的点击回调（由 cpymo.ui.on_item_click 注册）。
  * 未注册、无 Lua 状态或回调本身出错时静默返回，不影响调用方。 */
-void cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index);
+/* Returns 1 when a handler was invoked and 0 when the page has none: a click
+ * on an item added by the patch layer then has no effect at all. */
+int cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index);
 
 void cpymo_lua_gc_full(cpymo_lua_context *l);
 

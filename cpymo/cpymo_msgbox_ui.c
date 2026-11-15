@@ -318,10 +318,13 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 #if CPYMO_FEATURE_LEVEL >= 1
 		if (ui->selection >= CPYMO_MSGBOX_ITEM_EXTRA_BASE) {
 			const cpymo_ui_patch *patch = CPYMO_MSGBOX_UI_PATCH(e);
-			if (patch) cpymo_lua_ui_page_click(
+			/* Without an on_item_click handler the click must not close the
+			   message box: an added button only does what its author wrote. */
+			if (patch && cpymo_lua_ui_page_click(
 				&e->lua, CPYMO_UI_PATCH_PAGE_MSGBOX,
-				(size_t)(ui->selection - CPYMO_MSGBOX_ITEM_EXTRA_BASE));
-			return cpymo_msgbox_ui_okcancel_finish(e, false);
+				ui->selection - CPYMO_MSGBOX_ITEM_EXTRA_BASE))
+				return cpymo_msgbox_ui_okcancel_finish(e, false);
+			return CPYMO_ERR_SUCC;
 		}
 #endif
 		return cpymo_msgbox_ui_okcancel_finish(e, !ui->selection);
@@ -334,10 +337,12 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 #if CPYMO_FEATURE_LEVEL >= 1
 		if (mouse_sel >= CPYMO_MSGBOX_ITEM_EXTRA_BASE) {
 			const cpymo_ui_patch *patch = CPYMO_MSGBOX_UI_PATCH(e);
-			if (patch) cpymo_lua_ui_page_click(
+			/* Same rule as the keyboard path: no handler, no effect. */
+			if (patch && cpymo_lua_ui_page_click(
 				&e->lua, CPYMO_UI_PATCH_PAGE_MSGBOX,
-				(size_t)(mouse_sel - CPYMO_MSGBOX_ITEM_EXTRA_BASE));
-			return cpymo_msgbox_ui_okcancel_finish(e, false);
+				mouse_sel - CPYMO_MSGBOX_ITEM_EXTRA_BASE))
+				return cpymo_msgbox_ui_okcancel_finish(e, false);
+			return CPYMO_ERR_SUCC;
 		}
 #endif
 		return cpymo_msgbox_ui_okcancel_finish(e, !mouse_sel);

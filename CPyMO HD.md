@@ -327,9 +327,12 @@ CPyMO默认将会把`main`设置为一个空表。
   - 序号 = 该页的容量编号起点 + 它在追加列表中的位置；起点由引擎按页面登记：存读档`31`、设置`6`（Switch 且开启无障碍时`12`）、音乐鉴赏为曲目数、回想`64`、右键菜单`9`、脚本选项为候选数、消息框`3`、相册为当前页的 CG 数
   - 会真正显示出来的页面是设置、存档、读档、音乐鉴赏、回想、消息框与文本型选项菜单；相册是预先烘焙好的 5×5 图格、右键菜单是固定条目，这两页只占序号，追加项不会出现
   - 列表页行高固定，追加项要滚动才能看到，不会压缩原有行
+  - 追加项没有任何默认行为：必须用`on_item_click`给它注册回调，否则点击它不会有任何效果，既不报错，也不影响同一页的其他条目
 * `on_item_click(page: string, callback: int -> void)`
   - 注册追加项的点击回调，`callback`收到被点击追加项的序号，与`item_add`的返回值一致
   - 同一页面重复注册会替换之前的回调
+  - 没有注册回调时点击追加项不会有任何效果：消息框里没有回调的追加按钮不会关闭消息框，选择界面里也不会改动当前选中
+  - 回调在帧循环里执行，与脚本同受看门狗约束
 
 页面键与序号：
 
@@ -345,12 +348,15 @@ CPyMO默认将会把`main`设置为一个空表。
 查询：
 
 * `item_get(page: string, index: int) : table?`
-  - 返回`{index, text, hidden, extra, extra_index}`，该条没有任何改写时返回`nil`
-  - `text`为`nil`表示没有被改写；`hidden`只对真实条目有意义
+  - 返回`{index, text, hidden, extra, extra_index, rewritten}`；序号落在该页容量内或是一条追加项时都能查到
+  - 完全没有改写时也返回该条现在的内容：`text`取自引擎实际绘制的文本，该条还没被绘制过时为`nil`
+  - `rewritten`为`true`表示这一层存有该条的改写或隐藏；`hidden`只对真实条目有意义
   - `extra_index`是追加项在追加列表中的位置，真实条目为`-1`
+  - 序号既不是真实条目也不是追加项时返回`nil`
 * `items(page: string) : table`
   - 返回`{page, base, count, extra_count, entries, extras}`
   - `base`是该页的容量编号起点（该页面还没被打开过时为`nil`），`count`是被改写的真实条目数，`extras`是该页全部的追加项
+  - `entries`列出该页的全部真实条目，没被改写的也在其中；每项含`index`、`text`、`hidden`与`rewritten`，没有改写时`text`取自引擎实际绘制的文本
 * `pages() : string[]` - 返回全部页面键
 
 #### 保留与持久化
@@ -386,6 +392,8 @@ local f = io.open("ui_patch.txt", "w")
 f:write(cpymo.serialize(cpymo.ui.export_patch()))
 f:close()
 ```
+
+查询用的原文缓存只是引擎绘制时的记录，不属于改写数据，不参与`export_patch()`。
 
 ### `cpymo.select_img`
 

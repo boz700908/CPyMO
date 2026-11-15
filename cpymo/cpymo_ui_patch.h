@@ -43,9 +43,20 @@ typedef struct cpymo_ui_patch_base {
     size_t count;
 } cpymo_ui_patch_base;
 
+/* Engine-reported original text of a real item. This is a read-only cache
+ * filled while the page draws, so cpymo.ui.item_get()/items() can report the
+ * current content of an item even when it was never rewritten. */
+typedef struct cpymo_ui_patch_orig {
+    struct cpymo_ui_patch_orig *next;
+    char *page;
+    int index;
+    char *text;
+} cpymo_ui_patch_orig;
+
 typedef struct cpymo_ui_patch {
     cpymo_ui_patch_entry *entries;
     cpymo_ui_patch_base *bases;
+    cpymo_ui_patch_orig *origs;
     int extra_count;
 } cpymo_ui_patch;
 
@@ -64,6 +75,15 @@ void cpymo_ui_patch_clear(cpymo_ui_patch *patch, const char *page);
 
 /* 该条应显示的文本；没有改写时返回 original。原文与改写都是稳定指针。 */
 const char *cpymo_ui_patch_text(const cpymo_ui_patch *patch, const char *page, int index, const char *original);
+
+/* Remember the engine's own text of a real item. Called automatically by
+ * cpymo_ui_patch_text(), so a page only needs to be drawn once. */
+void cpymo_ui_patch_remember(
+    cpymo_ui_patch *patch, const char *page, int index, const char *text);
+
+/* Last text the engine reported for a real item; NULL if never seen. */
+const char *cpymo_ui_patch_orig_text(
+    const cpymo_ui_patch *patch, const char *page, int index);
 
 bool cpymo_ui_patch_hidden(const cpymo_ui_patch *patch, const char *page, int index);
 

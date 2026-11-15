@@ -415,13 +415,19 @@ static error_t cpymo_select_img_ok(cpymo_engine *e, int sel, uint64_t hash, cpym
 		extra_n = (int)cpymo_ui_patch_extra_count(o->patch, o->patch_page);
 
 	if (extra_n > 0 && sel >= (int)o->all_selections - extra_n) {
-		cpymo_select_img_reset(o);
 #if CPYMO_FEATURE_LEVEL >= 1
-		cpymo_lua_ui_page_click(
+		/* An added choice only does what its author wrote: with no handler the
+		   click leaves the selection untouched. */
+		int called = cpymo_lua_ui_page_click(
 			&e->lua, o->patch_page,
 			sel - ((int)o->all_selections - extra_n));
+#else
+		int called = 0;
 #endif
-		cpymo_engine_request_redraw(e);
+		if (called) {
+			cpymo_select_img_reset(o);
+			cpymo_engine_request_redraw(e);
+		}
 		return CPYMO_ERR_SUCC;
 	}
 

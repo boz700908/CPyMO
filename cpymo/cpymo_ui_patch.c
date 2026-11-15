@@ -77,6 +77,7 @@ void cpymo_ui_patch_init(cpymo_ui_patch *patch)
     if (patch == NULL) return;
     patch->entries = NULL;
     patch->bases = NULL;
+    patch->origs = NULL;
     patch->extra_count = 0;
 }
 
@@ -99,8 +100,18 @@ void cpymo_ui_patch_free(cpymo_ui_patch *patch)
         b = next;
     }
 
+    cpymo_ui_patch_orig *o = patch->origs;
+    while (o) {
+        cpymo_ui_patch_orig *next = o->next;
+        free(o->page);
+        free(o->text);
+        free(o);
+        o = next;
+    }
+
     patch->entries = NULL;
     patch->bases = NULL;
+    patch->origs = NULL;
     patch->extra_count = 0;
 }
 
@@ -179,6 +190,10 @@ const char *cpymo_ui_patch_text(
             return e->text;
         }
     }
+
+    /* Nothing rewritten: cache what the engine itself draws, so queries can
+     * still report the current content of the item. */
+    cpymo_ui_patch_remember((cpymo_ui_patch *)patch, page, index, original);
 
     return original;
 }
@@ -346,6 +361,53 @@ const cpymo_ui_patch_entry *cpymo_ui_patch_extra_entry(
         }
 
         if (rank == n) return e;
+    }
+
+    return NULL;
+}
+
+void cpymo_ui_patch_remember(
+    cpymo_ui_patch *patch, const char *page, int index, const char *text)
+{
+    if (patch == NULL || page == NULL) return;
+    if (index < 0 || text == NULL || text[0] == '\0') return;
+
+    for (cpymo_ui_patch_orig *o = patch->origs; o; o = o->next) {
+        if (o->index == index && strcmp(o->page, page) == 0) {
+            if (o->text != NULL && strcmp(o->text, text) == 0) return;
+            char *copy = cpymo_ui_patch_strdup(text);
+            if (copy == NULL) return;
+            free(o->text);
+            o->text = copy;
+            return;
+        }
+    }
+
+    cpymo_ui_patch_orig *o =
+        (cpymo_ui_patch_orig *)malloc(sizeof(cpymo_ui_patch_orig));
+    if (o == NULL) return;
+
+    o->page = cpymo_ui_patch_strdup(page);
+    o->text = cpymo_ui_patch_strdup(text);
+    if (o->page == NULL || o->text == NULL) {
+        free(o->page);
+        free(o->text);
+        free(o);
+        return;
+    }
+
+    o->index = index;
+    o->next = patch->origs;
+    patch->origs = o;
+}
+
+const char *cpymo_ui_patch_orig_text(
+    const cpymo_ui_patch *patch, const char *page, int index)
+{
+    if (patch == NULL || page == NULL || index < 0) return NULL;
+
+    for (const cpymo_ui_patch_orig *o = patch->origs; o; o = o->next) {
+        if (o->index == index && strcmp(o->page, page) == 0) return o->text;
     }
 
     return NULL;

@@ -1314,14 +1314,17 @@ error_t cpymo_lua_pop_color(
 
 #if CPYMO_FEATURE_LEVEL >= 1
 
-void cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index)
+/* Returns 1 when a handler was invoked, 0 when the page has none: a click on
+   an item added by the patch layer then has no effect at all. */
+int cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index)
 {
-    if (l == NULL || l->lua_state == NULL) return;
-    if (l->ui_click_ref == LUA_NOREF) return;
-    if (page == NULL) return;
+    if (l == NULL || l->lua_state == NULL) return 0;
+    if (l->ui_click_ref == LUA_NOREF) return 0;
+    if (page == NULL) return 0;
 
     lua_State *L = l->lua_state;
     int top = lua_gettop(L);
+    int called = 0;
 
     /* 各页派发过来的是「页内追加项序号」，回调统一收全局序号，
        与 cpymo.ui.item_add 的返回值一致。 */
@@ -1339,9 +1342,11 @@ void cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index)
             printf("[cpymo] on_item_click(%s, %d) failed: %s\n",
                 page, index, err ? err : "(unknown)");
         }
+        called = 1;
     }
 
     lua_settop(L, top);
+    return called;
 }
 
 #endif

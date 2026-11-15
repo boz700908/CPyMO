@@ -362,19 +362,28 @@ static int cpymo_lua_api_ui_item_get(lua_State *l)
         extra = cpymo_ui_patch_extra_entry(patch, page, (size_t)extra_index);
     }
 
+    /* Nothing stored for this index: when the page registered its capacity the
+       index is still a real item, so report what the engine draws right now
+       instead of nil. The original text is cached as the page draws. */
     if (item == NULL && extra == NULL) {
-        lua_pushnil(l);
-        return 1;
+        if (base == (size_t)-1 || index < 0 || index >= (int)base) {
+            lua_pushnil(l);
+            return 1;
+        }
     }
 
     const cpymo_ui_patch_entry *src = extra != NULL ? extra : item;
+
+    const char *text = NULL;
+    if (src != NULL && src->text != NULL) text = src->text;
+    else if (extra == NULL) text = cpymo_ui_patch_orig_text(patch, page, index);
 
     lua_newtable(l);
 
     lua_pushinteger(l, index);
     lua_setfield(l, -2, "index");
 
-    if (src != NULL && src->text != NULL) lua_pushstring(l, src->text);
+    if (text != NULL) lua_pushstring(l, text);
     else lua_pushnil(l);
     lua_setfield(l, -2, "text");
 
@@ -386,6 +395,10 @@ static int cpymo_lua_api_ui_item_get(lua_State *l)
 
     lua_pushinteger(l, extra_index);
     lua_setfield(l, -2, "extra_index");
+
+    /* Whether this layer stores anything for the item (rewrite or hide). */
+    lua_pushboolean(l, item != NULL || extra != NULL);
+    lua_setfield(l, -2, "rewritten");
 
     return 1;
 }
@@ -428,19 +441,31 @@ static int cpymo_lua_api_ui_items(lua_State *l)
     int n = 0;
     for (int i = 0; i < limit; ++i) {
         const cpymo_ui_patch_entry *item = cpymo_ui_patch_entry_at(patch, page, i);
-        if (item == NULL) continue;
+        const char *orig = cpymo_ui_patch_orig_text(patch, page, i);
+
+        /* A real item is listed even when it was never rewritten; only entries
+           above the page capacity need a patch record to exist at all. */
+        int real = base == (size_t)-1 || i < (int)base;
+        if (item == NULL && orig == NULL && !real) continue;
+
+        const char *text = NULL;
+        if (item != NULL && item->text != NULL) text = item->text;
+        else text = orig;
 
         lua_newtable(l);
 
         lua_pushinteger(l, i);
         lua_setfield(l, -2, "index");
 
-        if (item->text != NULL) lua_pushstring(l, item->text);
+        if (text != NULL) lua_pushstring(l, text);
         else lua_pushnil(l);
         lua_setfield(l, -2, "text");
 
-        lua_pushboolean(l, item->hidden);
+        lua_pushboolean(l, item != NULL && item->hidden);
         lua_setfield(l, -2, "hidden");
+
+        lua_pushboolean(l, item != NULL);
+        lua_setfield(l, -2, "rewritten");
 
         lua_rawseti(l, -2, (lua_Integer)(++n));
     }
