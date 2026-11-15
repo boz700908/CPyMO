@@ -167,6 +167,11 @@ make
 - `CPYMO_MAX_SAVES` - Maximum number of save slots
 - `CPYMO_LANG` - Default language
 
+### Feature Level / Lua Scripting
+- `LUA=1` (GNU Make) or `-DENABLE_LUA=ON` (CMake) - Enable Feature Level 1, the YukimiScript/Lua scripting layer
+- `CPYMO_FEATURE_LEVEL` - Feature level, default `0`. Level 1 requires Lua and is mutually exclusive with `DISABLE_AUTOSAVE` / `LOW_FRAME_RATE`: `cpymo/cpymo_prelude.h` fails at compile time
+- `LINK_WITH_ONELUA` - Compile the bundled single-file Lua 5.4 (`lua/onelua.c`) instead of linking an external liblua
+
 ### Accessibility Features
 - `ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1` - Export game text to clipboard for visually impaired players
 - `ENABLE_EXIT_CONFIRM=1` - Prompt confirmation on exit

@@ -1031,6 +1031,25 @@ CPyMO ASCII ART仅支持键盘操作：
 用于将PyMO API公开到[YukimiScript](github.com/Strrationalism/YukimiScript)语言中，
 使得YukimiScript语言可以访问PyMO/CPyMO引擎的各项功能。
 
+### 启用方式
+
+Lua 脚本层默认关闭（Feature Level 0）。开启需要同时给出三个编译选项：
+
+- GNU Make：`make LUA=1`，已支持的后端为 `sdl1`、`ascii-art`、`sdl2`（含 `Makefile.Emscripten`）
+- CMake：`cmake -DENABLE_LUA=ON ...`
+- 等价的手工组合：`-DCPYMO_FEATURE_LEVEL=1 -DLINK_WITH_ONELUA -I<仓库根>/lua`
+
+Lua 5.4 源码就在仓库的 `lua/` 目录，`LINK_WITH_ONELUA` 直接编译其中的单文件 `onelua.c`，不需要外部 liblua。
+
+Level 1 与两种后端配置互斥，会在 `cpymo/cpymo_prelude.h` 的预处理期直接 `#error`：
+
+- text 后端固定 `-DLOW_FRAME_RATE`
+- PSV 后端固定 `-DDISABLE_AUTOSAVE`
+
+3DS、Wii、Switch、PSP、Android、UWP 后端没有接入这套开关，保持 Feature Level 0。
+
+各功能级别的完整规划见 `CPyMO HD.md`。
+
 # 关于“Song of PyMO”
 
 此乐曲在支持启动音乐的平台作为CPyMO的启动音乐使用，为CPyMO软件的一部分。

@@ -21,6 +21,10 @@ ifeq ($(LEAKCHECK), 1)
 CFLAGS += -DLEAKCHECK
 endif
 
+ifeq ($(LUA), 1)
+CFLAGS += -DCPYMO_FEATURE_LEVEL=1 -DLINK_WITH_ONELUA -I../../lua
+endif
+
 LDFLAGS += -g -lm
 
 TARGET := cpymo-ascii-art

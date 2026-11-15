@@ -25,6 +25,7 @@ env:
   # 末尾 0594d4f = "PyMO" 的 ASCII（50 79 4d 4f），因此不会与别家 homebrew 撞车。
 
 jobs:
+  # Feature Level 0：Switch 后端未接入 lua（Makefile.Switch 无 CPYMO_FEATURE_LEVEL 开关）。
   build-switch:
     name: 'Nintendo Switch'
     runs-on: ubuntu-latest
@@ -124,6 +125,8 @@ jobs:
         name: CPyMO for Nintendo Switch (Accessibility)
         path: ./cpymo-backends/sdl2/dist
 
+  # Feature Level 0：3DS / Wii / PSP / Android / UWP 无 lua 接入（无开关或显式源清单）。
+  # 另：PSV 的 Makefile.PSV 固定 -DDISABLE_AUTOSAVE，与 Level 1 在 cpymo_prelude.h 编译期冲突。
   build-3ds:
     name: 'Nintendo 3DS'
     runs-on: ubuntu-latest
@@ -359,7 +362,7 @@ jobs:
       run: |
         cd cpymo-backends/sdl2
         export AUDIO_BACKEND=ffmpeg
-        make -f Makefile.Emscripten -j
+        make -f Makefile.Emscripten -j LUA=1
         # SINGLE_FILE：wasm 与预载资源都内联在 cpymo.js 里，单文件分发。
         mkdir -p ../../artifacts/web
         cp cpymo.js ../../artifacts/web/
@@ -369,7 +372,7 @@ jobs:
         cd cpymo-backends/sdl2
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten clean
-        make -f Makefile.Emscripten -j ENABLE_ACCESSIBILITY=1
+        make -f Makefile.Emscripten -j ENABLE_ACCESSIBILITY=1 LUA=1
         # SINGLE_FILE：wasm 与预载资源都内联在 cpymo.js 里，单文件分发。
         mkdir -p ../../artifacts/web-accessibility
         cp cpymo.js ../../artifacts/web-accessibility/
@@ -395,7 +398,7 @@ jobs:
         unzip -q game.zip -d game
         export AUDIO_BACKEND=ffmpeg
         make -f Makefile.Emscripten clean
-        make -f Makefile.Emscripten -j BUILD_GAME_DIR=game WASM=$([ "${{ inputs.web_build_type }}" = "wasm" ] && echo 1 || echo 0)
+        make -f Makefile.Emscripten -j LUA=1 BUILD_GAME_DIR=game WASM=$([ "${{ inputs.web_build_type }}" = "wasm" ] && echo 1 || echo 0)
         # SINGLE_FILE：整包游戏内联进单个 cpymo.html。
         mkdir -p ../../artifacts/web-game
         cp cpymo.html ../../artifacts/web-game/
@@ -603,7 +606,7 @@ jobs:
         cd ./cpymo-backends/sdl1
         export SDL=../../SDL-1.2.15
         export USE_SDL_MIXER=1
-        make -j
+        make -j LUA=1
         strip cpymo.exe
 
         wget https://raw.githubusercontent.com/libsdl-org/SDL_mixer/SDL-1.2/COPYING
@@ -638,7 +641,7 @@ jobs:
       run: |
         cd cpymo-backends/sdl1
         export USE_SDL_MIXER=1
-        make -j
+        make -j LUA=1
         strip ./cpymo
 
     - name: Upload
@@ -777,7 +780,7 @@ jobs:
     # 与 build-macos / build-switch 同一模式：一个 job 内先出普通版再出无障碍版。
     # 两版用不同构建目录（build / build-a11y），互不复用产物，无需 clean。
     - name: Configure CMake (普通版)
-      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }}
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }} -DENABLE_LUA=ON
 
     - name: Build (普通版)
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
@@ -814,7 +817,7 @@ jobs:
         if-no-files-found: error
 
     - name: Configure CMake (无障碍版)
-      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }} -DENABLE_ACCESSIBILITY=ON
+      run: cmake "-DCMAKE_TOOLCHAIN_FILE=${{ matrix.vcpkg-path }}" -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} -B ${{github.workspace}}/build-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} ${{ matrix.cmake-flags }} -DENABLE_ACCESSIBILITY=ON -DENABLE_LUA=ON
 
     - name: Build (无障碍版)
       run: cmake --build ${{github.workspace}}/build-a11y --config ${{env.BUILD_TYPE}}
@@ -879,7 +882,7 @@ jobs:
 
       - name: Build CPyMO ASCII Art
         run: |
-          make -C cpymo-backends/ascii-art -j
+          make -C cpymo-backends/ascii-art -j LUA=1
           strip cpymo-backends/ascii-art/cpymo-ascii-art
 
       - name: Upload CPyMO ASCII Art
@@ -919,7 +922,7 @@ jobs:
         working-directory: ./cpymo-backends/ios
         run: |
           rm -rf build
-          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
+          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_LUA=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
           cmake --build build -j $(sysctl -n hw.physicalcpu) --config Release
           cd ./build
           mkdir Payload
@@ -938,7 +941,7 @@ jobs:
         working-directory: ./cpymo-backends/ios
         run: |
           rm -rf build
-          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
+          cmake -S. -Bbuild -DCMAKE_TOOLCHAIN_FILE=./ios-cmake/ios.toolchain.cmake -DENABLE_BITCODE=0 -DPLATFORM=OS64 -DENABLE_ACCESSIBILITY=ON -DENABLE_LUA=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_FLAGS="-Wno-error=unguarded-availability-new" -DCMAKE_OBJC_FLAGS="-Wno-error=unguarded-availability-new"
           cmake --build build -j $(sysctl -n hw.physicalcpu) --config Release
           cd ./build
           mkdir Payload
@@ -980,7 +983,7 @@ jobs:
 
       - name: Build macOS x64
         run: |
-          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-osx -B build-mac-x64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=x86_64
+          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-osx -B build-mac-x64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=x86_64 -DENABLE_LUA=ON
           cmake --build build-mac-x64 --config ${{env.BUILD_TYPE}}
           strip ./build-mac-x64/build/cpymo
           strip ./build-mac-x64/build/cpymo-tool
@@ -994,7 +997,7 @@ jobs:
 
       - name: Build macOS Apple Silicon
         run: |
-          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=arm64-osx -B build-mac-arm64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=arm64
+          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=arm64-osx -B build-mac-arm64 -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=arm64 -DENABLE_LUA=ON
           cmake --build build-mac-arm64 --config ${{env.BUILD_TYPE}}
           strip ./build-mac-arm64/build/cpymo
           strip ./build-mac-arm64/build/cpymo-tool
@@ -1008,7 +1011,7 @@ jobs:
 
       - name: Build macOS x64 (Accessibility)
         run: |
-          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-osx -B build-mac-x64-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=x86_64 -DENABLE_ACCESSIBILITY=ON
+          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-osx -B build-mac-x64-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=x86_64 -DENABLE_ACCESSIBILITY=ON -DENABLE_LUA=ON
           cmake --build build-mac-x64-a11y --config ${{env.BUILD_TYPE}}
           strip ./build-mac-x64-a11y/build/cpymo
           strip ./build-mac-x64-a11y/build/cpymo-tool
@@ -1022,7 +1025,7 @@ jobs:
 
       - name: Build macOS Apple Silicon (Accessibility)
         run: |
-          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=arm64-osx -B build-mac-arm64-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=arm64 -DENABLE_ACCESSIBILITY=ON
+          cmake -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=arm64-osx -B build-mac-arm64-a11y -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_OSX_ARCHITECTURES=arm64 -DENABLE_ACCESSIBILITY=ON -DENABLE_LUA=ON
           cmake --build build-mac-arm64-a11y --config ${{env.BUILD_TYPE}}
           strip ./build-mac-arm64-a11y/build/cpymo
           strip ./build-mac-arm64-a11y/build/cpymo-tool
@@ -1058,7 +1061,7 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
         run: |
           cd cpymo-backends/ascii-art/
-          make -j
+          make -j LUA=1
           strip ./cpymo-ascii-art
 
       - name: 'Build (Windows)'
@@ -1066,7 +1069,7 @@ jobs:
         if: ${{ runner.os == 'Windows' }}
         run: |
           cd cpymo-backends/ascii-art/
-          make -j
+          make -j LUA=1
           strip ./cpymo-ascii-art.exe
 
       - name: 'Upload'
@@ -1079,6 +1082,7 @@ jobs:
 
 
 
+  # Feature Level 0：text 后端固定 -DLOW_FRAME_RATE，与 Level 1 在 cpymo_prelude.h 编译期冲突。
   build-text:
     name: 'CPyMO Text'
     runs-on: ${{ matrix.os }}
