@@ -584,8 +584,22 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 	}
 #endif
 
-	if (cpymo_ui_enabled(engine))
+	if (cpymo_ui_enabled(engine)) {
+		#if CPYMO_FEATURE_LEVEL >= 1
+		/* 自带页面(存档/设置/回想/音乐鉴赏/相册/消息框等)打开时解释器暂停，
+		   但 #lua 协程与帧驱动定时器继续跑：常驻 HUD 的增删改在任何页面上都要能发生。 */
+		error_t lua_pause_err = CPYMO_ERR_SUCC;
+		if (engine->feature_level >= 1) {
+			lua_pause_err =
+				cpymo_lua_timers_update(&engine->lua, delta_time_sec);
+			cpymo_lua_block_update(&engine->lua);
+		}
+		#endif
 		err = cpymo_ui_update(engine, delta_time_sec);
+		#if CPYMO_FEATURE_LEVEL >= 1
+		CPYMO_THROW(lua_pause_err);
+		#endif
+	}
 	else {
 
 		#if CPYMO_FEATURE_LEVEL >= 1

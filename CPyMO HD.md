@@ -43,6 +43,7 @@ CPyMO HD将引擎扩展功能划分为四个功能级别，每个级别都基于
 # Feature Level 1
 
 * 支持Lua语言，在pymo脚本中新增`#lua`命令，此行后面的部分会被直接当作lua代码执行
+* `#lua` 块整体运行在一个Lua协程里，可以用 `cpymo.wait` / `cpymo.yield` 跨帧挂起；同一时刻来了新的 `#lua` 块时，尚未跑完的旧块会被丢弃
 
 ## 在 YukimiScript 中使用
 
@@ -168,6 +169,14 @@ CPyMO默认将会把`main`设置为一个空表。
 * `serialize(serializable) : string` - 将lua值序列化为lua表达式字符串
 * `deserialize(string) : serializable` - 将序列化后的lua表达式字符串反序列化为lua值
 * `exit()` - 退出游戏
+* `timer(delay: number, callback: function, ...) : int` - `delay` 秒后调用一次 `callback`，返回可供 `timer_cancel` 使用的id，其余参数原样传给 `callback`
+* `every(interval: number, callback: function, ...) : int` - 每 `interval` 秒调用一次 `callback`，返回取消用id
+* `timer_cancel(id: int)` - 取消一个由 `timer` 或 `every` 创建的定时器
+* `wait(seconds: number)` - 挂起当前 `#lua` 块 `seconds` 秒；只能写在 `#lua` 块里，写在定时器回调里会报错
+* `yield()` - 让出到下一帧，只能写在 `#lua` 块里
+
+时序以游戏时间累加，菜单暂停时不走。定时器、挂起位置与常驻显示项都不写入存档，读档后需自行重建。
+为保证可移植性，`io.read`、`os.execute`、`io.popen`、`debug.sethook` 与不带参数的 `io.lines` 已被替换为报错，指引改用 `cpymo.wait` / `cpymo.yield`。
 
 ### `cpymo.render`
 
@@ -288,6 +297,15 @@ CPyMO默认将会把`main`设置为一个空表。
   - `bg_image`为system目录下背景图的文件名
   - 该命令在有提前渲染好的缓存图片的情况下会调用缓存图片，否则会创建缓存图片
 * `open_load_yesnobox(save_id: int)` - 打开读档的“是否”对话框
+* `hud(id: any, text: string, options: table?)` - 添加或改写一条常驻显示项
+  - 显示在所有页面之上，包括存档、读档、设置、回想、音乐鉴赏、相册、消息框等自带页面
+  - 没有焦点、不可点击、不参与输入；不随页面切换清除
+  - 同一个 `id` 再次调用即改写文本或位置，不会新增第二条；`id` 可以是任意可作表键的值
+  - `text` 内容变化时通过无障碍通道朗读；只改位置或颜色不会朗读；空字符串不朗读
+  - `options` 字段：`x`、`y`（屏幕坐标，省略时在右上角自上而下堆叠）、`size`（字号，省略时按屏幕高度推算）、`color`（color表）、`silent`（为 `true` 时不朗读）
+* `hud_remove(id: any)` - 移除一条常驻显示项
+
+自带页面打开时脚本解释器暂停，但 `#lua` 协程与 `timer` / `every` 仍在运行，因此可以在任何页面上增删改常驻显示项；这些回调里不要假设脚本正在推进。
 
 ### `cpymo.select_img`
 
