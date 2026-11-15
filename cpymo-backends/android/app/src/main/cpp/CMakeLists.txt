@@ -55,6 +55,14 @@ include_directories(
         "../../../../../../endianness.h"
         "../../../../ffmpeg-android-maker/output/include/${ANDROID_ABI}/")
 
+option(ENABLE_LUA "Enable CPyMO HD feature level 1 (Lua scripting)" OFF)
+
+if (ENABLE_LUA)
+	add_definitions (-DCPYMO_FEATURE_LEVEL=1)
+	add_definitions (-DLINK_WITH_ONELUA)
+	include_directories ("../../../../../../lua/")
+endif ()
+
 add_subdirectory("../../../../../../cpymo" cpymolib)
 
 file (GLOB CPYMO_BACKEND_SRC "../../../../../sdl2/*.c")

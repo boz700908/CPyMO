@@ -125,7 +125,7 @@ jobs:
         name: CPyMO for Nintendo Switch (Accessibility)
         path: ./cpymo-backends/sdl2/dist
 
-  # Feature Level 0：3DS / Wii / PSP / Android / UWP 无 lua 接入（无开关或显式源清单）。
+  # Feature Level 0：3DS / Wii / PSP / UWP 无 lua 接入（无开关或显式源清单）。
   # 另：PSV 的 Makefile.PSV 固定 -DDISABLE_AUTOSAVE，与 Level 1 在 cpymo_prelude.h 编译期冲突。
   build-3ds:
     name: 'Nintendo 3DS'
@@ -483,6 +483,8 @@ jobs:
         cd ./cpymo-backends/android
         ./gradlew assembleRelease --stacktrace
         cp ./app/build/outputs/apk/release/app-release.apk ../../cpymo-signed.apk
+      env:
+        ENABLE_LUA: 1
 
     - name: Build APK (Accessibility)
       run: |
@@ -562,12 +564,12 @@ jobs:
       with:
         name: CPyMO for Universal Windows Platform
         path: |
-          ./cpymo-backends/uwp/AppPackages/CPyMO/*.msix
-          ./cpymo-backends/uwp/AppPackages/CPyMO/*.appx
-          ./cpymo-backends/uwp/AppPackages/CPyMO/*.msixbundle
-          ./cpymo-backends/uwp/AppPackages/CPyMO/*.appxbundle
-          ./cpymo-backends/uwp/AppPackages/CPyMO/*.msixupload
-          ./cpymo-backends/uwp/AppPackages/CPyMO/*.appxupload
+          ./cpymo-backends/uwp/AppPackages/CPyMO/**/*.msix
+          ./cpymo-backends/uwp/AppPackages/CPyMO/**/*.appx
+          ./cpymo-backends/uwp/AppPackages/CPyMO/**/*.msixbundle
+          ./cpymo-backends/uwp/AppPackages/CPyMO/**/*.appxbundle
+          ./cpymo-backends/uwp/AppPackages/CPyMO/**/*.msixupload
+          ./cpymo-backends/uwp/AppPackages/CPyMO/**/*.appxupload
         if-no-files-found: error
 
   build-SDL1-windows:
