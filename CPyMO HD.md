@@ -307,6 +307,35 @@ CPyMO默认将会把`main`设置为一个空表。
 
 自带页面打开时脚本解释器暂停，但 `#lua` 协程与 `timer` / `every` 仍在运行，因此可以在任何页面上增删改常驻显示项；这些回调里不要假设脚本正在推进。
 
+#### 改写界面条目
+
+自带页面里的每一条都可以按“页面键 + 序号”改写文本或隐藏，不改变游戏逻辑，也不写入存档。
+
+* `item_set(page: string, index: int, text: string)`
+  - 把第`index`条显示为`text`
+  - `text`传空串表示撤销改写，恢复原文
+  - 仅对运行时绘制文字的条目有效；纯图片条目（图片选项）没有文字可改，会被忽略
+  - 改写在关闭页面后依然保留
+* `item_hide(page: string, index: int)`
+  - 隐藏第`index`条，不再绘制，键盘导航会跳过它
+  - 若隐藏后该页面已没有可选项，隐藏被忽略，避免菜单不可操作
+  - 用`item_set`写一次非空文本即可取消隐藏
+* `item_clear(page: string)`
+  - 清除该页面的全部改写、隐藏和追加项
+* `item_add(page: string, text: string) : int`
+  - 在页面末尾追加一条文字条目，返回它的序号
+  - 目前只有存读档界面有空余行可追加
+* `on_item_click(page: string, callback: int -> void)`
+  - 注册追加项的点击回调，`callback`收到被点击追加项的序号
+
+页面键：
+
+* `config` - 设置界面
+* `save`、`load` - 存档、读档界面（追加项序号从`CPYMO_MAX_SAVES`起）
+* `rmenu` - 右键菜单，序号固定为
+  0 自动、1 存档、2 读档、3 快进、4 隐藏窗口、5 回想、6 设置、7 重开、8 返回游戏
+* `select` - 脚本选项与`cpymo.select_img`创建的选项菜单
+
 ### `cpymo.select_img`
 
 把引擎内建的图片选择界面（脚本里的`select_img`/`select_imgs`命令）交给Lua驱动：Lua给出候选、位置与可用状态，界面本身仍由引擎绘制与操作，因此焦点移动的提示音、朗读、鼠标悬停与存档标记等行为与脚本路径完全一致。

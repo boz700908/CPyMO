@@ -11,6 +11,7 @@
 #include "cpymo_hash_flags.h"
 #include "cpymo_key_pulse.h"
 #include "cpymo_key_hold.h"
+#include "cpymo_ui_patch.h"
 
 struct cpymo_engine;
 
@@ -59,6 +60,9 @@ struct cpymo_select_img {
 #ifdef ENABLE_TEXT_EXTRACT
 	char *select_img_name;
 #endif
+
+	const cpymo_ui_patch *patch;
+	const char *patch_page;
 };
 
 typedef struct cpymo_select_img cpymo_select_img;

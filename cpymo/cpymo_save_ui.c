@@ -5,6 +5,7 @@
 #include "cpymo_save.h"
 #include "cpymo_msgbox_ui.h"
 #include "cpymo_localization.h"
+#include "cpymo_ui_patch.h"
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -32,10 +33,64 @@ const static size_t first_slot = 0;
 const static size_t first_slot = 1;
 #endif
 
+#if CPYMO_FEATURE_LEVEL >= 1
+#define CPYMO_SAVE_UI_PATCH(e) ((e)->feature_level >= 1 ? &(e)->lua.ui_patch : NULL)
+#else
+#define CPYMO_SAVE_UI_PATCH(e) NULL
+#endif
+
+static const char *cpymo_save_ui_page(bool is_load_ui)
+{
+	return is_load_ui ? CPYMO_UI_PATCH_PAGE_LOAD : CPYMO_UI_PATCH_PAGE_SAVE;
+}
+
+/* 从 from 沿 dir 在该页 [first, last] 范围内找第一个未被隐藏的项；
+ * 全部隐藏或走出范围时返回 -1。没有补丁时恒等于 from。 */
+static int cpymo_save_ui_step_visible(
+	const cpymo_engine *e, const char *page, int from, int dir, int first, int last)
+{
+	const cpymo_ui_patch *patch = CPYMO_SAVE_UI_PATCH(e);
+	if (patch == NULL) return from;
+
+	for (int i = from; i >= first && i <= last; i += dir) {
+		if (!cpymo_ui_patch_hidden(patch, page, i)) return i;
+	}
+
+	return -1;
+}
+
 static void cpymo_save_ui_draw_node(const cpymo_engine *e, const void *node_to_draw, float y)
 {
 	const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data_const(e);
-	const cpymo_save_ui_item *item = &ui->items[cpymo_list_ui_encode_uint_node_dec(node_to_draw)];
+	const char *page = cpymo_save_ui_page(ui->is_load_ui);
+	uintptr_t node = cpymo_list_ui_encode_uint_node_dec(node_to_draw);
+
+	/* 追加项：序号从 CPYMO_MAX_SAVES 起算。文本每帧临时创建，条目数量很少。 */
+	if (node >= CPYMO_MAX_SAVES) {
+		const char *text = cpymo_ui_patch_extra_text(
+			CPYMO_SAVE_UI_PATCH(e), page, node - CPYMO_MAX_SAVES);
+		if (text != NULL) {
+			cpymo_backend_text extra;
+			float w;
+			if (cpymo_backend_text_create(&extra, &w, cpymo_str_pure(text),
+				cpymo_gameconfig_font_size(&e->gameconfig)) == CPYMO_ERR_SUCC) {
+				cpymo_backend_text_draw(
+					extra,
+					0,
+					y + cpymo_gameconfig_font_size(&e->gameconfig),
+					cpymo_color_white,
+					1.0f,
+					cpymo_backend_image_draw_type_ui_element);
+				cpymo_backend_text_free(extra);
+			}
+		}
+		return;
+	}
+
+	/* 被隐藏的条目保留原位（不绘制），避免行高与高亮错位。 */
+	if (cpymo_ui_patch_hidden(CPYMO_SAVE_UI_PATCH(e), page, (int)node)) return;
+
+	const cpymo_save_ui_item *item = &ui->items[node];
 
 	cpymo_backend_text_draw(
 		item->text,
@@ -82,6 +137,16 @@ static error_t cpymo_save_ui_ok(cpymo_engine *e, void *selected)
 
 	uintptr_t save_id = cpymo_list_ui_encode_uint_node_dec(selected);
 
+	/* 追加项没有存档槽位，点击只派发给 Lua 回调。 */
+	if (save_id >= CPYMO_MAX_SAVES) {
+#if CPYMO_FEATURE_LEVEL >= 1
+		cpymo_lua_ui_page_click(
+			&e->lua, cpymo_save_ui_page(ui->is_load_ui),
+			(int)(save_id - CPYMO_MAX_SAVES));
+#endif
+		return CPYMO_ERR_SUCC;
+	}
+
 	if (ui->is_load_ui) {
 		if (!ui->items[save_id].is_empty_save) {
 			cpymo_list_ui_ignore_key_hold_exit_onetime(e);
@@ -119,19 +184,50 @@ static void cpymo_save_ui_deleter(cpymo_engine *e, void *ui_data)
 
 static void* cpymo_save_ui_get_next(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
+	const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data_const(e);
+	const char *page = cpymo_save_ui_page(ui->is_load_ui);
+	int first = ui->is_load_ui ? 0 : (int)first_slot;
+
 	uintptr_t i = cpymo_list_ui_encode_uint_node_dec(cur);
-	if (i >= CPYMO_MAX_SAVES - 1) 
+
+	if (i >= CPYMO_MAX_SAVES) {
+		uintptr_t extra = i - CPYMO_MAX_SAVES + 1;
+		if (extra < cpymo_ui_patch_extra_count(CPYMO_SAVE_UI_PATCH(e), page))
+			return cpymo_list_ui_encode_uint_node_enc(CPYMO_MAX_SAVES + extra);
 		return NULL;
-	else return cpymo_list_ui_encode_uint_node_enc(i + 1);
+	}
+
+	int next = cpymo_save_ui_step_visible(
+		e, page, (int)i + 1, 1, first, CPYMO_MAX_SAVES - 1);
+	if (next >= 0) return cpymo_list_ui_encode_uint_node_enc((uintptr_t)next);
+
+	if (cpymo_ui_patch_extra_count(CPYMO_SAVE_UI_PATCH(e), page) > 0)
+		return cpymo_list_ui_encode_uint_node_enc(CPYMO_MAX_SAVES);
+
+	return NULL;
 }
 
 static void* cpymo_save_ui_get_prev(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
 	const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data_const(e);
+	const char *page = cpymo_save_ui_page(ui->is_load_ui);
+	int first = ui->is_load_ui ? 0 : (int)first_slot;
+	int last = CPYMO_MAX_SAVES - 1;
 
 	uintptr_t i = cpymo_list_ui_encode_uint_node_dec(cur);
-	if (i == (ui->is_load_ui ? 0 : first_slot)) return NULL;
-	else return cpymo_list_ui_encode_uint_node_enc(i - 1);
+
+	int from;
+	if (i >= CPYMO_MAX_SAVES) {
+		if (i > CPYMO_MAX_SAVES)
+			return cpymo_list_ui_encode_uint_node_enc(i - 1);
+		from = last;
+	}
+	else from = (int)i - 1;
+
+	int prev = cpymo_save_ui_step_visible(e, page, from, -1, first, last);
+	if (prev >= 0) return cpymo_list_ui_encode_uint_node_enc((uintptr_t)prev);
+
+	return NULL;
 }
 
 #ifdef ENABLE_TEXT_EXTRACT
@@ -140,7 +236,14 @@ static error_t cpymo_save_ui_visual_impaired_selection_changed(cpymo_engine *e, 
 	if (cur) {
 		uintptr_t i = cpymo_list_ui_encode_uint_node_dec(cur);
 		const cpymo_save_ui *ui = (const cpymo_save_ui *)cpymo_list_ui_data(e);
-		cpymo_a11y_speak(ui->items[i].orginal_text);
+
+		if (i >= CPYMO_MAX_SAVES) {
+			cpymo_a11y_speak(cpymo_ui_patch_extra_text(
+				CPYMO_SAVE_UI_PATCH(e),
+				cpymo_save_ui_page(ui->is_load_ui),
+				i - CPYMO_MAX_SAVES));
+		}
+		else cpymo_a11y_speak(ui->items[i].orginal_text);
 	}
 	return CPYMO_ERR_SUCC;
 }
@@ -150,6 +253,13 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 {
 	cpymo_save_ui *ui = NULL;
 	uintptr_t first = is_load_ui ? 0 : first_slot;
+
+	/* 起始项若被隐藏，向后找第一个可见项；全部隐藏时保持原位不变。 */
+	int start_visible = cpymo_save_ui_step_visible(
+		e, cpymo_save_ui_page(is_load_ui), (int)first, 1,
+		(int)first, CPYMO_MAX_SAVES - 1);
+	if (start_visible < 0) start_visible = (int)first;
+
 	error_t err = cpymo_list_ui_enter(
 		e,
 		(void **)&ui,
@@ -157,7 +267,7 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 		&cpymo_save_ui_draw_node,
 		&cpymo_save_ui_ok,
 		&cpymo_save_ui_deleter,
-		cpymo_list_ui_encode_uint_node_enc(first),
+		cpymo_list_ui_encode_uint_node_enc((uintptr_t)start_visible),
 		&cpymo_save_ui_get_next,
 		&cpymo_save_ui_get_prev,
 		false,
@@ -280,13 +390,17 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 			free(msg);
 		}
 
+		const char *text_patched = cpymo_ui_patch_text(
+			CPYMO_SAVE_UI_PATCH(e), cpymo_save_ui_page(ui->is_load_ui),
+			(int)i, text_buf);
+
 		float w;
 		error_t err = cpymo_backend_text_create(
-			&ui->items[i].text, &w, cpymo_str_pure(text_buf), fontsize);
+			&ui->items[i].text, &w, cpymo_str_pure(text_patched), fontsize);
 
 #ifdef ENABLE_TEXT_EXTRACT
 		ui->items[i].orginal_text = 
-			cpymo_str_copy_malloc(cpymo_str_pure(text_buf));
+			cpymo_str_copy_malloc(cpymo_str_pure(text_patched));
 #endif
 
 		if (err != CPYMO_ERR_SUCC) {

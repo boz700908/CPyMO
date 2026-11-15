@@ -45,6 +45,17 @@ static error_t cpymo_select_img_ok_callback_default(cpymo_engine *e, int sel, ui
 	return CPYMO_ERR_SUCC;
 }
 
+#ifdef ENABLE_TEXT_EXTRACT
+static void cpymo_select_img_speak_current(const cpymo_select_img *o)
+{
+	cpymo_a11y_speak(cpymo_ui_patch_text(
+		o->patch, o->patch_page, o->current_selection,
+		o->selections[o->current_selection].original_text));
+}
+#else
+#define cpymo_select_img_speak_current(o) ((void)(o))
+#endif
+
 void cpymo_select_img_reset(cpymo_select_img *img)
 {
 	if (img->select_img_image) {
@@ -132,6 +143,9 @@ error_t cpymo_select_img_configuare_begin(
 	sel->current_selection = 0;
 	sel->all_selections = selections;
 	sel->ok_callback = &cpymo_select_img_ok_callback_default;
+
+	sel->patch = NULL;
+	sel->patch_page = NULL;
 
 	return CPYMO_ERR_SUCC;
 }
@@ -271,6 +285,13 @@ static bool cpymo_select_img_mouse_in_selection(cpymo_select_img *o, int sel, co
 
 void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, struct cpymo_engine *e, int init_position)
 {
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (sel->patch == NULL && sel->patch_page == NULL && e->feature_level >= 1) {
+		sel->patch = &e->lua.ui_patch;
+		sel->patch_page = CPYMO_UI_PATCH_PAGE_SELECT;
+	}
+#endif
+
 	assert(sel->selections);
 	assert(sel->all_selections);
 	assert(sel->current_selection == sel->all_selections);
@@ -294,10 +315,32 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 		for (size_t i = 0; i < sel->all_selections; ++i)
 			sel->selections[i].enabled = true;
 
+	{
+		int patch_hide = 0, patch_enabled = 0;
+		for (size_t i = 0; i < sel->all_selections; ++i) {
+			if (sel->selections[i].enabled) patch_enabled++;
+			if (cpymo_ui_patch_hidden(sel->patch, sel->patch_page, (int)i))
+				patch_hide++;
+		}
+
+		/* Hiding every enabled entry would leave the menu unusable. */
+		if (patch_hide > 0 && patch_hide < patch_enabled)
+			for (size_t i = 0; i < sel->all_selections; ++i)
+				if (cpymo_ui_patch_hidden(sel->patch, sel->patch_page, (int)i))
+					sel->selections[i].enabled = false;
+	}
+
+	if (sel->current_selection >= (int)sel->all_selections)
+		sel->current_selection = 0;
+
 	if (sel->selections[sel->current_selection].enabled == false) {
 		sel->current_selection = 0;
-		while (sel->selections[sel->current_selection].enabled == false)
+		while (sel->current_selection < (int)sel->all_selections &&
+			sel->selections[sel->current_selection].enabled == false)
 			sel->current_selection++;
+
+		if (sel->current_selection >= (int)sel->all_selections)
+			sel->current_selection = 0;
 	}
 
 	// Trim disabled images.
@@ -339,7 +382,9 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 
 #ifdef ENABLE_TEXT_EXTRACT
 	{
-		const char *spoken = sel->selections[sel->current_selection].original_text;
+		const char *spoken = cpymo_ui_patch_text(
+			sel->patch, sel->patch_page, sel->current_selection,
+			sel->selections[sel->current_selection].original_text);
 		if (spoken && spoken[0]) {
 			cpymo_engine_extract_text_cstr(
 				e, cpymo_localization_get(e)->visual_help_selection);
@@ -384,7 +429,7 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_engine_request_redraw(e);
 
 			CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
-			cpymo_a11y_speak(o->selections[o->current_selection].original_text);
+			cpymo_select_img_speak_current(o);
 		}
 
 		if (cpymo_key_pluse_output(&o->key_up)) {
@@ -392,7 +437,7 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 			cpymo_engine_request_redraw(e);
 
 			CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
-			cpymo_a11y_speak(o->selections[o->current_selection].original_text);
+			cpymo_select_img_speak_current(o);
 		}
 
 		if (cpymo_input_mouse_moved(e) && e->input.mouse_position_useable) {
@@ -403,7 +448,7 @@ error_t cpymo_select_img_update(cpymo_engine *e, cpymo_select_img *o, float dt)
 						cpymo_engine_request_redraw(e);
 
 						CALL_VISUALLY_PLAY_SOUND(SOUND_SELECT);
-						cpymo_a11y_speak(o->selections[o->current_selection].original_text);
+						cpymo_select_img_speak_current(o);
 					}
 				}
 			}
@@ -566,11 +611,26 @@ error_t cpymo_select_img_configuare_select_text(
 
 	cpymo_select_img_selection *s = &sel->selections[sel->current_selection++];
 	float text_width;
+
+	const int patch_index = (int)(sel->current_selection - 1);
+	if (cpymo_ui_patch_hidden(sel->patch, sel->patch_page, patch_index))
+		enabled = false;
+
+	cpymo_str shown_text = text;
+	{
+		char *org_text = cpymo_str_copy_malloc(text);
+		const char *patched_text =
+			cpymo_ui_patch_text(sel->patch, sel->patch_page, patch_index, org_text);
+		if (patched_text && patched_text != org_text)
+			shown_text = cpymo_str_pure(patched_text);
+		if (org_text) free(org_text);
+	}
+
 	error_t err =
 		cpymo_backend_text_create(
 			&s->or_text,
 			&text_width,
-			text,
+			shown_text,
 			fontsize);
 	
 	CPYMO_THROW(err);
@@ -585,7 +645,7 @@ error_t cpymo_select_img_configuare_select_text(
 	s->has_selected = cpymo_hash_flags_check(flags, hash);
 
 #ifdef ENABLE_TEXT_EXTRACT
-	s->original_text = cpymo_str_copy_malloc(text);
+	s->original_text = cpymo_str_copy_malloc(shown_text);
 #endif
 
 	return CPYMO_ERR_SUCC;

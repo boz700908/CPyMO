@@ -255,6 +255,13 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 		return err;
 	}
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (e->feature_level >= 1) {
+		rmenu->menu.patch = &e->lua.ui_patch;
+		rmenu->menu.patch_page = CPYMO_UI_PATCH_PAGE_RMENU;
+	}
+#endif
+
 	const float font_size = cpymo_gameconfig_font_size(&e->gameconfig);
 	rmenu->bg_zoom_out = cpymo_rmenu_bg_zoom(rmenu, font_size);
 

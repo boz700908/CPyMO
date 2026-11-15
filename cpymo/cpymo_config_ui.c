@@ -2,6 +2,7 @@
 #include "cpymo_config_ui.h"
 #include "cpymo_engine.h"
 #include "cpymo_list_ui.h"
+#include "cpymo_ui_patch.h"
 #include "cpymo_save_global.h"
 #include "cpymo_localization.h"
 #include "cpymo_accessibility.h"
@@ -52,19 +53,39 @@ typedef struct {
 
 const static float side_padding = 16;
 
+#if CPYMO_FEATURE_LEVEL >= 1
+#define CPYMO_CONFIG_UI_PATCH(e) ((e)->feature_level >= 1 ? &(e)->lua.ui_patch : NULL)
+#else
+#define CPYMO_CONFIG_UI_PATCH(e) NULL
+#endif
+
 static void *cpymo_config_ui_get_next_item(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
 	uintptr_t x = cpymo_list_ui_encode_uint_node_dec(cur);
+	const cpymo_ui_patch *patch = CPYMO_CONFIG_UI_PATCH(e);
 
-	if (x >= CONFIG_ITEMS - 1) return NULL;
-	else return cpymo_list_ui_encode_uint_node_enc((x + 1));
+	/* 跳过被隐藏的条目；没有补丁时行为与逐项 +1 完全一致。 */
+	for (uintptr_t i = x + 1; i < CONFIG_ITEMS; ++i) {
+		if (!cpymo_ui_patch_hidden(patch, CPYMO_UI_PATCH_PAGE_CONFIG, (int)i))
+			return cpymo_list_ui_encode_uint_node_enc(i);
+	}
+
+	return NULL;
 }
 
 static void *cpymo_config_ui_get_prev_item(const cpymo_engine *e, const void *ui_data, const void *cur)
 {
 	uintptr_t x = cpymo_list_ui_encode_uint_node_dec(cur);
+	const cpymo_ui_patch *patch = CPYMO_CONFIG_UI_PATCH(e);
+
 	if (x == 0) return NULL;
-	else return cpymo_list_ui_encode_uint_node_enc((x - 1));
+
+	for (uintptr_t i = x; i > 0; --i) {
+		if (!cpymo_ui_patch_hidden(patch, CPYMO_UI_PATCH_PAGE_CONFIG, (int)(i - 1)))
+			return cpymo_list_ui_encode_uint_node_enc(i - 1);
+	}
+
+	return NULL;
 }
 
 /* 安全区（issue #57）：设置页按屏高均分整屏，刘海与手势条会盖住首末项，
@@ -175,6 +196,13 @@ static void cpymo_config_ui_draw_node(const cpymo_engine *e, const void *node_to
 		inc_dec_btn_symbol_y;
 
 	size_t item_index = cpymo_list_ui_encode_uint_node_dec(node_to_draw);
+
+	/* 设置页整屏刚好排满 CONFIG_ITEMS 行，没有多余行可放追加项；
+	 * 越界节点不绘制，隐藏项留空位（不重排，避免行高与高亮错位）。 */
+	if (item_index >= CONFIG_ITEMS) return;
+	if (cpymo_ui_patch_hidden(
+		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG, (int)item_index))
+		return;
 
 	cpymo_config_ui_calc_layout(
 		e, ui, 
@@ -310,7 +338,10 @@ static void cpymo_config_ui_refresh_items(cpymo_engine *e)
 		err = cpymo_backend_text_create( \
 			&show_name, \
 			&width, \
-			cpymo_str_pure(TEXT), \
+			cpymo_str_pure(cpymo_ui_patch_text( \
+				CPYMO_CONFIG_UI_PATCH(e), \
+				CPYMO_UI_PATCH_PAGE_CONFIG, \
+				(int)(ITEM_ID), TEXT)), \
 			ui->font_size); \
 		if (err == CPYMO_ERR_SUCC) { \
 			if (ui->items[ITEM_ID].show_name) \
@@ -710,6 +741,7 @@ static error_t cpymo_config_ui_update(cpymo_engine *e, float dt, void *sel)
 	cpymo_key_pluse_update(&ui->mouse_button, dt, e->input.mouse_button);
 
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
+	if (i < 0 || i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
 
 	if (ui->items[i].show_inc_dec_button)
 	{
@@ -786,6 +818,7 @@ static error_t cpymo_config_ui_ok(cpymo_engine *e, void *sel)
 {
 	cpymo_config_ui *ui = (cpymo_config_ui *)cpymo_list_ui_data(e);
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
+	if (i < 0 || i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
 
 	return ui->items[i].show_inc_dec_button ?
 		CPYMO_ERR_SUCC :
@@ -798,6 +831,8 @@ static error_t cpymo_config_ui_visual_im_help_selection_changed_callback(cpymo_e
 {
 	const int i = (int)cpymo_list_ui_encode_uint_node_dec(sel);
 	cpymo_config_ui *ui = (cpymo_config_ui *)cpymo_list_ui_data(e);
+	if (i < 0 || i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
+
 	cpymo_config_ui_extract_setting_name_and_value(e, i, ui->items[i].value);
 
 	return CPYMO_ERR_SUCC;
