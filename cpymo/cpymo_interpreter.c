@@ -18,6 +18,12 @@
 
 #define CHARA_BUF_SIZE 64
 
+/* PyMO 的 #chara_anime 是「若干条偏移行 + 一条 do 行」，偏移在行之间累积，
+   这里存这一组的收集结果（最多 32 组 x/y，与原实现上限一致）。*/
+#define CPYMO_CHARA_ANIME_MAX_OFFSETS 32
+static float cpymo_chara_anime_buf[CPYMO_CHARA_ANIME_MAX_OFFSETS * 2];
+static size_t cpymo_chara_anime_buf_count = 0;
+
 void cpymo_interpreter_init(
 	cpymo_interpreter *out, 
 	cpymo_script *script, 
@@ -606,53 +612,86 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 	CHARA_QUAKE("chara_up", 0, -16, 0, 0, 0, -6, 0, 0)
 	#undef CHARA_QUAKE
 
+	// 收集一条偏移（PyMO 每条 #chara_anime 就是一组 x,y）
 	D("chara_anime") {
+		POP_ARG(x_str); ENSURE(x_str);
+		POP_ARG(y_str); ENSURE(y_str);
+
+		if (cpymo_chara_anime_buf_count >= CPYMO_CHARA_ANIME_MAX_OFFSETS) {
+			printf(
+				"[Warning] chara_anime has too many offsets in script %s(%u)\n",
+				interpreter->script->script_name,
+				(unsigned)interpreter->script_parser.cur_line);
+			cpymo_chara_anime_buf_count = 0;
+			CONT_NEXTLINE;
+		}
+
+		cpymo_chara_anime_buf[cpymo_chara_anime_buf_count * 2]
+			= (float)cpymo_str_atoi(x_str);
+		cpymo_chara_anime_buf[cpymo_chara_anime_buf_count * 2 + 1]
+			= (float)cpymo_str_atoi(y_str);
+		cpymo_chara_anime_buf_count++;
+
+		CONT_NEXTLINE;
+	}
+
+	D("chara_anime_do") {
 		POP_ARG(id_str); ENSURE(id_str);
 		POP_ARG(peroid_str); ENSURE(peroid_str);
 		POP_ARG(loop_str); ENSURE(loop_str);
+		POP_ARG(bg_str);
+
+		/* 可选第 4 参数：1 或 bg = 不阻塞脚本的后台循环（剧情往下走，
+		   动画一直转）。不填或填其他值 = 原有阻塞语义，旧脚本行为不变。*/
+		bool as_bg = cpymo_str_equals_str(bg_str, "1")
+			|| cpymo_str_equals_str(bg_str, "bg");
 
 		int loops = cpymo_str_atoi(loop_str);
+		float period = (float)cpymo_str_atoi(peroid_str) / 1000.0f;
+		int chara_id = cpymo_str_atoi(id_str);
 
-		float *buffer = (float *)malloc(64 * sizeof(float));
-		if (buffer == NULL) return CPYMO_ERR_OUT_OF_MEM;
-		size_t offsets = 0;
-
-		while (offsets < 32) {
-			POP_ARG(x_str);
-			if (IS_EMPTY(x_str)) break;
-
-			POP_ARG(y_str); 
-			if (IS_EMPTY(y_str)) break;
-
-			float x = (float)cpymo_str_atoi(x_str);
-			float y = (float)cpymo_str_atoi(y_str);
-			buffer[offsets * 2] = x;
-			buffer[offsets * 2 + 1] = y;
-			offsets++;
+		float *buffer = (float *)malloc(
+			CPYMO_CHARA_ANIME_MAX_OFFSETS * 2 * sizeof(float));
+		if (buffer == NULL) {
+			cpymo_chara_anime_buf_count = 0;
+			return CPYMO_ERR_OUT_OF_MEM;
 		}
 
-		if (offsets > 0 || loops == 0) {
-			cpymo_charas_play_anime(
-				engine,
-				(float)cpymo_str_atoi(peroid_str) / 1000.0f,
-				loops,
-				buffer,
-				offsets,
-				true);
+		size_t offsets = cpymo_chara_anime_buf_count;
+		if (offsets > 0)
+			memcpy(buffer, cpymo_chara_anime_buf, offsets * 2 * sizeof(float));
+		cpymo_chara_anime_buf_count = 0;
 
-			cpymo_charas_set_play_anime(&engine->charas, cpymo_str_atoi(id_str));
-
+		/* 0 轮 = 停止当前动画（含后台循环），有没有偏移都照样停。*/
+		if (loops == 0) {
+			free(buffer);
+			cpymo_charas_stop_anime(engine);
 			return CPYMO_ERR_SUCC;
 		}
-		else {
+
+		if (offsets == 0) {
 			free(buffer);
 			printf(
-				"[Error] chara_anime has invalid argument in script %s(%u)\n",
+				"[Error] chara_anime_do has no offset in script %s(%u)\n",
 				interpreter->script->script_name,
 				(unsigned)interpreter->script_parser.cur_line);
 			CONT_NEXTLINE;
 		}
+
+		if (as_bg)
+			/* 第 4 参数为 1/bg：后台循环，脚本继续往下走。*/
+			cpymo_charas_play_anime_bg(
+				engine, period, buffer, offsets, true);
+		else
+			/* 否则保持原有阻塞语义；负数仍是无限循环，按继续键结束。*/
+			cpymo_charas_play_anime(
+				engine, period, loops, buffer, offsets, true);
+
+		cpymo_charas_set_play_anime(&engine->charas, chara_id);
+
+		return CPYMO_ERR_SUCC;
 	}
+
 
 	D("scroll") {
 		POP_ARG(filename); ENSURE(filename);

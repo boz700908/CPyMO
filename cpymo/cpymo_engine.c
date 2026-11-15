@@ -533,6 +533,8 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 			&engine->anime, 
 			delta_time_sec);
 
+		cpymo_charas_update(engine, delta_time_sec);
+
 		err = cpymo_select_img_update(
 			engine, 
 			&engine->select_img, 

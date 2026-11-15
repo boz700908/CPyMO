@@ -358,6 +358,16 @@ static void cpymo_charas_stop_all_anime(cpymo_engine *e)
 #endif
 
 	cpymo_charas *c = &e->charas;
+
+	// 没有偏移数据时没什么可收尾的（也避免下面访问 NULL[-2]）。
+	if (c->anime_pos == NULL || c->anime_pos_count == 0) {
+		c->anime_owned = false;
+		c->anime_pos = NULL;
+		c->anime_pos_current = 0;
+		c->anime_loop = 0;
+		return;
+	}
+
 	struct cpymo_chara *ch = c->chara;
 	
 	float last_pos_x = c->anime_pos[(c->anime_pos_count - 1) * 2] * (float)e->gameconfig.imagesize_w / 540.0f;
@@ -380,6 +390,11 @@ static void cpymo_charas_stop_all_anime(cpymo_engine *e)
 	c->anime_loop = 0;
 
 	cpymo_bg_follow_chara_quake(&e->bg, false);
+}
+
+void cpymo_charas_stop_anime(cpymo_engine *e)
+{
+	cpymo_charas_stop_all_anime(e);
 }
 
 void cpymo_charas_set_play_anime(cpymo_charas * c, int id)
@@ -417,10 +432,32 @@ static bool cpymo_charas_wait_for_anime(cpymo_engine *e, float delta_time)
 	return true;
 #endif
 
-	if (cpymo_input_foward_key_just_pressed(e)) 
+	(void)delta_time;
+
+	if (cpymo_input_foward_key_just_pressed(e))
 		return true;
 
+	/* 帧在 cpymo_charas_update 里推进，这里只判断是否播完。
+	   负数是无限循环（loop 永不降到 0），只有继续键能让它结束。*/
 	cpymo_charas *c = &e->charas;
+	return c->anime_loop == 0;
+}
+
+void cpymo_charas_update(cpymo_engine *e, float delta_time)
+{
+#ifdef LOW_FRAME_RATE
+	return;
+#endif
+
+	cpymo_charas *c = &e->charas;
+	if (c->anime_pos == NULL || c->anime_pos_count == 0) return;
+
+	// period <= 0 会让下面的 while 永远转下去，直接结束这个动画，
+	// 否则阻塞式脚本会永远等下去。
+	if (c->anime_period <= 0.0f) {
+		cpymo_charas_stop_all_anime(e);
+		return;
+	}
 
 	c->anime_timer += delta_time;
 	while (c->anime_timer >= c->anime_period) {
@@ -432,13 +469,34 @@ static bool cpymo_charas_wait_for_anime(cpymo_engine *e, float delta_time)
 		if (c->anime_pos_current >= c->anime_pos_count) {
 			c->anime_pos_current = 0;
 
-			// loop_num 为负表示无限循环：不递减，永远不满足结束条件，
-			// 直到玩家按下继续键（函数开头）或 LOW_FRAME_RATE 直接返回。
+			// 负数是无限循环：不递减，也就永不结束。
 			if (c->anime_loop > 0) c->anime_loop--;
 		}
 	}
+}
 
-	return c->anime_loop == 0;
+static void cpymo_charas_setup_anime(
+	cpymo_engine *e,
+	float period,
+	int loop_num,
+	float *offsets,
+	size_t offsets_xy_count,
+	bool offsets_owned)
+{
+	cpymo_charas *c = &e->charas;
+
+	// 已经有一个动画在跑（例如后台循环）时先收尾，再换新的。
+	if (c->anime_pos) cpymo_charas_stop_all_anime(e);
+
+	cpymo_engine_request_redraw(e);
+
+	c->anime_period = period;
+	c->anime_pos_current = 0;
+	c->anime_pos_count = offsets_xy_count;
+	c->anime_pos = offsets;
+	c->anime_loop = loop_num;
+	c->anime_owned = offsets_owned;
+	c->anime_timer = 0;
 }
 
 void cpymo_charas_play_anime(
@@ -450,26 +508,36 @@ void cpymo_charas_play_anime(
 	bool offsets_owned)
 {
 #ifdef LOW_FRAME_RATE
+	if (offsets_owned) free(offsets);
 	return;
 #endif
 
-	cpymo_charas *c = &e->charas;
-	assert(c->anime_pos == NULL);
-
-	cpymo_engine_request_redraw(e);
-
-	c->anime_period = period;
-	c->anime_pos_current = 0;
-	c->anime_pos_count = offsets_xy_count;
-	c->anime_pos = offsets;
-	c->anime_loop = loop_num;
-	c->anime_owned = offsets_owned;
-	c->anime_timer = 0;
+	/* 阻塞式：脚本停在这一行，播完 loop_num 轮或玩家按继续键后收尾。*/
+	cpymo_charas_setup_anime(
+		e, period, loop_num, offsets, offsets_xy_count, offsets_owned);
 
 	cpymo_wait_register_with_callback(
 		&e->wait, 
 		&cpymo_charas_wait_for_anime,
 		&cpymo_charas_anime_finished_callback);
+}
+
+void cpymo_charas_play_anime_bg(
+	cpymo_engine *e,
+	float period,
+	float *offsets,
+	size_t offsets_xy_count,
+	bool offsets_owned)
+{
+#ifdef LOW_FRAME_RATE
+	if (offsets_owned) free(offsets);
+	return;
+#endif
+
+	/* 非阻塞：剧情继续往下走，动画一直循环（loop = -1），
+	   直到被下一次播放覆盖，或被 chara_anime_do 的 0 轮停止。*/
+	cpymo_charas_setup_anime(
+		e, period, -1, offsets, offsets_xy_count, offsets_owned);
 }
 
 error_t cpymo_charas_scale(cpymo_engine *e, int chara_id, float scale, float time)

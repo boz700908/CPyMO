@@ -87,12 +87,20 @@ error_t cpymo_charas_pos(
 	int coord_mode, 
 	float x, float y);
 
+void cpymo_charas_update(struct cpymo_engine *e, float delta_time);
+void cpymo_charas_stop_anime(struct cpymo_engine *e);
 void cpymo_charas_set_play_anime(cpymo_charas *c, int id);
 void cpymo_charas_set_all_chara_play_anime(cpymo_charas *c);
 void cpymo_charas_play_anime(
 	struct cpymo_engine *e, 
 	float period, 
 	int loop_num, 
+	float *offsets, 
+	size_t offsets_xy_count,
+	bool offsets_owned);
+void cpymo_charas_play_anime_bg(
+	struct cpymo_engine *e, 
+	float period, 
 	float *offsets, 
 	size_t offsets_xy_count,
 	bool offsets_owned);
