@@ -1,4 +1,5 @@
 #include "cpymo_prelude.h"
+#include <stdlib.h>
 #if CPYMO_FEATURE_LEVEL >= 1
 #include "cpymo_engine.h"
 
