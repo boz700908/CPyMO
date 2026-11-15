@@ -447,6 +447,17 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		return CPYMO_ERR_SUCC;
 	}
 
+	D("input") {
+		POP_ARG(var_str); ENSURE(var_str);
+		POP_ARG(prompt_str);
+
+		err = cpymo_input_text_start(engine, var_str, prompt_str);
+		CPYMO_THROW(err);
+
+		cpymo_wait_register(&engine->wait, &cpymo_input_text_wait_for);
+		return CPYMO_ERR_SUCC;
+	}
+
 	D("chara_pos") {
 		POP_ARG(id_str); ENSURE(id_str);
 		POP_ARG(x_str); ENSURE(x_str);

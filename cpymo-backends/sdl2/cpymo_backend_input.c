@@ -387,3 +387,82 @@ void cpymo_input_refresh_joysticks()
 	}
 #endif
 }
+
+/* 文本输入（`input` 命令）
+ *
+ * 事件由主循环最前端的 cpymo_sdl2_input_text_handle_event() 采集，字符先攒在
+ * 本地缓冲里；引擎每帧调用 cpymo_backend_input_text_poll() 取走一次（取走即清空），
+ * 控制字符约定 '\b' 退格、'\n' 确认、27 取消。
+ * 输入激活期间其它按键一律吞掉，避免顺手触发游戏的跳过/菜单。 */
+
+static bool sdl2_input_text_active = false;
+static char sdl2_input_text_buf[128];
+static size_t sdl2_input_text_len = 0;
+static char sdl2_input_text_returned[129];
+
+static void sdl2_input_text_append(const char *s)
+{
+	while (*s && sdl2_input_text_len < sizeof(sdl2_input_text_buf) - 1)
+		sdl2_input_text_buf[sdl2_input_text_len++] = *s++;
+	sdl2_input_text_buf[sdl2_input_text_len] = 0;
+}
+
+static void sdl2_input_text_append_char(char c)
+{
+	char s[2];
+	s[0] = c;
+	s[1] = 0;
+	sdl2_input_text_append(s);
+}
+
+void cpymo_backend_input_text_begin(void)
+{
+	sdl2_input_text_active = true;
+	sdl2_input_text_len = 0;
+	sdl2_input_text_buf[0] = 0;
+	sdl2_input_text_returned[0] = 0;
+	SDL_StartTextInput();
+}
+
+void cpymo_backend_input_text_end(void)
+{
+	sdl2_input_text_active = false;
+	sdl2_input_text_len = 0;
+	sdl2_input_text_buf[0] = 0;
+	sdl2_input_text_returned[0] = 0;
+	SDL_StopTextInput();
+}
+
+const char *cpymo_backend_input_text_poll(void)
+{
+	size_t i;
+	for (i = 0; i <= sdl2_input_text_len; ++i)
+		sdl2_input_text_returned[i] = sdl2_input_text_buf[i];
+
+	sdl2_input_text_len = 0;
+	sdl2_input_text_buf[0] = 0;
+	return sdl2_input_text_returned;
+}
+
+/* 返回 true 表示该事件已被输入框消费，主循环应跳过后续处理。 */
+bool cpymo_sdl2_input_text_handle_event(const SDL_Event *event)
+{
+	if (!sdl2_input_text_active) return false;
+
+	if (event->type == SDL_TEXTINPUT) {
+		sdl2_input_text_append(event->text.text);
+		return true;
+	}
+
+	if (event->type == SDL_KEYDOWN) {
+		switch (event->key.keysym.sym) {
+		case SDLK_BACKSPACE: sdl2_input_text_append_char('\b'); return true;
+		case SDLK_RETURN:
+		case SDLK_KP_ENTER: sdl2_input_text_append_char('\n'); return true;
+		case SDLK_ESCAPE: sdl2_input_text_append_char(27); return true;
+		default: return true;
+		}
+	}
+
+	return false;
+}

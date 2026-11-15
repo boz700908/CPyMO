@@ -666,6 +666,10 @@ START:
 		mouse_wheel = 0;
 
 		while (SDL_PollEvent(&event)) {
+			{
+				extern bool cpymo_sdl2_input_text_handle_event(const SDL_Event *e);
+				if (cpymo_sdl2_input_text_handle_event(&event)) continue;
+			}
 			#ifdef ENABLE_TEXT_EXTRACT
 			cpymo_sdl2_enqueue_copy_action(&event);
 			#endif

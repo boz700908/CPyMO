@@ -17,6 +17,7 @@
 #include "cpymo_scroll.h"
 #include "cpymo_floating_hint.h"
 #include "cpymo_say.h"
+#include "cpymo_input_text.h"
 #include "cpymo_text.h"
 #include "cpymo_hash_flags.h"
 #include "cpymo_ui.h"
@@ -39,6 +40,7 @@ struct cpymo_engine {
 	cpymo_scroll scroll;
 	cpymo_floating_hint floating_hint;
 	cpymo_say say;
+	cpymo_input_text input_text;
 	cpymo_text text;
 	cpymo_hash_flags flags;
 	struct cpymo_ui *ui;

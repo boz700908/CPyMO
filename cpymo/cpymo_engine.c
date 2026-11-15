@@ -164,6 +164,7 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 
 	// init say
 	cpymo_say_init(&out->say);
+	cpymo_input_text_init(&out->input_text);
 
 	// init text
 	cpymo_text_init(&out->text);
@@ -257,6 +258,7 @@ void cpymo_engine_free(cpymo_engine *engine)
 	cpymo_hash_flags_free(&engine->flags);
 	cpymo_text_free(&engine->text);
 	cpymo_say_free(&engine->say);
+	cpymo_input_text_free(&engine->input_text);
 	cpymo_backlog_free(&engine->backlog);
 	cpymo_floating_hint_free(&engine->floating_hint);
 	cpymo_scroll_free(&engine->scroll);
@@ -588,6 +590,7 @@ void cpymo_engine_draw(const cpymo_engine *engine)
 	cpymo_text_draw(engine);
 	cpymo_say_draw(engine);
 	cpymo_say_dialog_ext_draw(engine);
+	cpymo_input_text_draw(&engine->input_text, engine);
 }
 
 void cpymo_engine_trim_memory(cpymo_engine *e)

@@ -55,4 +55,23 @@ void cpymo_accessibility_enqueue_action(cpymo_accessibility_action action);
  */
 cpymo_input cpymo_input_snapshot();
 
+/* 文本输入（后端可选能力）
+ *
+ * `input` 命令用：进入输入模式后，后端把本帧收到的字符按 UTF-8 交给引擎，
+ * 其中控制字符固定为 '\b'(8) 退格、'\n'(10) 确认、27 取消。
+ * poll 返回的内容只在本帧有效，引擎取走后由后端清空。
+ *
+ * 后端可以完全不实现：下面用弱符号声明，链接后地址为 NULL 时引擎侧
+ * 打一条警告并跳过该命令。不支持弱符号的编译器（MSVC）下是普通声明。
+ */
+#if defined(__GNUC__) || defined(__clang__)
+#define CPYMO_BACKEND_INPUT_TEXT_WEAK __attribute__((weak))
+#else
+#define CPYMO_BACKEND_INPUT_TEXT_WEAK
+#endif
+
+CPYMO_BACKEND_INPUT_TEXT_WEAK void cpymo_backend_input_text_begin(void);
+CPYMO_BACKEND_INPUT_TEXT_WEAK void cpymo_backend_input_text_end(void);
+CPYMO_BACKEND_INPUT_TEXT_WEAK const char *cpymo_backend_input_text_poll(void);
+
 #endif
