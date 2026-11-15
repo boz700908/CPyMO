@@ -155,6 +155,18 @@ error_t cpymo_interpreter_execute_step(cpymo_interpreter * interpreter, cpymo_en
 	cpymo_str command =
 		cpymo_parser_curline_pop_command(&interpreter->script_parser);
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (engine->feature_level >= 1 &&
+		cpymo_lua_context_has_pending(&engine->lua) &&
+		!cpymo_str_equals_str(command, "lua")) {
+		printf(
+			"[lua] %s(%d): incomplete #lua block discarded.\n",
+			interpreter->script->script_name,
+			(int)interpreter->script_parser.cur_line);
+		cpymo_lua_context_discard_pending(&engine->lua);
+	}
+#endif
+
 	error_t err = cpymo_interpreter_dispatch(command, interpreter, engine, cont);
 	switch (err) {
 	case CPYMO_ERR_NOT_FOUND:
@@ -2376,11 +2388,11 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 			cpymo_parser_curline_readuntil(&interpreter->script_parser, '\0');
 
 		cpymo_str_trim(&lua_code);
-		error_t err = cpymo_lua_context_push_lua_code(&engine->lua, lua_code);
-		CPYMO_THROW(err);
-
-		err = cpymo_lua_context_execute(&engine->lua, 0, 0);
-		return err;
+		return cpymo_lua_context_execute_script_block(
+			&engine->lua,
+			lua_code,
+			interpreter->script->script_name,
+			(int)interpreter->script_parser.cur_line);
 	}
 #endif
 	

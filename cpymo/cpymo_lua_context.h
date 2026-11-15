@@ -4,6 +4,7 @@
 #include "cpymo_prelude.h"
 #if CPYMO_FEATURE_LEVEL >= 1
 
+#include <stddef.h>
 #include <lua.h>
 #include "cpymo_error.h"
 #include "cpymo_str.h"
@@ -18,6 +19,16 @@ typedef struct {
     int script_wait_function_ref;
     int script_wait_callback_ref;
     int script_commands_table_ref;
+
+    /* Multi-line #lua accumulation (Feature Level I). */
+    char *pending_code;
+    size_t pending_len;
+    size_t pending_cap;
+    char pending_chunkname[160];
+    int pending_line;
+
+    /* Instruction budget for one #lua block; 0 disables the watchdog. */
+    int instruction_budget;
 } cpymo_lua_context;
 
 error_t cpymo_lua_context_init(
@@ -37,6 +48,24 @@ error_t cpymo_lua_context_push_lua_code(
 
 error_t cpymo_lua_context_execute(
     cpymo_lua_context *l, int nargs, int nresults);
+
+#define CPYMO_LUA_DEFAULT_INSTRUCTION_BUDGET 2000000
+
+/* Runs a #lua block the way a REPL would: consecutive incomplete lines are
+   accumulated until the chunk compiles, then executed. Errors are reported
+   with printf and swallowed so a typo cannot terminate the game. */
+error_t cpymo_lua_context_execute_script_block(
+    cpymo_lua_context *l,
+    cpymo_str lua_code,
+    const char *script_name,
+    int line);
+
+void cpymo_lua_context_discard_pending(cpymo_lua_context *l);
+
+int cpymo_lua_context_has_pending(const cpymo_lua_context *l);
+
+error_t cpymo_lua_context_set_instruction_budget(
+    cpymo_lua_context *l, int budget);
 
 error_t cpymo_lua_error_conv(int lua_error);
 

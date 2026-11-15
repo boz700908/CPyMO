@@ -10,6 +10,9 @@
 #include <onelua.c>
 #endif
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <lauxlib.h>
 #include <lualib.h>
 #include <lgc.h>
@@ -301,8 +304,189 @@ static int cpymo_lua_context_create_readonly_metatable(lua_State *l)
     return luaL_ref(l, LUA_REGISTRYINDEX);
 }
 
+static int cpymo_lua_pending_reserve(cpymo_lua_context *l, size_t need)
+{
+    if (need <= l->pending_cap) return 1;
+
+    size_t cap = l->pending_cap ? l->pending_cap : 128;
+    while (cap < need) cap += cap / 2 + 64;
+
+    char *grown = (char *)realloc(l->pending_code, cap);
+    if (grown == NULL) return 0;
+
+    l->pending_code = grown;
+    l->pending_cap = cap;
+    return 1;
+}
+
+void cpymo_lua_context_discard_pending(cpymo_lua_context *l)
+{
+    l->pending_len = 0;
+    if (l->pending_code) l->pending_code[0] = '\0';
+}
+
+int cpymo_lua_context_has_pending(const cpymo_lua_context *l)
+{ return l->pending_len > 0; }
+
+error_t cpymo_lua_context_set_instruction_budget(
+    cpymo_lua_context *l, int budget)
+{
+    if (budget < 0) return CPYMO_ERR_INVALID_ARG;
+    l->instruction_budget = budget;
+    return CPYMO_ERR_SUCC;
+}
+
+static void cpymo_lua_report_error(
+    const char *script_name, int line, const char *msg)
+{
+    printf(
+        "[lua] %s(%d): %s\n",
+        script_name ? script_name : "(lua)",
+        line,
+        msg ? msg : "(unknown error)");
+}
+
+/* True when the compiler stopped on an unfinished construct, which is the
+   same test the stock Lua REPL uses to ask for another line. */
+static int cpymo_lua_message_is_incomplete(const char *msg)
+{
+    static const char eofmark[] = "<eof>";
+    const size_t marklen = sizeof(eofmark) - 1;
+
+    if (msg == NULL) return 0;
+
+    size_t len = strlen(msg);
+    if (len < marklen) return 0;
+    return memcmp(msg + len - marklen, eofmark, marklen) == 0;
+}
+
+static int cpymo_lua_traceback(lua_State *l)
+{
+    const char *msg = lua_tostring(l, 1);
+    if (msg == NULL) msg = "(error object is not a string)";
+    luaL_traceback(l, l, msg, 1);
+    return 1;
+}
+
+static void cpymo_lua_instruction_hook(lua_State *l, lua_Debug *ar)
+{
+    (void)ar;
+    luaL_error(
+        l,
+        "lua code exceeded the instruction budget (%d); "
+        "possible infinite loop",
+        cpymo_lua_state_get_lua_context(l)->instruction_budget);
+}
+
+static int cpymo_lua_api_os_exit_disabled(lua_State *l)
+{
+    (void)l;
+    return luaL_error(
+        l,
+        "os.exit() is disabled in CPyMO scripts; use cpymo.exit() instead.");
+}
+
+static void cpymo_lua_context_harden_stdlib(lua_State *l)
+{
+    lua_getglobal(l, "os");
+    if (lua_istable(l, -1)) {
+        lua_pushcfunction(l, cpymo_lua_api_os_exit_disabled);
+        lua_setfield(l, -2, "exit");
+    }
+    lua_pop(l, 1);
+}
+
+error_t cpymo_lua_context_execute_script_block(
+    cpymo_lua_context *l,
+    cpymo_str lua_code,
+    const char *script_name,
+    int line)
+{
+    if (l->lua_state == NULL) return CPYMO_ERR_SUCC;
+
+    lua_State *L = l->lua_state;
+
+    if (cpymo_lua_context_has_pending(l) == 0) {
+        l->pending_line = line;
+        snprintf(
+            l->pending_chunkname,
+            sizeof(l->pending_chunkname),
+            "=%s",
+            script_name ? script_name : "(lua)");
+    }
+
+    if (!cpymo_lua_pending_reserve(l, l->pending_len + lua_code.len + 2))
+        return CPYMO_ERR_OUT_OF_MEM;
+
+    if (lua_code.len > 0) {
+        memcpy(l->pending_code + l->pending_len, lua_code.begin, lua_code.len);
+        l->pending_len += lua_code.len;
+    }
+
+    l->pending_code[l->pending_len++] = '\n';
+    l->pending_code[l->pending_len] = '\0';
+
+    if (l->pending_len > (1024u * 1024u)) {
+        cpymo_lua_report_error(
+            script_name,
+            l->pending_line,
+            "accumulated #lua block exceeds 1 MiB; discarded.");
+        cpymo_lua_context_discard_pending(l);
+        return CPYMO_ERR_SUCC;
+    }
+
+    int status = luaL_loadbuffer(
+        L, l->pending_code, l->pending_len, l->pending_chunkname);
+
+    if (status != LUA_OK) {
+        const char *msg = lua_tostring(L, -1);
+
+        if (status == LUA_ERRSYNTAX && cpymo_lua_message_is_incomplete(msg)) {
+            lua_pop(L, 1);
+            return CPYMO_ERR_SUCC; /* wait for the rest of the block */
+        }
+
+        cpymo_lua_report_error(script_name, l->pending_line, msg);
+        lua_pop(L, 1);
+        cpymo_lua_context_discard_pending(l);
+        return CPYMO_ERR_SUCC; /* soft failure: keep playing */
+    }
+
+    int base = lua_gettop(L);
+    lua_pushcfunction(L, cpymo_lua_traceback);
+    lua_insert(L, base);
+
+    if (l->instruction_budget > 0)
+        lua_sethook(
+            L,
+            cpymo_lua_instruction_hook,
+            LUA_MASKCOUNT,
+            l->instruction_budget);
+
+    status = lua_pcall(L, 0, 0, base);
+
+    lua_sethook(L, NULL, 0, 0);
+
+    if (status != LUA_OK) {
+        cpymo_lua_report_error(
+            script_name, l->pending_line, lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
+
+    lua_remove(L, base);
+    cpymo_lua_context_discard_pending(l);
+    return CPYMO_ERR_SUCC;
+}
+
 error_t cpymo_lua_context_init(cpymo_lua_context *l, cpymo_engine *e)
 {
+    l->pending_code = NULL;
+    l->pending_len = 0;
+    l->pending_cap = 0;
+    l->pending_chunkname[0] = '\0';
+    l->pending_line = 0;
+    l->instruction_budget = CPYMO_LUA_DEFAULT_INSTRUCTION_BUDGET;
+
     if (e->feature_level < 1) {
         l->lua_state = NULL;
         return CPYMO_ERR_SUCC;
@@ -316,6 +500,8 @@ error_t cpymo_lua_context_init(cpymo_lua_context *l, cpymo_engine *e)
     *(cpymo_lua_context **)lua_getextraspace(l->lua_state) = l;
 
     luaL_openlibs(l->lua_state);
+
+    cpymo_lua_context_harden_stdlib(l->lua_state);
 
     l->readonly_metatable = 
         cpymo_lua_context_create_readonly_metatable(l->lua_state);
@@ -333,6 +519,13 @@ error_t cpymo_lua_context_init(cpymo_lua_context *l, cpymo_engine *e)
 
 void cpymo_lua_context_free(cpymo_lua_context *l)
 {
+    if (l->pending_code) {
+        free(l->pending_code);
+        l->pending_code = NULL;
+        l->pending_len = 0;
+        l->pending_cap = 0;
+    }
+
     if (l->lua_state) {
         cpymo_lua_get_main_actor(l);
         cpymo_lua_actor_free(l);
@@ -362,7 +555,7 @@ error_t cpymo_lua_context_push_lua_code(
 {
     assert(l->lua_state);
     error_t err = cpymo_lua_error_conv(
-        luaL_loadbuffer(l->lua_state, code.begin, code.len, "="));
+        luaL_loadbuffer(l->lua_state, code.begin, code.len, "=(lua)"));
 
     if (err != CPYMO_ERR_SUCC) {
         const char *errstr = lua_tostring(l->lua_state, -1);
