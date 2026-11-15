@@ -1513,7 +1513,9 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		return CPYMO_ERR_SUCC;
 	}
 
-	D("chara_scroll") {
+	/* ykm 里 chara_scroll_complex 是同一套 10 参实现的另一个名字 */
+	else if (cpymo_str_equals_str(command, "chara_scroll")
+		|| cpymo_str_equals_str(command, "chara_scroll_complex")) {
 		POP_ARG(coord_mode_str); ENSURE(coord_mode_str);
 		POP_ARG(chara_id_str); ENSURE(chara_id_str);
 		POP_ARG(filename_or_endx); ENSURE(filename_or_endx);
