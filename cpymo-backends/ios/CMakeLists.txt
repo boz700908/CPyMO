@@ -59,6 +59,8 @@ option(ENABLE_LUA "Enable CPyMO HD feature level 1 (Lua scripting)" OFF)
 if (ENABLE_LUA)
 	add_definitions (-DCPYMO_FEATURE_LEVEL=1)
 	add_definitions (-DLINK_WITH_ONELUA)
+	# Lua 5.4.6 在 iOS 上必须定义 LUA_USE_IOS：iOS SDK 把 system() 标记为不可用（见 lua/loslib.c 的 l_system）
+	add_definitions (-DLUA_USE_IOS)
 	include_directories ("../../lua/")
 endif ()
 
