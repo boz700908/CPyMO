@@ -27,6 +27,10 @@ ifeq ($(ENABLE_EXIT_CONFIRM), 1)
 CFLAGS += -DENABLE_EXIT_CONFIRM
 endif
 
+ifeq ($(LUA), 1)
+CFLAGS += -DCPYMO_FEATURE_LEVEL=1 -DLINK_WITH_ONELUA -I../../lua
+endif
+
 ifeq ($(OS), Windows_NT)
 LDFLAGS += -lmingw32
 endif

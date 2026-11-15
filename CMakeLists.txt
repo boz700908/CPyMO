@@ -22,6 +22,15 @@ endif ()
 if (ENABLE_ACCESSIBILITY)
 	add_definitions (-DENABLE_TEXT_EXTRACT)
 endif ()
+
+option(ENABLE_LUA "Enable CPyMO HD feature level 1 (Lua scripting)" OFF)
+
+if (ENABLE_LUA)
+	add_definitions (-DCPYMO_FEATURE_LEVEL=1)
+	add_definitions (-DLINK_WITH_ONELUA)
+	include_directories ("./lua/")
+endif ()
+
 add_definitions (-DLEAKCHECK)
 add_definitions (-DLIMIT_WINDOW_SIZE_TO_SCREEN)
 

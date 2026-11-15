@@ -69,6 +69,15 @@ void cpymo_engine_play_startup_music_once(void)
 		cpymo_backend_startup_music_play();
 }
 
+static error_t cpymo_engine_feature_level_warning(cpymo_engine *e)
+{
+	return cpymo_msgbox_ui_enter(
+		e,
+		cpymo_str_pure("CPyMO HD Feature Level is not compatible."),
+		NULL,
+		NULL);
+}
+
 error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 {
 	/* 启动音乐只属于游戏选择器阶段：真正进入游戏就收掉，
@@ -89,6 +98,17 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 	error_t err = cpymo_gameconfig_parse_from_file(&out->gameconfig, path);
 	free(path);
 	if (err != CPYMO_ERR_SUCC) return err;
+
+	// get feature level
+	if (!strcmp(out->gameconfig.platform, "cpymohd1"))
+		out->feature_level = 1;
+	else if (!strcmp(out->gameconfig.platform, "cpymohd2"))
+		out->feature_level = 2;
+	else if (!strcmp(out->gameconfig.platform, "cpymohd3"))
+		out->feature_level = 3;
+	else
+		out->feature_level = 0;
+
 
 	// set default volume for audio system
 	{
@@ -114,7 +134,8 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 	}
 
 	cpymo_script *boot_script;
-	err = cpymo_script_create_bootloader(&boot_script, out->gameconfig.startscript);
+	err = cpymo_script_create_bootloader(
+		&boot_script, out->gameconfig.startscript, out->feature_level);
 	if (err != CPYMO_ERR_SUCC) {
 		free(out->interpreter);
 		cpymo_vars_free(&out->vars);
@@ -186,6 +207,20 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 		return err;
 	}
 
+	// init lua
+	#if CPYMO_FEATURE_LEVEL >= 1
+	err = cpymo_lua_context_init(&out->lua, out);
+	if (err != CPYMO_ERR_SUCC) {
+		cpymo_backlog_free(&out->backlog);
+		free(out->title);
+		cpymo_interpreter_free(out->interpreter);
+		free(out->interpreter);
+		cpymo_vars_free(&out->vars);
+		cpymo_assetloader_free(&out->assetloader);
+		return err;
+	}
+	#endif
+
 	// states
 	out->skipping = false;
 	out->redraw = true;
@@ -234,6 +269,12 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 			&cpymo_engine_version_warning);
 	}
 
+	if (out->feature_level > CPYMO_FEATURE_LEVEL) {
+		cpymo_wait_callback_after_seconds(
+			&out->wait, 0,
+			&cpymo_engine_feature_level_warning);
+	}
+
 	return CPYMO_ERR_SUCC;
 }
 
@@ -255,7 +296,10 @@ void cpymo_engine_free(cpymo_engine *engine)
 			printf("[Error] Can not save config. %s\n", cpymo_error_message(err));
 	}
 	
-	cpymo_hash_flags_free(&engine->flags);
+	#if CPYMO_FEATURE_LEVEL >= 1
+	cpymo_lua_context_free(&engine->lua);
+	#endif
+		cpymo_hash_flags_free(&engine->flags);
 	cpymo_text_free(&engine->text);
 	cpymo_say_free(&engine->say);
 	cpymo_input_text_free(&engine->input_text);
@@ -528,6 +572,14 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 		err = cpymo_ui_update(engine, delta_time_sec);
 	else {
 
+		#if CPYMO_FEATURE_LEVEL >= 1
+		if (engine->feature_level >= 1) {
+			err = cpymo_lua_actor_update_main(&engine->lua, delta_time_sec);
+			CPYMO_THROW(err);
+		}
+		#endif
+		
+
 		cpymo_anime_update(
 			engine, 
 			&engine->anime, 
@@ -577,6 +629,12 @@ void cpymo_engine_draw(const cpymo_engine *engine)
 	cpymo_bg_draw(engine);
 	cpymo_scroll_draw(&engine->scroll);
 	cpymo_charas_draw(engine);
+
+	#if CPYMO_FEATURE_LEVEL >= 1
+	if (engine->feature_level >= 1)
+		cpymo_lua_actor_draw_main(&engine->lua);
+	#endif
+
 	cpymo_anime_draw(&engine->anime);
 	cpymo_select_img_draw(
 		&engine->select_img, 
@@ -604,6 +662,11 @@ void cpymo_engine_trim_memory(cpymo_engine *e)
 	cpymo_charas_gc(&e->charas, true);
 
 	cpymo_anime_off(&e->anime);
+
+	#if CPYMO_FEATURE_LEVEL >= 1
+	if (e->feature_level >= 1) 
+		cpymo_lua_gc_full(&e->lua);
+	#endif
 
 	cpymo_audio_se_stop(e);
 	cpymo_audio_vo_stop(e);

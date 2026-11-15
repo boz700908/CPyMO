@@ -9,6 +9,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#if CPYMO_FEATURE_LEVEL >= 1
+#include "cpymo_lua_context.h"
+#include "../stb/stb_ds.h"
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -245,6 +250,24 @@ error_t cpymo_save_write(cpymo_engine * e, unsigned short save_id)
 			}
 		}
 	}
+
+	// LUA
+	#if CPYMO_FEATURE_LEVEL >= 1
+	if (e->feature_level >= 1 && e->lua.lua_state != NULL) {
+		extern error_t cpymo_lua_context_call_save(
+			cpymo_engine *e, char **out_save_str);
+
+		char *chbuf = NULL;
+		error_t lua_err = cpymo_lua_context_call_save(e, &chbuf);
+		if (lua_err != CPYMO_ERR_SUCC) {
+			fclose(save);
+			return lua_err;
+		}
+
+		WRITE_STR(chbuf);
+		arrfree(chbuf);
+	}
+	#endif
 
 	#undef PACK32
 	#undef WRITE_STR
@@ -594,6 +617,21 @@ error_t cpymo_save_load_savedata(cpymo_engine *e, FILE *save)
 			}
 		}
 	}
+
+	// LUA (optional, absent in saves made by older engines)
+	#if CPYMO_FEATURE_LEVEL >= 1
+	if (e->feature_level >= 1 && e->lua.lua_state != NULL) {
+		char *lua_save = NULL;
+		if (cpymo_save_read_string(&lua_save, save) == CPYMO_ERR_SUCC) {
+			extern error_t cpymo_lua_context_call_load(
+				cpymo_engine *e, const char *str);
+
+			error_t lua_err = cpymo_lua_context_call_load(e, lua_save);
+			free(lua_save);
+			if (lua_err != CPYMO_ERR_SUCC) return lua_err;
+		}
+	}
+	#endif
 
 	if (e->interpreter == NULL) return CPYMO_ERR_BAD_FILE_FORMAT;
 

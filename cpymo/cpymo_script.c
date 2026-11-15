@@ -30,7 +30,8 @@ error_t cpymo_script_load(
     return CPYMO_ERR_SUCC;
 }
 
-error_t cpymo_script_create_bootloader(cpymo_script **out, char *startscript)
+error_t cpymo_script_create_bootloader(
+    cpymo_script **out, char *startscript, uint8_t feature_level)
 {
     const char *script_format =
 		"#textbox message,name\n"
@@ -40,6 +41,13 @@ error_t cpymo_script_create_bootloader(cpymo_script **out, char *startscript)
 		"#bg logo2\n"
         "#wait 300\n"
 		"#change %s";
+
+    #if CPYMO_FEATURE_LEVEL >= 1
+    if (feature_level >= 1)
+        script_format =
+            "#textbox message,name\n"
+            "#change %s";
+    #endif
 
     cpymo_script *script = (cpymo_script *)malloc(sizeof(cpymo_script) + 1);
     if (script == NULL) return CPYMO_ERR_OUT_OF_MEM;

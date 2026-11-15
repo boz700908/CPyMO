@@ -24,7 +24,12 @@
 #include "cpymo_audio.h"
 #include "cpymo_backlog.h"
 
+#if CPYMO_FEATURE_LEVEL >= 1
+#include "cpymo_lua_context.h"
+#endif
+
 struct cpymo_engine {
+	uint8_t feature_level;
 	cpymo_gameconfig gameconfig;
 	cpymo_assetloader assetloader;
 	cpymo_vars vars;
@@ -46,6 +51,10 @@ struct cpymo_engine {
 	struct cpymo_ui *ui;
 	cpymo_audio_system audio;
 	cpymo_backlog backlog;
+
+	#if CPYMO_FEATURE_LEVEL >= 1
+	cpymo_lua_context lua;
+	#endif
 
 	bool skipping;
 	char *title;
