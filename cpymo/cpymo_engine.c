@@ -85,6 +85,18 @@ error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir)
 	if (cpymo_backend_startup_music_stop != NULL)
 		cpymo_backend_startup_music_stop();
 
+	// YukimiScript 角色名表（#__define_character），延迟分配
+	out->chara_names = NULL;
+	out->chara_names_len = out->chara_names_cap = 0;
+	out->select_pending = NULL;
+	out->select_pending_len = out->select_pending_cap = 0;
+	out->select_pending_count = 0;
+	out->select_pending_kind = cpymo_select_pending_none;
+	out->chara_pending = NULL;
+	out->chara_pending_len = out->chara_pending_cap = 0;
+	out->chara_pending_count = 0;
+	out->chara_pending_kind = cpymo_chara_pending_none;
+
 	// init audio system
 	cpymo_audio_init(&out->audio);
 
@@ -317,6 +329,9 @@ void cpymo_engine_free(cpymo_engine *engine)
 	cpymo_vars_free(&engine->vars);
 	cpymo_assetloader_free(&engine->assetloader);
 	if (engine->title) free(engine->title);
+	if (engine->chara_names) free(engine->chara_names);
+	if (engine->select_pending) free(engine->select_pending);
+	if (engine->chara_pending) free(engine->chara_pending);
 	cpymo_audio_free(&engine->audio);
 
 	#ifdef ENABLE_TEXT_EXTRACT
@@ -705,3 +720,179 @@ void cpymo_engine_extract_text_submit(cpymo_engine *e)
 }
 
 #endif
+
+/* ── #__define_character：YukimiScript 的角色符号 -> 名字表 ───────
+ * pymo2ykm 把 say 里的角色名换成 c0、c1 这样的符号，再用
+ * @__define_character 绑定真实名字。引擎只在显示与朗读处需要这张表，
+ * 所以按 symbol\0name\0 紧凑存放，查找取最后一个匹配（后定义覆盖）。 */
+static void cpymo_engine_str_unquote(cpymo_str *s)
+{
+	if (s->len >= 2 && s->begin[0] == '"' && s->begin[s->len - 1] == '"') {
+		s->begin++;
+		s->len -= 2;
+	}
+}
+
+error_t cpymo_engine_define_character(
+	cpymo_engine *e, cpymo_str symbol, cpymo_str name)
+{
+	cpymo_engine_str_unquote(&symbol);
+	cpymo_engine_str_unquote(&name);
+	cpymo_str_trim(&symbol);
+	cpymo_str_trim(&name);
+	if (symbol.len == 0 || name.len == 0) return CPYMO_ERR_INVALID_ARG;
+
+	const size_t need = symbol.len + 1 + name.len + 1;
+	if (e->chara_names_len + need > e->chara_names_cap) {
+		size_t cap = e->chara_names_cap ? e->chara_names_cap : 64;
+		while (cap < e->chara_names_len + need) cap *= 2;
+		char *grown = (char *)realloc(e->chara_names, cap);
+		if (grown == NULL) return CPYMO_ERR_OUT_OF_MEM;
+		e->chara_names = grown;
+		e->chara_names_cap = cap;
+	}
+
+	char *dst = e->chara_names + e->chara_names_len;
+	memcpy(dst, symbol.begin, symbol.len);
+	dst += symbol.len;
+	*dst++ = '\0';
+	memcpy(dst, name.begin, name.len);
+	dst += name.len;
+	*dst++ = '\0';
+	e->chara_names_len = (size_t)(dst - e->chara_names);
+
+	return CPYMO_ERR_SUCC;
+}
+
+cpymo_str cpymo_engine_find_character_name(cpymo_engine *e, cpymo_str symbol)
+{
+	if (e->chara_names == NULL) return symbol;
+
+	cpymo_str key = symbol;
+	cpymo_engine_str_unquote(&key);
+	cpymo_str_trim(&key);
+	if (key.len == 0) return symbol;
+
+	cpymo_str out = symbol;
+	const char *p = e->chara_names;
+	const char *const end = e->chara_names + e->chara_names_len;
+	while (p < end) {
+		const char *sym = p;
+		p += strlen(sym) + 1;
+		if (p >= end) break;
+		const char *nm = p;
+		p += strlen(nm) + 1;
+		if (strlen(sym) == key.len && memcmp(sym, key.begin, key.len) == 0)
+			out = cpymo_str_pure(nm);
+	}
+
+	return out;
+}
+
+/* ── 两段式选择的条目缓存 ────────────────────────────────────────
+ * YukimiScript 把「一条选择项」写成一行，最后用 @*_do 收尾；这里
+ * 按行累积，字段之间用 \t 隔开，条目之间用 \0 隔开。
+ * 条目数通常只有几个，用可增长的线性缓冲即可。 */
+error_t cpymo_engine_select_pending_kind(cpymo_engine *e, int kind)
+{
+	if (e->select_pending_kind != (uint8_t)kind) {
+		e->select_pending_len = 0;
+		e->select_pending_count = 0;
+		e->select_pending_kind = (uint8_t)kind;
+	}
+
+	return CPYMO_ERR_SUCC;
+}
+
+void cpymo_engine_select_pending_reset(cpymo_engine *e)
+{
+	e->select_pending_len = 0;
+	e->select_pending_count = 0;
+}
+
+error_t cpymo_engine_select_pending_push(
+	cpymo_engine *e, cpymo_str f1, cpymo_str f2, cpymo_str f3, cpymo_str f4)
+{
+	cpymo_str fields[4] = { f1, f2, f3, f4 };
+	for (int i = 0; i < 4; ++i) cpymo_str_trim(&fields[i]);
+
+	size_t need = 1;
+	for (int i = 0; i < 4; ++i) need += fields[i].len + (i < 3 ? 1 : 0);
+
+	if (e->select_pending_len + need > e->select_pending_cap) {
+		size_t cap = e->select_pending_cap ? e->select_pending_cap : 256;
+		while (cap < e->select_pending_len + need) cap *= 2;
+		char *grown = (char *)realloc(e->select_pending, cap);
+		if (grown == NULL) return CPYMO_ERR_OUT_OF_MEM;
+		e->select_pending = grown;
+		e->select_pending_cap = cap;
+	}
+
+	char *dst = e->select_pending + e->select_pending_len;
+	for (int i = 0; i < 4; ++i) {
+		if (i) *dst++ = '\t';
+		if (fields[i].len) {
+			memcpy(dst, fields[i].begin, fields[i].len);
+			dst += fields[i].len;
+		}
+	}
+	*dst++ = '\0';
+	e->select_pending_len = (size_t)(dst - e->select_pending);
+	++e->select_pending_count;
+
+	return CPYMO_ERR_SUCC;
+}
+
+/* ── chara_multi 族的收集缓冲 ─────────────────────────────────────
+ * 与选择组同一套做法：一条命令一行，字段用 \t 分隔、条目用 \0 分隔，
+ * 存在引擎里，*_do 到达时一次性执行。kind 变了自动清空，避免上一段
+ * 没收尾的半截数据串到下一段。 */
+error_t cpymo_engine_chara_pending_kind(cpymo_engine *e, int kind)
+{
+	if (e->chara_pending_kind != (uint8_t)kind) {
+		e->chara_pending_len = 0;
+		e->chara_pending_count = 0;
+		e->chara_pending_kind = (uint8_t)kind;
+	}
+
+	return CPYMO_ERR_SUCC;
+}
+
+void cpymo_engine_chara_pending_reset(cpymo_engine *e)
+{
+	e->chara_pending_len = 0;
+	e->chara_pending_count = 0;
+}
+
+error_t cpymo_engine_chara_pending_push(
+	cpymo_engine *e, const cpymo_str *fields, size_t field_count)
+{
+	if (field_count > 5) return CPYMO_ERR_INVALID_ARG;
+
+	size_t need = 1;
+	for (size_t i = 0; i < field_count; ++i) need += fields[i].len + 1;
+
+	if (e->chara_pending_len + need > e->chara_pending_cap) {
+		size_t cap = e->chara_pending_cap ? e->chara_pending_cap : 256;
+		while (cap < e->chara_pending_len + need) cap *= 2;
+
+		char *grown = (char *)realloc(e->chara_pending, cap);
+		if (grown == NULL) return CPYMO_ERR_OUT_OF_MEM;
+
+		e->chara_pending = grown;
+		e->chara_pending_cap = cap;
+	}
+
+	char *dst = e->chara_pending + e->chara_pending_len;
+	for (size_t i = 0; i < field_count; ++i) {
+		if (i > 0) *dst++ = '\t';
+		if (fields[i].len > 0) memcpy(dst, fields[i].begin, fields[i].len);
+		dst += fields[i].len;
+	}
+	*dst++ = '\0';
+
+	e->chara_pending_len = (size_t)(dst - e->chara_pending);
+	++e->chara_pending_count;
+
+	return CPYMO_ERR_SUCC;
+}

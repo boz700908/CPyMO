@@ -217,6 +217,688 @@ void cpymo_interpreter_checkpoint(cpymo_interpreter * interpreter)
 		{ longjmp(cont, EXEC_CONTVAL_OK); return CPYMO_ERR_UNKNOWN; }	\
 	else return CPYMO_ERR_NO_MORE_CONTENT; }
 
+/* ── YukimiScript 两段式选择组 ────────────────────────────────────
+ * @sel 文本 / @sel_do、@select_text 文本 / @select_text_do …… 是 ykmc
+ * 的另一种写法：一条选择项一行，最后用 *_do 收尾。旧 PyMO 写法把
+ * 「数量 + 条目」都塞在同一行里。两者靠字段数区分（互不重叠），命中
+ * 才接管；否则返回 CPYMO_ERR_NOT_FOUND，照旧交给 D() 链，旧脚本
+ * 一个字节都不受影响。 */
+
+static bool cpymo_interpreter_arg_is_count(cpymo_str s)
+{
+	if (s.len == 0) return false;
+	for (size_t i = 0; i < s.len; ++i)
+		if (s.begin[i] < '0' || s.begin[i] > '9') return false;
+	return true;
+}
+
+/* 数当前行还剩几个逗号分隔字段；取完把解析器恢复原位，不消耗任何
+ * 输入，因此不影响后面原有命令的解析。 */
+static size_t cpymo_interpreter_count_args(cpymo_interpreter *interp)
+{
+	cpymo_parser *p = &interp->script_parser;
+	const size_t pos = p->cur_pos, line = p->cur_line;
+	const bool line_end = p->is_line_end;
+
+	size_t n = 0;
+	for (;;) {
+		cpymo_str cell = cpymo_parser_curline_pop_commacell(p);
+		cpymo_str_trim(&cell);
+		if (cell.len == 0) break;
+		++n;
+	}
+
+	p->cur_pos = pos;
+	p->cur_line = line;
+	p->is_line_end = line_end;
+
+	return n;
+}
+
+/* 看一眼首个字段（不消耗输入）。 */
+static cpymo_str cpymo_interpreter_peek_arg1(cpymo_interpreter *interp)
+{
+	cpymo_parser *p = &interp->script_parser;
+	const size_t pos = p->cur_pos, line = p->cur_line;
+	const bool line_end = p->is_line_end;
+
+	cpymo_str cell = cpymo_parser_curline_pop_commacell(p);
+	cpymo_str_trim(&cell);
+
+	p->cur_pos = pos;
+	p->cur_line = line;
+	p->is_line_end = line_end;
+
+	return cell;
+}
+
+/* 选择项的存档标记：同一脚本、同一 *_do 行、同一下标、同一文本。 */
+static uint64_t cpymo_interpreter_select_hash(
+	cpymo_interpreter *interp, const char *prefix, size_t i, cpymo_str text)
+{
+	uint64_t hash;
+	cpymo_str_hash_init(&hash);
+	cpymo_str_hash_append_cstr(&hash, prefix);
+	cpymo_str_hash_append_cstr(&hash, interp->script->script_name);
+	cpymo_str_hash_append_cstr(&hash, "/");
+
+	char buf[32];
+	sprintf(buf, "%u", (unsigned)interp->script_parser.cur_line);
+	cpymo_str_hash_append_cstr(&hash, buf);
+	cpymo_str_hash_append_cstr(&hash, "/");
+	sprintf(buf, "%d", (int)i);
+	cpymo_str_hash_append_cstr(&hash, buf);
+	cpymo_str_hash_append_cstr(&hash, "/");
+	cpymo_str_hash_append(&hash, text);
+
+	return hash;
+}
+
+static void cpymo_interpreter_pending_fields(char *entry, cpymo_str out[4])
+{
+	for (int i = 0; i < 4; ++i) out[i] = cpymo_str_pure("");
+
+	char *p = entry;
+	for (int i = 0; i < 4 && p != NULL; ++i) {
+		char *tab = strchr(p, '\t');
+		if (tab != NULL) *tab = '\0';
+		out[i] = cpymo_str_pure(p);
+		p = tab != NULL ? tab + 1 : NULL;
+	}
+}
+
+typedef struct { const char *p, *end; } cpymo_pending_iter;
+
+static void cpymo_pending_iter_begin(cpymo_pending_iter *it, cpymo_engine *e)
+{
+	it->p = e->select_pending;
+	it->end = e->select_pending + e->select_pending_len;
+}
+
+static bool cpymo_pending_iter_next(cpymo_pending_iter *it, cpymo_str f[4])
+{
+	if (it->p == NULL || it->p >= it->end) return false;
+
+	char *entry = (char *)it->p;
+	it->p += strlen(entry) + 1;
+	cpymo_interpreter_pending_fields(entry, f);
+
+	return true;
+}
+
+static error_t cpymo_interpreter_pending_push(
+	cpymo_engine *e, int kind,
+	cpymo_str f1, cpymo_str f2, cpymo_str f3, cpymo_str f4)
+{
+	CPYMO_THROW(cpymo_engine_select_pending_kind(e, kind));
+	return cpymo_engine_select_pending_push(e, f1, f2, f3, f4);
+}
+
+static error_t cpymo_interpreter_sel_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	cpymo_interpreter_checkpoint(interpreter);
+
+	POP_ARG(hint_pic);
+
+	if (engine->select_pending_kind != cpymo_select_pending_sel)
+		return CPYMO_ERR_INVALID_ARG;
+
+	const size_t count = engine->select_pending_count;
+	if (count == 0) return CPYMO_ERR_INVALID_ARG;
+
+	error_t err = cpymo_select_img_configuare_begin(
+		&engine->select_img, count, cpymo_str_pure(""),
+		&engine->assetloader, &engine->gameconfig);
+	CPYMO_THROW(err);
+
+	if (!(IS_EMPTY(hint_pic)))
+		cpymo_select_img_configuare_select_text_hint_pic(engine, hint_pic);
+
+	cpymo_pending_iter it;
+	cpymo_pending_iter_begin(&it, engine);
+	cpymo_str f[4];
+	size_t i = 0;
+	while (i < count && cpymo_pending_iter_next(&it, f)) {
+		cpymo_str text = f[0];
+
+		uint64_t hash =
+			cpymo_interpreter_select_hash(interpreter, "SEL: ", i, text);
+
+		enum cpymo_select_img_selection_hint_state hint_mode =
+			cpymo_select_img_selection_nohint;
+		if (!(IS_EMPTY(hint_pic))) {
+			uint32_t first_char = cpymo_str_utf8_try_head_to_utf32(&text);
+			if (first_char == 0x25cb)
+				hint_mode = cpymo_select_img_selection_hint01;
+			else if (first_char == 0x00D7)
+				hint_mode = cpymo_select_img_selection_hint23;
+		}
+
+		err = cpymo_select_img_configuare_select_text(
+			&engine->select_img, &engine->assetloader, &engine->gameconfig,
+			&engine->flags, text, true, hint_mode, hash,
+			cpymo_gameconfig_font_size(&engine->gameconfig));
+		if (err != CPYMO_ERR_SUCC) return err;
+
+		++i;
+	}
+
+	cpymo_select_img_configuare_end_select_text(
+		&engine->select_img, &engine->wait, engine,
+		0, 0,
+		engine->gameconfig.imagesize_w,
+		engine->gameconfig.imagesize_h / 2.0f,
+		cpymo_color_white, -1, true);
+
+	cpymo_engine_select_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_select_text_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	cpymo_interpreter_checkpoint(interpreter);
+
+	if (engine->select_pending_kind != cpymo_select_pending_text)
+		return CPYMO_ERR_INVALID_ARG;
+
+	const size_t count = engine->select_pending_count;
+	if (count == 0) return CPYMO_ERR_INVALID_ARG;
+
+	POP_ARG(x1_str); ENSURE(x1_str);
+	POP_ARG(y1_str); ENSURE(y1_str);
+	POP_ARG(x2_str); ENSURE(x2_str);
+	POP_ARG(y2_str); ENSURE(y2_str);
+	POS(x1, y1, x1_str, y1_str);
+	POS(x2, y2, x2_str, y2_str);
+	POP_ARG(col); ENSURE(col);
+	POP_ARG(init_pos); ENSURE(init_pos);
+
+	error_t err = cpymo_select_img_configuare_begin(
+		&engine->select_img, count, cpymo_str_pure(""),
+		&engine->assetloader, &engine->gameconfig);
+	CPYMO_THROW(err);
+
+	cpymo_pending_iter it;
+	cpymo_pending_iter_begin(&it, engine);
+	cpymo_str f[4];
+	size_t i = 0;
+	while (i < count && cpymo_pending_iter_next(&it, f)) {
+		uint64_t hash = cpymo_interpreter_select_hash(
+			interpreter, "SELECT_TEXT: ", i, f[0]);
+
+		err = cpymo_select_img_configuare_select_text(
+			&engine->select_img, &engine->assetloader, &engine->gameconfig,
+			&engine->flags, f[0], true, cpymo_select_img_selection_nohint,
+			hash, cpymo_gameconfig_font_size(&engine->gameconfig));
+		if (err != CPYMO_ERR_SUCC) return err;
+
+		++i;
+	}
+
+	cpymo_select_img_configuare_end_select_text(
+		&engine->select_img, &engine->wait, engine, x1, y1, x2, y2,
+		cpymo_str_as_color(col), cpymo_str_atoi(init_pos), false);
+
+	cpymo_engine_select_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_select_var_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	cpymo_interpreter_checkpoint(interpreter);
+
+	if (engine->select_pending_kind != cpymo_select_pending_var)
+		return CPYMO_ERR_INVALID_ARG;
+
+	const size_t count = engine->select_pending_count;
+	if (count == 0) return CPYMO_ERR_INVALID_ARG;
+
+	POP_ARG(x1_str); ENSURE(x1_str);
+	POP_ARG(y1_str); ENSURE(y1_str);
+	POP_ARG(x2_str); ENSURE(x2_str);
+	POP_ARG(y2_str); ENSURE(y2_str);
+	POS(x1, y1, x1_str, y1_str);
+	POS(x2, y2, x2_str, y2_str);
+	POP_ARG(col); ENSURE(col);
+	POP_ARG(init_pos); ENSURE(init_pos);
+
+	error_t err = cpymo_select_img_configuare_begin(
+		&engine->select_img, count, cpymo_str_pure(""),
+		&engine->assetloader, &engine->gameconfig);
+	CPYMO_THROW(err);
+
+	cpymo_pending_iter it;
+	cpymo_pending_iter_begin(&it, engine);
+	cpymo_str f[4];
+	size_t i = 0;
+	while (i < count && cpymo_pending_iter_next(&it, f)) {
+		uint64_t hash = cpymo_interpreter_select_hash(
+			interpreter, "SELECT_VAR: ", i, f[0]);
+
+		const bool enabled = cpymo_vars_eval(&engine->vars, f[1]) != 0;
+
+		err = cpymo_select_img_configuare_select_text(
+			&engine->select_img, &engine->assetloader, &engine->gameconfig,
+			&engine->flags, f[0], enabled, cpymo_select_img_selection_nohint,
+			hash, cpymo_gameconfig_font_size(&engine->gameconfig));
+		if (err != CPYMO_ERR_SUCC) return err;
+
+		++i;
+	}
+
+	cpymo_select_img_configuare_end_select_text(
+		&engine->select_img, &engine->wait, engine, x1, y1, x2, y2,
+		cpymo_str_as_color(col), cpymo_str_atoi(init_pos), false);
+
+	cpymo_engine_select_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_select_img_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	cpymo_interpreter_checkpoint(interpreter);
+
+	if (engine->select_pending_kind != cpymo_select_pending_img)
+		return CPYMO_ERR_INVALID_ARG;
+
+	const size_t count = engine->select_pending_count;
+	if (count == 0) return CPYMO_ERR_INVALID_ARG;
+
+	POP_ARG(filename); ENSURE(filename);
+	POP_ARG(init_pos); ENSURE(init_pos);
+
+	error_t err = cpymo_select_img_configuare_begin(
+		&engine->select_img, count, filename,
+		&engine->assetloader, &engine->gameconfig);
+	CPYMO_THROW(err);
+
+	cpymo_pending_iter it;
+	cpymo_pending_iter_begin(&it, engine);
+	cpymo_str f[4];
+	size_t i = 0;
+	while (i < count && cpymo_pending_iter_next(&it, f)) {
+		const bool enabled = cpymo_vars_eval(&engine->vars, f[2]) != 0;
+		POS(x, y, f[0], f[1]);
+
+		uint64_t hash = cpymo_interpreter_select_hash(
+			interpreter, "SELECT_IMG: ", i, filename);
+
+		cpymo_select_img_configuare_select_img_selection(
+			engine, x, y, enabled, hash);
+
+		++i;
+	}
+
+	cpymo_select_img_configuare_end(
+		&engine->select_img, &engine->wait, engine, cpymo_str_atoi(init_pos));
+
+	cpymo_engine_select_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_select_imgs_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	cpymo_interpreter_checkpoint(interpreter);
+
+	if (engine->select_pending_kind != cpymo_select_pending_imgs)
+		return CPYMO_ERR_INVALID_ARG;
+
+	const size_t count = engine->select_pending_count;
+	if (count == 0) return CPYMO_ERR_INVALID_ARG;
+
+	POP_ARG(init_pos); ENSURE(init_pos);
+
+	error_t err = cpymo_select_img_configuare_begin(
+		&engine->select_img, count, cpymo_str_pure(""),
+		&engine->assetloader, &engine->gameconfig);
+	CPYMO_THROW(err);
+
+	cpymo_pending_iter it;
+	cpymo_pending_iter_begin(&it, engine);
+	cpymo_str f[4];
+	size_t i = 0;
+	while (i < count && cpymo_pending_iter_next(&it, f)) {
+		const bool enabled = cpymo_vars_eval(&engine->vars, f[3]);
+		POS(x, y, f[1], f[2]);
+
+		uint64_t hash = cpymo_interpreter_select_hash(
+			interpreter, "SELECT_IMGS: ", i, f[0]);
+
+		cpymo_select_img_configuare_select_imgs_selection(
+			engine, f[0], x, y, enabled, hash);
+
+		++i;
+	}
+
+	cpymo_select_img_configuare_end(
+		&engine->select_img, &engine->wait, engine, cpymo_str_atoi(init_pos));
+
+	cpymo_engine_select_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_select_two_stage(
+	cpymo_str command, cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	/* 收集行：一条选择项一行 */
+	if (cpymo_str_equals_str(command, "sel")) {
+		if (cpymo_interpreter_count_args(interpreter) != 1)
+			return CPYMO_ERR_NOT_FOUND;
+		/* 旧写法 #sel 0（数量 0、无条目）也是单个字段，别抢它 */
+		if (cpymo_interpreter_arg_is_count(
+				cpymo_interpreter_peek_arg1(interpreter)))
+			return CPYMO_ERR_NOT_FOUND;
+
+		POP_ARG(text); ENSURE(text);
+		return cpymo_interpreter_pending_push(
+			engine, cpymo_select_pending_sel,
+			text, cpymo_str_pure(""), cpymo_str_pure(""), cpymo_str_pure(""));
+	}
+
+	if (cpymo_str_equals_str(command, "select_text")) {
+		if (cpymo_interpreter_count_args(interpreter) != 1)
+			return CPYMO_ERR_NOT_FOUND;
+
+		POP_ARG(text); ENSURE(text);
+		return cpymo_interpreter_pending_push(
+			engine, cpymo_select_pending_text,
+			text, cpymo_str_pure(""), cpymo_str_pure(""), cpymo_str_pure(""));
+	}
+
+	if (cpymo_str_equals_str(command, "select_var")) {
+		if (cpymo_interpreter_count_args(interpreter) != 2)
+			return CPYMO_ERR_NOT_FOUND;
+
+		POP_ARG(text); ENSURE(text);
+		POP_ARG(expr); ENSURE(expr);
+		return cpymo_interpreter_pending_push(
+			engine, cpymo_select_pending_var,
+			text, expr, cpymo_str_pure(""), cpymo_str_pure(""));
+	}
+
+	if (cpymo_str_equals_str(command, "select_img")) {
+		if (cpymo_interpreter_count_args(interpreter) != 3)
+			return CPYMO_ERR_NOT_FOUND;
+
+		POP_ARG(x); ENSURE(x);
+		POP_ARG(y); ENSURE(y);
+		POP_ARG(v); ENSURE(v);
+		return cpymo_interpreter_pending_push(
+			engine, cpymo_select_pending_img,
+			x, y, v, cpymo_str_pure(""));
+	}
+
+	if (cpymo_str_equals_str(command, "select_imgs")) {
+		if (cpymo_interpreter_count_args(interpreter) != 4)
+			return CPYMO_ERR_NOT_FOUND;
+
+		POP_ARG(filename); ENSURE(filename);
+		POP_ARG(x); ENSURE(x);
+		POP_ARG(y); ENSURE(y);
+		POP_ARG(v); ENSURE(v);
+		return cpymo_interpreter_pending_push(
+			engine, cpymo_select_pending_imgs, filename, x, y, v);
+	}
+
+	/* 收尾行 */
+	if (cpymo_str_equals_str(command, "sel_do"))
+		return cpymo_interpreter_sel_do(interpreter, engine);
+
+	if (cpymo_str_equals_str(command, "select_text_do"))
+		return cpymo_interpreter_select_text_do(interpreter, engine);
+
+	if (cpymo_str_equals_str(command, "select_var_do"))
+		return cpymo_interpreter_select_var_do(interpreter, engine);
+
+	if (cpymo_str_equals_str(command, "select_img_do"))
+		return cpymo_interpreter_select_img_do(interpreter, engine);
+
+	if (cpymo_str_equals_str(command, "select_imgs_do"))
+		return cpymo_interpreter_select_imgs_do(interpreter, engine);
+
+	return CPYMO_ERR_NOT_FOUND;
+}
+
+
+/* ── YukimiScript chara_multi 族 ──────────────────────────────────
+ * @chara_multi / @chara_y_multi / @chara_quake_multi /
+ * @chara_down_multi / @chara_up_multi 一条角色一行，最后 *_do 收尾。
+ * 旧 PyMO 把这些写在单行里（#chara / #chara_y 一次多组参数），命令
+ * 名与字段数都不同，命中才接管；否则 CPYMO_ERR_NOT_FOUND 交回 D() 链，
+ * 旧脚本的解析结果一个字节都不变。 */
+typedef struct { const char *p, *end; } cpymo_chara_iter;
+
+static void cpymo_chara_iter_begin(cpymo_chara_iter *it, cpymo_engine *e)
+{
+	it->p = e->chara_pending;
+	it->end = e->chara_pending + e->chara_pending_len;
+}
+
+static bool cpymo_chara_iter_next(cpymo_chara_iter *it, cpymo_str f[5])
+{
+	if (it->p == NULL || it->p >= it->end) return false;
+
+	char *entry = (char *)it->p;
+	it->p += strlen(entry) + 1;
+
+	for (int i = 0; i < 5; ++i) f[i] = cpymo_str_pure("");
+
+	char *p = entry;
+	for (int i = 0; i < 5 && p != NULL; ++i) {
+		char *tab = strchr(p, '\t');
+		if (tab != NULL) *tab = '\0';
+		f[i] = cpymo_str_pure(p);
+		p = tab != NULL ? tab + 1 : NULL;
+	}
+
+	return true;
+}
+
+static error_t cpymo_interpreter_chara_push(
+	cpymo_engine *e, int kind, cpymo_str *f, size_t n)
+{
+	CPYMO_THROW(cpymo_engine_chara_pending_kind(e, kind));
+	return cpymo_engine_chara_pending_push(e, f, n);
+}
+
+static error_t cpymo_interpreter_chara_multi_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	error_t err;
+	size_t n = cpymo_interpreter_count_args(interpreter);
+	float time = 0.3f;
+
+	if (n > 1) return CPYMO_ERR_NOT_FOUND;
+	if (n == 1) {
+		POP_ARG(t);
+		time = (float)cpymo_str_atoi(t) / 1000.0f;
+	}
+
+	cpymo_chara_iter it;
+	cpymo_chara_iter_begin(&it, engine);
+	cpymo_str f[5];
+
+	while (cpymo_chara_iter_next(&it, f)) {
+		int chara_id = cpymo_str_atoi(f[0]);
+		int layer = cpymo_str_atoi(f[3]);
+		float pos_x = (float)cpymo_str_atoi(f[2])
+			/ 100.0f * (float)engine->gameconfig.imagesize_w;
+
+		if (cpymo_str_equals_str(f[1], "NULL")) {
+			cpymo_charas_kill(engine, chara_id, time);
+		}
+		else {
+			struct cpymo_chara *ch;
+			err = cpymo_charas_new_chara(
+				engine, &ch, f[1], chara_id, layer, 5,
+				pos_x, 0.0f, 0.0f, time);
+			if (err != CPYMO_ERR_SUCC) return err;
+		}
+	}
+
+	cpymo_charas_wait(engine);
+	cpymo_engine_chara_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_chara_y_multi_do(
+	cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	error_t err;
+	size_t n = cpymo_interpreter_count_args(interpreter);
+	int coord_mode = 5;
+	float time = 0.3f;
+
+	if (n > 2) return CPYMO_ERR_NOT_FOUND;
+	if (n >= 1) {
+		POP_ARG(cm);
+		coord_mode = cpymo_str_atoi(cm);
+	}
+	if (n >= 2) {
+		POP_ARG(t);
+		time = (float)cpymo_str_atoi(t) / 1000.0f;
+	}
+
+	cpymo_chara_iter it;
+	cpymo_chara_iter_begin(&it, engine);
+	cpymo_str f[5];
+
+	while (cpymo_chara_iter_next(&it, f)) {
+		int chara_id = cpymo_str_atoi(f[0]);
+		int layer = cpymo_str_atoi(f[4]);
+		POS(pos_x, pos_y, f[2], f[3]);
+
+		if (cpymo_str_equals_str(f[1], "NULL")) {
+			cpymo_charas_kill(engine, chara_id, time);
+		}
+		else {
+			struct cpymo_chara *ch;
+			err = cpymo_charas_new_chara(
+				engine, &ch, f[1], chara_id, layer, coord_mode,
+				pos_x, pos_y, 0.0f, time);
+			if (err != CPYMO_ERR_SUCC) return err;
+		}
+	}
+
+	cpymo_charas_wait(engine);
+	cpymo_engine_chara_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+/* 立绘左右振动：与 #quake 同一组偏移，但只作用在列出的角色上，
+ * 也不带动背景。 */
+static error_t cpymo_interpreter_chara_quake_do(cpymo_engine *engine)
+{
+	static float offsets[] = { -1, -2, 4, 3, 6, -4, 5, 3, 2, -1, 0, 0 };
+
+	cpymo_charas_play_anime(
+		engine, 0.06f, 1, offsets, sizeof(offsets) / sizeof(float) / 2, false);
+
+	cpymo_chara_iter it;
+	cpymo_chara_iter_begin(&it, engine);
+	cpymo_str f[5];
+	while (cpymo_chara_iter_next(&it, f))
+		cpymo_charas_set_play_anime(&engine->charas, cpymo_str_atoi(f[0]));
+
+	cpymo_engine_chara_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+/* 立绘下沉 / 上跳：手册只给了名字，这里用半屏高（180/360）近似。
+ * 下沉的位移在动画结束时折进位置、留在那儿；上跳跳起后落回原处，
+ * 净位移为零，两者成对使用时互相抵消。 */
+static error_t cpymo_interpreter_chara_shift_do(cpymo_engine *engine, bool down)
+{
+	static float down_offsets[] = { 0, 0, 0, 180 };
+	static float up_offsets[] = { 0, -180, 0, 0 };
+
+	cpymo_charas_play_anime(
+		engine, 0.3f, 1, down ? down_offsets : up_offsets, 2, false);
+
+	cpymo_chara_iter it;
+	cpymo_chara_iter_begin(&it, engine);
+	cpymo_str f[5];
+	while (cpymo_chara_iter_next(&it, f))
+		cpymo_charas_set_play_anime(&engine->charas, cpymo_str_atoi(f[0]));
+
+	cpymo_engine_chara_pending_reset(engine);
+	return CPYMO_ERR_SUCC;
+}
+
+static error_t cpymo_interpreter_chara_two_stage(
+	cpymo_str command, cpymo_interpreter *interpreter, cpymo_engine *engine)
+{
+	cpymo_str f[5];
+	int i;
+
+	if (cpymo_str_equals_str(command, "chara_multi")) {
+		size_t n = cpymo_interpreter_count_args(interpreter);
+		if (n < 2 || n > 4) return CPYMO_ERR_NOT_FOUND;
+
+		for (i = 0; i < 5; ++i) f[i] = cpymo_str_pure("");
+		POP_ARG(a); POP_ARG(b); POP_ARG(c); POP_ARG(d);
+		ENSURE(b);
+		f[0] = a; f[1] = b; f[2] = c; f[3] = d;
+		return cpymo_interpreter_chara_push(
+			engine, cpymo_chara_pending_chara, f, 4);
+	}
+
+	if (cpymo_str_equals_str(command, "chara_y_multi")) {
+		size_t n = cpymo_interpreter_count_args(interpreter);
+		if (n < 3 || n > 5) return CPYMO_ERR_NOT_FOUND;
+
+		for (i = 0; i < 5; ++i) f[i] = cpymo_str_pure("");
+		POP_ARG(a); POP_ARG(b); POP_ARG(c); POP_ARG(d); POP_ARG(e);
+		ENSURE(b);
+		f[0] = a; f[1] = b; f[2] = c; f[3] = d; f[4] = e;
+		return cpymo_interpreter_chara_push(
+			engine, cpymo_chara_pending_chara_y, f, 5);
+	}
+
+	if (cpymo_str_equals_str(command, "chara_quake_multi")
+		|| cpymo_str_equals_str(command, "chara_down_multi")
+		|| cpymo_str_equals_str(command, "chara_up_multi")) {
+		int kind = cpymo_chara_pending_quake;
+
+		if (cpymo_interpreter_count_args(interpreter) != 1)
+			return CPYMO_ERR_NOT_FOUND;
+
+		if (cpymo_str_equals_str(command, "chara_down_multi"))
+			kind = cpymo_chara_pending_down;
+		else if (cpymo_str_equals_str(command, "chara_up_multi"))
+			kind = cpymo_chara_pending_up;
+
+		for (i = 0; i < 5; ++i) f[i] = cpymo_str_pure("");
+		POP_ARG(a);
+		ENSURE(a);
+		f[0] = a;
+		return cpymo_interpreter_chara_push(engine, kind, f, 1);
+	}
+
+	/* 收尾行 */
+	if (cpymo_str_equals_str(command, "chara_multi_do"))
+		return cpymo_interpreter_chara_multi_do(interpreter, engine);
+
+	if (cpymo_str_equals_str(command, "chara_y_multi_do"))
+		return cpymo_interpreter_chara_y_multi_do(interpreter, engine);
+
+	if (cpymo_str_equals_str(command, "chara_quake_multi_do"))
+		return cpymo_interpreter_chara_quake_do(engine);
+
+	if (cpymo_str_equals_str(command, "chara_down_multi_do"))
+		return cpymo_interpreter_chara_shift_do(engine, true);
+
+	if (cpymo_str_equals_str(command, "chara_up_multi_do"))
+		return cpymo_interpreter_chara_shift_do(engine, false);
+
+	return CPYMO_ERR_NOT_FOUND;
+}
+
 static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *interpreter, cpymo_engine *engine, jmp_buf cont)
 {
 	error_t err;
@@ -244,7 +926,23 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 
 	#endif
 
+	/* YukimiScript 两段式选择组：不是它的命令就照旧往下走 */
+	err = cpymo_interpreter_select_two_stage(command, interpreter, engine);
+	if (err != CPYMO_ERR_NOT_FOUND) return err;
+
+	/* YukimiScript chara_multi 族：不是它的命令就照旧往下走 */
+	err = cpymo_interpreter_chara_two_stage(command, interpreter, engine);
+	if (err != CPYMO_ERR_NOT_FOUND) return err;
+
 	/*** I. Text ***/
+	D("__define_character") {
+		POP_ARG(symbol);
+		POP_ARG(name);
+		ENSURE(symbol);
+		ENSURE(name);
+		return cpymo_engine_define_character(engine, symbol, name);
+	}
+
 	D("say") {
 		cpymo_fade_reset(&engine->fade);
 		cpymo_interpreter_checkpoint(interpreter);
@@ -255,6 +953,10 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		if (IS_EMPTY(text)) {
 			text = name_or_text;
 			name_or_text.len = 0;
+		} else {
+			/* YukimiScript 的角色名是符号（c0…），这里换成真名；
+			   没定义过就原样返回，旧脚本零变化。 */
+			name_or_text = cpymo_engine_find_character_name(engine, name_or_text);
 		}
 
 		cpymo_engine_extract_text(engine, name_or_text);
@@ -956,6 +1658,63 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 	D("label") {
 		CONT_NEXTLINE;
 	}
+
+		/* YukimiScript 的 if_goto：left op right label。
+		 * op 为符号（eq/ne/gt/lt/ge/le，见 libpymo.ykm），也接受符号写法。
+		 * 新命令名，旧脚本不会出现；未知命令本来就只警告并跳过，
+		 * 所以既有脚本的解析结果一处未变。 */
+		D("if_goto") {
+			POP_ARG(cmp_left);
+			POP_ARG(cmp_op);
+			POP_ARG(cmp_right);
+			POP_ARG(cmp_label);
+
+			if (IS_EMPTY(cmp_left) || IS_EMPTY(cmp_op) ||
+				IS_EMPTY(cmp_right) || IS_EMPTY(cmp_label))
+				return CPYMO_ERR_INVALID_ARG;
+
+			const int cmp_lv = cpymo_vars_eval(&engine->vars, cmp_left);
+
+			int cmp_rv;
+			if (cpymo_vars_is_constant(cmp_right)) {
+				cmp_rv = cpymo_str_atoi(cmp_right);
+			}
+			else {
+				const cpymo_val *cmp_var =
+					cpymo_vars_access(&engine->vars, cmp_right);
+				if (cmp_var == NULL) { CONT_NEXTLINE; }
+				cmp_rv = *cmp_var;
+			}
+
+			bool cmp_result;
+			if (cpymo_str_equals_str(cmp_op, "eq")
+				|| cpymo_str_equals_str(cmp_op, "="))
+				cmp_result = cmp_lv == cmp_rv;
+			else if (cpymo_str_equals_str(cmp_op, "ne")
+				|| cpymo_str_equals_str(cmp_op, "!=")
+				|| cpymo_str_equals_str(cmp_op, "<>"))
+				cmp_result = cmp_lv != cmp_rv;
+			else if (cpymo_str_equals_str(cmp_op, "gt")
+				|| cpymo_str_equals_str(cmp_op, ">"))
+				cmp_result = cmp_lv > cmp_rv;
+			else if (cpymo_str_equals_str(cmp_op, "ge")
+				|| cpymo_str_equals_str(cmp_op, ">="))
+				cmp_result = cmp_lv >= cmp_rv;
+			else if (cpymo_str_equals_str(cmp_op, "lt")
+				|| cpymo_str_equals_str(cmp_op, "<"))
+				cmp_result = cmp_lv < cmp_rv;
+			else if (cpymo_str_equals_str(cmp_op, "le")
+				|| cpymo_str_equals_str(cmp_op, "<="))
+				cmp_result = cmp_lv <= cmp_rv;
+			else return CPYMO_ERR_INVALID_ARG;
+
+			if (!cmp_result) CONT_NEXTLINE;
+
+			err = cpymo_interpreter_goto_label(interpreter, cmp_label);
+			CPYMO_THROW(err);
+
+			CONT_WITH_CURRENT_CONTEXT;
+		}
 
 	D("goto") {
 		POP_ARG(label);

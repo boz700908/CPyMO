@@ -373,11 +373,18 @@ static void cpymo_charas_stop_all_anime(cpymo_engine *e)
 	float last_pos_x = c->anime_pos[(c->anime_pos_count - 1) * 2] * (float)e->gameconfig.imagesize_w / 540.0f;
 	float last_pos_y = c->anime_pos[(c->anime_pos_count - 1) * 2 + 1] * (float)e->gameconfig.imagesize_h / 360.0f;
 
+	/* 只把末帧偏移折进真正参与这次动画的角色。以前是无条件对全部
+	 * 角色折进：全屏 quake 设了全部角色、末帧又是 0,0，看不出差别，
+	 * 但只作用在部分角色上的动画会给别的角色留下位移。 */
 	while (ch) {
-		ch->play_anime = false;
-		cpymo_tween_assign(&ch->pos_x, last_pos_x + cpymo_tween_value(&ch->pos_x));
-		cpymo_tween_assign(&ch->pos_y, last_pos_y + cpymo_tween_value(&ch->pos_y));
+		if (ch->play_anime) {
+			cpymo_tween_assign(
+				&ch->pos_x, last_pos_x + cpymo_tween_value(&ch->pos_x));
+			cpymo_tween_assign(
+				&ch->pos_y, last_pos_y + cpymo_tween_value(&ch->pos_y));
+		}
 
+		ch->play_anime = false;
 		ch = ch->next;
 	}
 

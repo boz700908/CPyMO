@@ -28,6 +28,26 @@
 #include "cpymo_lua_context.h"
 #endif
 
+/* 两段式选择（YukimiScript 的 @sel/@select_* + @*_do）在收尾之前
+ * 逐行收集的条目的种类，用来核对收集行与 *_do 是否配套。 */
+enum cpymo_select_pending_kind {
+	cpymo_select_pending_none = 0,
+	cpymo_select_pending_sel,
+	cpymo_select_pending_text,
+	cpymo_select_pending_var,
+	cpymo_select_pending_img,
+	cpymo_select_pending_imgs
+};
+
+enum cpymo_chara_pending_kind {
+	cpymo_chara_pending_none = 0,
+	cpymo_chara_pending_chara,
+	cpymo_chara_pending_chara_y,
+	cpymo_chara_pending_quake,
+	cpymo_chara_pending_down,
+	cpymo_chara_pending_up
+};
+
 struct cpymo_engine {
 	uint8_t feature_level;
 	cpymo_gameconfig gameconfig;
@@ -59,10 +79,25 @@ struct cpymo_engine {
 	bool skipping;
 	char *title;
 
+	/* 两段式选择的条目缓存：条目以 \0 结尾，条目内字段以 \t 分隔。 */
+	char *select_pending;
+	size_t select_pending_len, select_pending_cap;
+	size_t select_pending_count;
+	uint8_t select_pending_kind;
+	char *chara_pending;
+	size_t chara_pending_len, chara_pending_cap;
+	size_t chara_pending_count;
+	uint8_t chara_pending_kind;
+
 	bool redraw;
 	bool ignore_next_mouse_button_flag;
 
 	bool config_skip_already_read_only;
+
+	/* #__define_character：YukimiScript 角色符号（c0…）到显示名的映射，
+	 * 按 symbol\0name\0 紧凑存放，见 cpymo_engine_define_character。 */
+	char *chara_names;
+	size_t chara_names_len, chara_names_cap;
 
 #ifdef ENABLE_TEXT_EXTRACT
 	char *text_extract_buffer;
@@ -72,6 +107,22 @@ struct cpymo_engine {
 };
 
 typedef struct cpymo_engine cpymo_engine;
+
+/* 记录/查询 #__define_character 定义的角色符号；未定义时原样返回 symbol。 */
+error_t cpymo_engine_define_character(
+	cpymo_engine *e, cpymo_str symbol, cpymo_str name);
+cpymo_str cpymo_engine_find_character_name(
+	cpymo_engine *e, cpymo_str symbol);
+
+/* 两段式选择的条目缓存：kind 变化时自动清空重来。 */
+error_t cpymo_engine_select_pending_kind(cpymo_engine *e, int kind);
+error_t cpymo_engine_select_pending_push(
+	cpymo_engine *e, cpymo_str f1, cpymo_str f2, cpymo_str f3, cpymo_str f4);
+void cpymo_engine_select_pending_reset(cpymo_engine *e);
+error_t cpymo_engine_chara_pending_kind(cpymo_engine *e, int kind);
+error_t cpymo_engine_chara_pending_push(
+	cpymo_engine *e, const cpymo_str *fields, size_t field_count);
+void cpymo_engine_chara_pending_reset(cpymo_engine *e);
 
 error_t cpymo_engine_init(cpymo_engine *out, const char *gamedir);
 void cpymo_engine_play_startup_music_once(void);
