@@ -170,7 +170,9 @@ static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 	
 	case 8: cpymo_ui_exit(e); break;
 	default:
-		assert(false);
+		/* Added items are dispatched by cpymo_select_img_ok and never reach
+		   here; a stray index must not take the engine down. */
+		break;
 	}
 
 	return CPYMO_ERR_SUCC;
@@ -178,16 +180,17 @@ static error_t cpymo_rmenu_ok(cpymo_engine *e, int sel, uint64_t hash, bool _)
 
 static inline float cpymo_rmenu_bg_zoom(
 	const cpymo_rmenu *r,
-	float font_size)
+	float font_size,
+	int menu_items)
 {
 	#ifdef DISABLE_IMAGE_SCALING
+	(void)r; (void)font_size; (void)menu_items;
 	return 1.0f;
 	#else
-	const size_t menu_items = 9;
 	const float menu_item_padding = 2.0f;
 	const float menu_padding = 16.0f;
 	const float menu_height =
-		(menu_item_padding + font_size) * menu_items + 2.0f * menu_padding;
+		(menu_item_padding + font_size) * (float)menu_items + 2.0f * menu_padding;
 
 	float zoom_out = (menu_height / r->bg_h);
 	if (zoom_out < 1.0f) zoom_out = 1.0f;
@@ -265,7 +268,16 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 #endif
 
 	const float font_size = cpymo_gameconfig_font_size(&e->gameconfig);
-	rmenu->bg_zoom_out = cpymo_rmenu_bg_zoom(rmenu, font_size);
+
+	/* Added items take a row too: size the backdrop for the real item
+	   count, otherwise their text runs past the box. */
+	int menu_items = 9;
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (rmenu->menu.patch && rmenu->menu.patch_page)
+		menu_items += (int)cpymo_ui_patch_extra_count(
+			rmenu->menu.patch, rmenu->menu.patch_page);
+#endif
+	rmenu->bg_zoom_out = cpymo_rmenu_bg_zoom(rmenu, font_size, menu_items);
 
 	#define RMENU_ITEM(_, TEXT, ENABLED) \
 		err = cpymo_select_img_configuare_select_text( \
