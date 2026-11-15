@@ -37,6 +37,9 @@ typedef struct {
     int timer_next_id;
     double timer_clock;
 
+    /* Persistent on-screen readouts driven by Lua (cpymo.ui.hud). */
+    struct cpymo_lua_hud_item *hud_items;
+
     /* Suspended #lua block. 0 means no block is waiting. */
     int block_co_ref;
     int block_line;

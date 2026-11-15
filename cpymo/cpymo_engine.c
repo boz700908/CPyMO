@@ -1,5 +1,6 @@
 ﻿#include "cpymo_prelude.h"
 #include "cpymo_engine.h"
+#include "cpymo_lua_hud.h"
 #include "cpymo_interpreter.h"
 #include <string.h>
 #include <stdio.h>
@@ -638,6 +639,14 @@ void cpymo_engine_draw(const cpymo_engine *engine)
 {
 	if (cpymo_ui_enabled(engine)) {
 		cpymo_ui_draw(engine);
+
+		#if CPYMO_FEATURE_LEVEL >= 1
+		if (engine->feature_level >= 1)
+			cpymo_lua_hud_draw_all(engine->lua.hud_items,
+				engine->gameconfig.imagesize_w,
+				engine->gameconfig.imagesize_h);
+		#endif
+
 		return;
 	}
 
@@ -666,6 +675,13 @@ void cpymo_engine_draw(const cpymo_engine *engine)
 	cpymo_say_draw(engine);
 	cpymo_say_dialog_ext_draw(engine);
 	cpymo_input_text_draw(&engine->input_text, engine);
+
+	#if CPYMO_FEATURE_LEVEL >= 1
+	if (engine->feature_level >= 1)
+		cpymo_lua_hud_draw_all(engine->lua.hud_items,
+			engine->gameconfig.imagesize_w,
+			engine->gameconfig.imagesize_h);
+	#endif
 }
 
 void cpymo_engine_trim_memory(cpymo_engine *e)

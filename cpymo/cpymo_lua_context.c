@@ -1,4 +1,5 @@
 #include "cpymo_prelude.h"
+#include "cpymo_lua_hud.h"
 
 #if CPYMO_FEATURE_LEVEL >= 1
 #include "cpymo_lua_context.h"
@@ -958,6 +959,7 @@ void cpymo_lua_context_free(cpymo_lua_context *l)
     }
 
     if (l->lua_state) {
+        cpymo_lua_hud_free_all(&l->hud_items);
         cpymo_lua_timers_free(l);
         cpymo_lua_get_main_actor(l);
         cpymo_lua_actor_free(l);

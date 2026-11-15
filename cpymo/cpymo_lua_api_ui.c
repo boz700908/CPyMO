@@ -11,6 +11,8 @@
 #include "cpymo_music_box.h"
 #include "cpymo_rmenu.h"
 #include "cpymo_save_ui.h"
+#include "cpymo_lua_hud.h"
+#include <string.h>
 
 #include <lauxlib.h>
 #include <lualib.h>
@@ -193,6 +195,84 @@ static int cpymo_lua_ui_open_load_yesnobox(lua_State *l)
     return 0;
 }
 
+static int cpymo_lua_api_ui_hud(lua_State *l)
+{
+    int top = lua_gettop(l);
+    if (top < 2 || top > 3)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.hud(id, text [, options]) takes 2 or 3 arguments.");
+
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+
+    const char *id = luaL_checkstring(l, 1);
+    cpymo_str text = cpymo_str_pure(luaL_checkstring(l, 2));
+
+    struct cpymo_lua_hud_options opts;
+    memset(&opts, 0, sizeof(opts));
+    opts.color = cpymo_color_white;
+
+    if (top == 3) {
+        if (!lua_istable(l, 3))
+            CPYMO_LUA_PANIC(l, "The options of cpymo.ui.hud must be a table.");
+
+        lua_getfield(l, 3, "x");
+        if (lua_isnumber(l, -1)) {
+            opts.has_pos = true;
+            opts.x = (float)lua_tonumber(l, -1);
+        }
+        lua_pop(l, 1);
+
+        lua_getfield(l, 3, "y");
+        if (lua_isnumber(l, -1)) {
+            opts.has_pos = true;
+            opts.y = (float)lua_tonumber(l, -1);
+        }
+        lua_pop(l, 1);
+
+        lua_getfield(l, 3, "size");
+        if (lua_isnumber(l, -1)) opts.size = (float)lua_tonumber(l, -1);
+        lua_pop(l, 1);
+
+        lua_getfield(l, 3, "color");
+        if (lua_istable(l, -1)) {
+            cpymo_color col = cpymo_color_white;
+
+            lua_getfield(l, -1, "r");
+            if (lua_isnumber(l, -1)) col.r = (uint8_t)lua_tointeger(l, -1);
+            lua_pop(l, 1);
+
+            lua_getfield(l, -1, "g");
+            if (lua_isnumber(l, -1)) col.g = (uint8_t)lua_tointeger(l, -1);
+            lua_pop(l, 1);
+
+            lua_getfield(l, -1, "b");
+            if (lua_isnumber(l, -1)) col.b = (uint8_t)lua_tointeger(l, -1);
+            lua_pop(l, 1);
+
+            opts.color = col;
+        }
+        lua_pop(l, 1);
+
+        lua_getfield(l, 3, "silent");
+        if (lua_isboolean(l, -1)) opts.silent = lua_toboolean(l, -1) != 0;
+        lua_pop(l, 1);
+    }
+
+    error_t err = cpymo_lua_hud_set(&e->lua.hud_items, id, text, &opts);
+    CPYMO_LUA_THROW(l, err);
+
+    return 0;
+}
+
+static int cpymo_lua_api_ui_hud_remove(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 1);
+
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    cpymo_lua_hud_remove(&e->lua.hud_items, luaL_checkstring(l, 1));
+
+    return 0;
+}
+
 void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
 {
     lua_State *l = ctx->lua_state;
@@ -214,6 +294,8 @@ void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
         { "open_album", &cpymo_lua_api_ui_open_album },
         { "play_movie", &cpymo_lua_api_ui_play_movie },
         { "open_load_yesnobox", &cpymo_lua_ui_open_load_yesnobox },
+        { "hud", &cpymo_lua_api_ui_hud },
+        { "hud_remove", &cpymo_lua_api_ui_hud_remove },
         { NULL, NULL }
     };
     luaL_setfuncs(l, funcs, 0);
