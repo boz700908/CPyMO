@@ -757,7 +757,7 @@ void cpymo_select_img_configuare_end_select_text(
 					s->enabled = true;
 					s->hash = 0;
 					s->has_selected = false;
-					s->hint_state = 0;
+					s->hint_state = (enum cpymo_select_img_selection_hint_state)0;
 					if (t && *t) {
 						if (cpymo_backend_text_create(
 							&s->or_text, &w,
