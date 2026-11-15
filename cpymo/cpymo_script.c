@@ -42,12 +42,7 @@ error_t cpymo_script_create_bootloader(
         "#wait 300\n"
 		"#change %s";
 
-    #if CPYMO_FEATURE_LEVEL >= 1
-    if (feature_level >= 1)
-        script_format =
-            "#textbox message,name\n"
-            "#change %s";
-    #endif
+    (void)feature_level;
 
     cpymo_script *script = (cpymo_script *)malloc(sizeof(cpymo_script) + 1);
     if (script == NULL) return CPYMO_ERR_OUT_OF_MEM;

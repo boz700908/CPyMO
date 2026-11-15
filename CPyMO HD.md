@@ -2,13 +2,16 @@
 
 > **实现状态（main 分支）**
 >
-> 本文是 CPyMO HD 的分级功能规划。`main` 已落地 Feature Level 1：`#lua` 命令、Actor 抽象、
-> `cpymo` 下的各 API 包（`render` / `asset` / `ui` / `flags` / `input` / `script` / `save`）、
-> `gameconfig.txt` 里的 `cpymohd1` / `cpymohd2` / `cpymohd3` 平台值，以及在 Feature Level 1 下
-> 跳过 logo1 / logo2。开启方式见 `README.md` 的 libpymo 一节。
+> 本文是 CPyMO HD 的分级功能规划。`main` 已落地 Feature Level 1 的 Lua 部分：`#lua` 命令、
+> Actor 抽象、`cpymo` 下的各 API 包（`render` / `asset` / `ui` / `flags` / `input` / `script` /
+> `save`），以及 `gameconfig.txt` 里的 `cpymohd1` / `cpymohd2` / `cpymohd3` 平台值。
+> 开启方式见 `README.md` 的 libpymo 一节。
 >
-> 尚未落地：移除 `s60v3` / `s60v5` 平台支持；Feature Level 2 的图形后端增强（旋转、缩放、
-> 加法混合）与 Feature Level 3 的 OpenGL ES 2.0 完整访问。
+> `main` 不做该级别里的删减项：不移除 `s60v3` / `s60v5` 平台支持，也不跳过启动时的
+> logo1 / logo2，Feature Level 1 与 Level 0 一样播放启动 logo。
+>
+> 尚未开始：Feature Level 2 的图形后端增强（旋转、缩放、加法混合）与 Feature Level 3 的
+> OpenGL ES 2.0 完整访问。
 
 CPyMO HD现在使用的Lua版本是`v5.4.6`。
 
@@ -18,10 +21,8 @@ CPyMO HD将引擎扩展功能划分为四个功能级别，每个级别都基于
 - Feature Level 0
   * 这个级别和PyMO完全一致。
 - Feature Level 1
-  * 这个级别删除了PyMO中部分落后的功能。
   * 该级别的backend部分与Feature Level 0保持一致，不需要增强硬件功能。
   * 该级别可能会占用更多的内存，除此之外，所有Feature Level 0可以运行的平台都应可以运行Feature Level 1.
-  * 移除了platform s60v3和s60v5的支持。
 - Feature Level 2
   * 这个级别在backend上增强图形功能：
     + 旋转
@@ -41,7 +42,6 @@ CPyMO HD将引擎扩展功能划分为四个功能级别，每个级别都基于
 
 # Feature Level 1
 
-* 禁用logo1和logo2在启动时的显示
 * 支持Lua语言，在pymo脚本中新增`#lua`命令，此行后面的部分会被直接当作lua代码执行
 
 ## Actor抽象
