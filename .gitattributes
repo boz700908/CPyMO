@@ -1,0 +1,4 @@
+# Git 里存 UTF-8（可正常 diff / review），工作区仍是 Windows PowerShell 习惯的
+# UTF-16 LE + BOM + LF。只对这一个文件生效：仓库里另有 ASCII 的
+# cpymo-backends/uwp/New-Cert.ps1，不能套用整条 *.ps1 规则。
+pymo2ykm.ps1 text eol=lf working-tree-encoding=UTF-16
