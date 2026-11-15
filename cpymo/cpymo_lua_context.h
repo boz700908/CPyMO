@@ -2,6 +2,7 @@
 #define INCLUDE_CPYMO_LUA_CONTEXT
 
 #include "cpymo_prelude.h"
+#include "cpymo_ui_patch.h"
 #if CPYMO_FEATURE_LEVEL >= 1
 
 #include <stddef.h>
@@ -40,6 +41,12 @@ typedef struct {
     /* Persistent on-screen readouts driven by Lua (cpymo.ui.hud). */
     struct cpymo_lua_hud_item *hud_items;
 
+    /* 自带页面条目补丁（改写 / 隐藏 / 追加），见 cpymo_ui_patch.h。 */
+    cpymo_ui_patch ui_patch;
+
+    /* cpymo.ui.on_item_click 注册的回调表（page -> function），LUA_NOREF 表示未注册。 */
+    int ui_click_ref;
+
     /* Suspended #lua block. 0 means no block is waiting. */
     int block_co_ref;
     int block_line;
@@ -52,6 +59,10 @@ error_t cpymo_lua_context_init(
     struct cpymo_engine *e);
 
 void cpymo_lua_context_free(cpymo_lua_context *l);
+
+/* 派发页面追加条目的点击回调（由 cpymo.ui.on_item_click 注册）。
+ * 未注册、无 Lua 状态或回调本身出错时静默返回，不影响调用方。 */
+void cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index);
 
 void cpymo_lua_gc_full(cpymo_lua_context *l);
 

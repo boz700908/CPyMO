@@ -1,5 +1,6 @@
 #include "cpymo_prelude.h"
 #include "cpymo_lua_hud.h"
+#include "cpymo_ui_patch.h"
 
 #if CPYMO_FEATURE_LEVEL >= 1
 #include "cpymo_lua_context.h"
@@ -907,6 +908,8 @@ error_t cpymo_lua_context_execute_script_block(
 
 error_t cpymo_lua_context_init(cpymo_lua_context *l, cpymo_engine *e)
 {
+    cpymo_ui_patch_init(&l->ui_patch);
+    l->ui_click_ref = LUA_NOREF;
     l->pending_code = NULL;
     l->pending_len = 0;
     l->pending_cap = 0;
@@ -960,10 +963,16 @@ void cpymo_lua_context_free(cpymo_lua_context *l)
 
     if (l->lua_state) {
         cpymo_lua_hud_free_all(&l->hud_items);
+        cpymo_ui_patch_free(&l->ui_patch);
         cpymo_lua_timers_free(l);
         cpymo_lua_get_main_actor(l);
         cpymo_lua_actor_free(l);
-        lua_close(l->lua_state);
+        if (l->lua_state && l->ui_click_ref != LUA_NOREF) {
+        luaL_unref(l->lua_state, LUA_REGISTRYINDEX, l->ui_click_ref);
+        l->ui_click_ref = LUA_NOREF;
+    }
+
+    lua_close(l->lua_state);
     } 
 }
 
@@ -1299,6 +1308,34 @@ error_t cpymo_lua_pop_color(
     *alpha = (float)color[3] / 255.0f;
 
     return CPYMO_ERR_SUCC;
+}
+
+#endif
+
+#if CPYMO_FEATURE_LEVEL >= 1
+
+void cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index)
+{
+    if (l == NULL || l->lua_state == NULL) return;
+    if (l->ui_click_ref == LUA_NOREF) return;
+    if (page == NULL) return;
+
+    lua_State *L = l->lua_state;
+    int top = lua_gettop(L);
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, l->ui_click_ref);
+    lua_getfield(L, -1, page);
+    if (lua_isfunction(L, -1)) {
+        lua_pushstring(L, page);
+        lua_pushinteger(L, index);
+        if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
+            const char *err = lua_tostring(L, -1);
+            printf("[cpymo] on_item_click(%s, %d) failed: %s\n",
+                page, index, err ? err : "(unknown)");
+        }
+    }
+
+    lua_settop(L, top);
 }
 
 #endif

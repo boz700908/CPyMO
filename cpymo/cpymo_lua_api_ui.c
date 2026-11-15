@@ -12,6 +12,7 @@
 #include "cpymo_rmenu.h"
 #include "cpymo_save_ui.h"
 #include "cpymo_lua_hud.h"
+#include "cpymo_ui_patch.h"
 #include <string.h>
 
 #include <lauxlib.h>
@@ -273,6 +274,95 @@ static int cpymo_lua_api_ui_hud_remove(lua_State *l)
     return 0;
 }
 
+
+static int cpymo_lua_api_ui_item_set(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 3)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.item_set(page, index, text) takes 3 arguments.");
+
+    const char *page = luaL_checkstring(l, 1);
+    int index = (int)luaL_checkinteger(l, 2);
+    const char *text = luaL_checkstring(l, 3);
+
+    error_t err = cpymo_ui_patch_set(&e->lua.ui_patch, page, index, text);
+    if (err != CPYMO_ERR_SUCC)
+        luaL_error(l, "cpymo.ui.item_set failed: %d", (int)err);
+
+    return 0;
+}
+
+static int cpymo_lua_api_ui_item_hide(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 2)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.item_hide(page, index) takes 2 arguments.");
+
+    const char *page = luaL_checkstring(l, 1);
+    int index = (int)luaL_checkinteger(l, 2);
+
+    error_t err = cpymo_ui_patch_hide(&e->lua.ui_patch, page, index);
+    if (err != CPYMO_ERR_SUCC)
+        luaL_error(l, "cpymo.ui.item_hide failed: %d", (int)err);
+
+    return 0;
+}
+
+static int cpymo_lua_api_ui_item_clear(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+
+    int top = lua_gettop(l);
+    if (top > 1)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.item_clear([page]) takes 0 or 1 argument.");
+
+    const char *page = top == 1 ? luaL_checkstring(l, 1) : NULL;
+    cpymo_ui_patch_clear(&e->lua.ui_patch, page);
+
+    return 0;
+}
+
+static int cpymo_lua_api_ui_item_add(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 2)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.item_add(page, text) takes 2 arguments.");
+
+    const char *page = luaL_checkstring(l, 1);
+    const char *text = luaL_checkstring(l, 2);
+
+    int n = (int)cpymo_ui_patch_extra_count(&e->lua.ui_patch, page);
+
+    error_t err = cpymo_ui_patch_add_extra(&e->lua.ui_patch, page, text);
+    if (err != CPYMO_ERR_SUCC)
+        luaL_error(l, "cpymo.ui.item_add failed: %d", (int)err);
+
+    lua_pushinteger(l, n);
+    return 1;
+}
+
+static int cpymo_lua_api_ui_on_item_click(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 2)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.on_item_click(page, fn) takes 2 arguments.");
+
+    const char *page = luaL_checkstring(l, 1);
+    luaL_checktype(l, 2, LUA_TFUNCTION);
+
+    if (e->lua.ui_click_ref == LUA_NOREF) {
+        lua_newtable(l);
+        e->lua.ui_click_ref = luaL_ref(l, LUA_REGISTRYINDEX);
+    }
+
+    lua_rawgeti(l, LUA_REGISTRYINDEX, e->lua.ui_click_ref);
+    lua_pushvalue(l, 2);
+    lua_setfield(l, -2, page);
+    lua_pop(l, 1);
+
+    return 0;
+}
+
 void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
 {
     lua_State *l = ctx->lua_state;
@@ -296,6 +386,11 @@ void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
         { "open_load_yesnobox", &cpymo_lua_ui_open_load_yesnobox },
         { "hud", &cpymo_lua_api_ui_hud },
         { "hud_remove", &cpymo_lua_api_ui_hud_remove },
+        { "item_set", &cpymo_lua_api_ui_item_set },
+        { "item_hide", &cpymo_lua_api_ui_item_hide },
+        { "item_clear", &cpymo_lua_api_ui_item_clear },
+        { "item_add", &cpymo_lua_api_ui_item_add },
+        { "on_item_click", &cpymo_lua_api_ui_on_item_click },
         { NULL, NULL }
     };
     luaL_setfuncs(l, funcs, 0);
