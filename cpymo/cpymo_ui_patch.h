@@ -36,8 +36,16 @@ typedef struct cpymo_ui_patch_entry {
     int extra;
 } cpymo_ui_patch_entry;
 
+/* 记录该页上游拥有的条目数，用于区分“真实条目”与“追加项”。 */
+typedef struct cpymo_ui_patch_base {
+    struct cpymo_ui_patch_base *next;
+    char *page;
+    size_t count;
+} cpymo_ui_patch_base;
+
 typedef struct cpymo_ui_patch {
     cpymo_ui_patch_entry *entries;
+    cpymo_ui_patch_base *bases;
     int extra_count;
 } cpymo_ui_patch;
 
@@ -68,9 +76,25 @@ int cpymo_ui_patch_visible_from(
 /* 在该页末尾追加文本条目。 */
 error_t cpymo_ui_patch_add_extra(cpymo_ui_patch *patch, const char *page, const char *text);
 
+void cpymo_ui_patch_set_base(cpymo_ui_patch *patch, const char *page, size_t count);
+
+/* 该页上游条目数；从未报告过时返回 (size_t)-1。 */
+size_t cpymo_ui_patch_get_base(const cpymo_ui_patch *patch, const char *page);
+
+/* 查询真实条目 index 上的补丁条目；无补丁返回 NULL。 */
+const cpymo_ui_patch_entry *cpymo_ui_patch_entry_at(
+    const cpymo_ui_patch *patch, const char *page, int index);
+
+/* 该页被改动的真实条目数（不含追加项）。 */
+size_t cpymo_ui_patch_patched_count(const cpymo_ui_patch *patch, const char *page);
+
 size_t cpymo_ui_patch_extra_count(const cpymo_ui_patch *patch, const char *page);
 
 const char *cpymo_ui_patch_extra_text(const cpymo_ui_patch *patch, const char *page, size_t n);
+/* 该页第 n 个追加项（按页内顺序，从 0 起）；没有返回 NULL。 */
+const cpymo_ui_patch_entry *cpymo_ui_patch_extra_entry(
+    const cpymo_ui_patch *patch, const char *page, size_t n);
+
 
 /* 页面节点总数 = 自带条目数 + 该页追加项数。 */
 static inline size_t cpymo_ui_patch_total(

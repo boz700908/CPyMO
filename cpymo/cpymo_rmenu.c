@@ -259,6 +259,8 @@ error_t cpymo_rmenu_enter(cpymo_engine *e)
 	if (e->feature_level >= 1) {
 		rmenu->menu.patch = &e->lua.ui_patch;
 		rmenu->menu.patch_page = CPYMO_UI_PATCH_PAGE_RMENU;
+		cpymo_ui_patch_set_base(
+			&e->lua.ui_patch, CPYMO_UI_PATCH_PAGE_RMENU, 9);
 	}
 #endif
 

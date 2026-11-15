@@ -318,6 +318,10 @@ error_t cpymo_music_box_enter(cpymo_engine *e)
 	} while (cpymo_parser_next_line(&p) && i < box->music_count);
 
 	assert(i == box->music_count);
+	cpymo_ui_patch_set_base(
+		CPYMO_MUSIC_BOX_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_MUSIC,
+		box->music_count);
+
 	cpymo_list_ui_set_current_node(e, cpymo_list_ui_encode_uint_node_enc(0));
 
 #ifdef ENABLE_TEXT_EXTRACT

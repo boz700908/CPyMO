@@ -14,9 +14,18 @@
 #include <stdint.h>
 #include "cpymo_accessibility.h"
 #include "cpymo_safe_area.h"
+#include "cpymo_ui_patch.h"
+#include "cpymo_ui_extra.h"
 #include <stdlib.h>
 
 #define ALBUM_MAX_CGS_SINGLE_PAGE 25
+
+#if CPYMO_FEATURE_LEVEL >= 1
+#define CPYMO_ALBUM_UI_PATCH(e) \
+	((e)->feature_level >= 1 ? &(e)->lua.ui_patch : NULL)
+#else
+#define CPYMO_ALBUM_UI_PATCH(e) NULL
+#endif
 static const float album_scroll_time = 3.0f;
 
 #ifdef CPYMO_TOOL
@@ -335,6 +344,53 @@ typedef struct {
 	float current_bg_x, current_bg_y;
 } cpymo_album;
 
+/* 相册页的条目补丁：改字同时影响标题绘制与朗读；隐藏=不可选中、不画高亮框。
+   网格缩略图由上游烘焙在一张 UI 图里，隐藏抹不掉格位，追加项也无处摆放。 */
+static bool cpymo_album_item_hidden(
+	const cpymo_engine *e, const cpymo_album *a, int i)
+{
+	if (i < 0 || i >= (int)a->cg_count) return true;
+	return cpymo_ui_patch_hidden(
+		CPYMO_ALBUM_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_ALBUM, i);
+}
+
+static int cpymo_album_step(
+	const cpymo_engine *e, const cpymo_album *a, int from, int dir)
+{
+	int n = (int)a->cg_count;
+	if (n <= 0) return -1;
+
+	int i = from;
+	for (int k = 0; k < n; ++k) {
+		i += dir;
+		if (i < 0 || i >= n) return -1;
+		if (!cpymo_album_item_hidden(e, a, i)) return i;
+	}
+
+	return -1;
+}
+
+static const char *cpymo_album_item_title(
+	const cpymo_engine *e, const cpymo_album *a, int i)
+{
+#ifdef ENABLE_TEXT_EXTRACT
+	if (i < 0 || i >= (int)a->cg_count) return NULL;
+	return cpymo_ui_patch_text(
+		CPYMO_ALBUM_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_ALBUM,
+		i, a->cg_infos[i].title_text);
+#else
+	(void)e; (void)a; (void)i;
+	return NULL;
+#endif
+}
+
+static void cpymo_album_speak_item(
+	const cpymo_engine *e, const cpymo_album *a, int i)
+{
+	const char *title = cpymo_album_item_title(e, a, i);
+	if (title) { cpymo_a11y_speak(title); }
+}
+
 uint64_t cpymo_album_cg_name_hash(cpymo_str cg_filename)
 {
 	uint64_t hash;
@@ -508,6 +564,9 @@ static error_t cpymo_album_load_page(cpymo_engine *e, cpymo_album *a)
 		}
 	}
 
+	cpymo_ui_patch_set_base(
+		CPYMO_ALBUM_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_ALBUM, a->cg_count);
+
 	return err;
 }
 
@@ -520,8 +579,7 @@ static error_t cpymo_album_next_page(cpymo_engine *e, cpymo_album *a)
 		error_t err = cpymo_album_load_page(e, a);
 #ifdef ENABLE_TEXT_EXTRACT
 		cpymo_accessibility_play_sound(SOUND_MENU);
-		if (err == CPYMO_ERR_SUCC && a->cg_count > 0 && a->cg_infos[0].title_text)
-			cpymo_a11y_speak(a->cg_infos[0].title_text);
+		if (err == CPYMO_ERR_SUCC) cpymo_album_speak_item(e, a, 0);
 #endif
 		return err;
 	}
@@ -542,8 +600,7 @@ static error_t cpymo_album_prev_page(cpymo_engine *e, cpymo_album *a)
 		error_t err = cpymo_album_load_page(e, a);
 #ifdef ENABLE_TEXT_EXTRACT
 		cpymo_accessibility_play_sound(SOUND_MENU);
-		if (err == CPYMO_ERR_SUCC && a->cg_count > 0 && a->cg_infos[0].title_text)
-			cpymo_a11y_speak(a->cg_infos[0].title_text);
+		if (err == CPYMO_ERR_SUCC) cpymo_album_speak_item(e, a, 0);
 #endif
 		return err;
 	}
@@ -571,6 +628,10 @@ static void cpymo_album_viewport(
 
 #ifndef __3DS__
 static bool cpymo_album_check_mouse_in_box(cpymo_engine *e, size_t i) {
+	if (cpymo_ui_patch_hidden(
+		CPYMO_ALBUM_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_ALBUM, (int)i))
+		return false;
+
 	size_t row = i / 5;
 	size_t col = i % 5;
 	float vx, vy, vw, vh;
@@ -597,8 +658,7 @@ static void cpymo_album_exit_showing_cg(cpymo_engine *e, cpymo_album *a) {
 	a->showing_cg = NULL;
 	cpymo_album_load_page(e, a);
 #ifdef ENABLE_TEXT_EXTRACT
-	if (a->cg_count > 0 && a->cg_infos[0].title_text)
-		cpymo_a11y_speak(a->cg_infos[0].title_text);
+	cpymo_album_speak_item(e, a, 0);
 #endif
 	cpymo_input_ignore_next_mouse_button_event(e);
 }
@@ -683,6 +743,14 @@ static void cpymo_album_showing_cg_next(
 
 static error_t cpymo_album_select_ok(cpymo_engine *e, cpymo_album *a)
 {
+	if (cpymo_album_item_hidden(e, a, a->current_cg_selection)) {
+		int nxt = cpymo_album_step(e, a, a->current_cg_selection, 1);
+		if (nxt < 0) nxt = cpymo_album_step(e, a, a->current_cg_selection, -1);
+		if (nxt < 0) return CPYMO_ERR_SUCC;
+		a->current_cg_selection = nxt;
+		cpymo_engine_request_redraw(e);
+	}
+
 	cpymo_album_cg_info *cg_info = &a->cg_infos[a->current_cg_selection];
 	if (!cg_info->preview_unlocked) return CPYMO_ERR_SUCC;
 	a->showing_cg = cg_info;
@@ -690,8 +758,7 @@ static error_t cpymo_album_select_ok(cpymo_engine *e, cpymo_album *a)
 	a->showing_cg_next_cg_id = 0;
 #ifdef ENABLE_TEXT_EXTRACT
 	cpymo_accessibility_play_sound(SOUND_ENTER);
-	if (cg_info->title_text)
-		cpymo_a11y_speak(cg_info->title_text);
+	cpymo_album_speak_item(e, a, a->current_cg_selection);
 #endif
 	cpymo_album_showing_cg_next(e, a);
 	cpymo_input_ignore_next_mouse_button_event(e);
@@ -786,32 +853,44 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 	if (cpymo_key_pluse_output(&album->key_right)) return cpymo_album_next_page(e, album);
 
 	if (cpymo_key_pluse_output(&album->key_down)) {
-		album->current_cg_selection++;
-		cpymo_engine_request_redraw(e);
+		int nxt = cpymo_album_step(e, album, album->current_cg_selection, 1);
 
-		if (album->current_cg_selection >= (int)album->cg_count)
+		/* 当前项可见却没有下一个可见项时翻页；整页无可见项时不动，避免空翻。 */
+		if (nxt < 0
+			&& !cpymo_album_item_hidden(e, album, album->current_cg_selection))
 			return cpymo_album_next_page(e, album);
+
+		if (nxt >= 0) {
+			album->current_cg_selection = nxt;
+			cpymo_engine_request_redraw(e);
 #ifdef ENABLE_TEXT_EXTRACT
-		cpymo_accessibility_play_sound(SOUND_SELECT);
-		if (album->cg_infos[album->current_cg_selection].title_text)
-			cpymo_a11y_speak(album->cg_infos[album->current_cg_selection].title_text);
+			cpymo_accessibility_play_sound(SOUND_SELECT);
 #endif
+			cpymo_album_speak_item(e, album, album->current_cg_selection);
+		}
+
 		return CPYMO_ERR_SUCC;
 	}
 
 	if (cpymo_key_pluse_output(&album->key_up)) {
-		cpymo_engine_request_redraw(e);
-		album->current_cg_selection--;
-		if (album->current_cg_selection < 0) {
+		int prv = cpymo_album_step(e, album, album->current_cg_selection, -1);
+
+		if (prv < 0
+			&& !cpymo_album_item_hidden(e, album, album->current_cg_selection)) {
 			error_t err = cpymo_album_prev_page(e, album);
 			album->current_cg_selection = (int)album->cg_count - 1;
 			return err;
 		}
+
+		if (prv >= 0) {
+			album->current_cg_selection = prv;
+			cpymo_engine_request_redraw(e);
 #ifdef ENABLE_TEXT_EXTRACT
-		cpymo_accessibility_play_sound(SOUND_SELECT);
-		if (album->cg_infos[album->current_cg_selection].title_text)
-			cpymo_a11y_speak(album->cg_infos[album->current_cg_selection].title_text);
+			cpymo_accessibility_play_sound(SOUND_SELECT);
 #endif
+			cpymo_album_speak_item(e, album, album->current_cg_selection);
+		}
+
 		return CPYMO_ERR_SUCC;
 	}
 
@@ -837,8 +916,7 @@ static error_t cpymo_album_update(cpymo_engine *e, void *a, float dt)
 						album->current_cg_selection = (int)i;
 #ifdef ENABLE_TEXT_EXTRACT
 						cpymo_accessibility_play_sound(SOUND_SELECT);
-						if (album->cg_infos[i].title_text)
-							cpymo_a11y_speak(album->cg_infos[i].title_text);
+						cpymo_album_speak_item(e, album, (int)i);
 #endif
 					}
 					break;
@@ -924,7 +1002,8 @@ static void cpymo_album_draw(const cpymo_engine *e, const void *_a)
 			}
 		}
 
-		if((int)i == a->current_cg_selection) {
+		if((int)i == a->current_cg_selection
+			&& !cpymo_album_item_hidden(e, a, (int)i)) {
 			const float thick = 3;
 			float highlight_rects[] = {
 				xywh[0] - thick, xywh[1], thick, xywh[3],
@@ -954,6 +1033,28 @@ static void cpymo_album_draw(const cpymo_engine *e, const void *_a)
 	}
 
 	const cpymo_album_cg_info *info = &a->cg_infos[a->current_cg_selection];
+
+	const char *title_override = cpymo_ui_patch_text(
+		CPYMO_ALBUM_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_ALBUM,
+		a->current_cg_selection, NULL);
+
+	if (title_override != NULL
+		&& !cpymo_album_item_hidden(e, a, a->current_cg_selection)) {
+		float vx, vy, vw, vh;
+		cpymo_album_viewport(e, &vx, &vy, &vw, &vh);
+
+		float draw_y = vy + vh / 4.0f;
+		if (a->current_cg_selection < 15) draw_y = vy + vh * 3.0f / 4.0f;
+
+		cpymo_ui_extra_draw_text(
+			title_override,
+			vx + vw * 0.03f,
+			draw_y,
+			cpymo_gameconfig_font_size(&e->gameconfig));
+
+		return;
+	}
+
 	if (info->title) {
 		float vx, vy, vw, vh;
 		cpymo_album_viewport(e, &vx, &vy, &vw, &vh);
@@ -1101,8 +1202,7 @@ error_t cpymo_album_enter(
 
 	err = cpymo_album_load_page(e, album);
 #ifdef ENABLE_TEXT_EXTRACT
-	if (err == CPYMO_ERR_SUCC && album->cg_count > 0 && album->cg_infos[0].title_text)
-		cpymo_a11y_speak(album->cg_infos[0].title_text);
+	if (err == CPYMO_ERR_SUCC) cpymo_album_speak_item(e, album, 0);
 #endif
 	return err;
 }

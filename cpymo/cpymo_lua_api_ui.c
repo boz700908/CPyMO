@@ -341,6 +341,159 @@ static int cpymo_lua_api_ui_item_add(lua_State *l)
     return 1;
 }
 
+static int cpymo_lua_api_ui_item_get(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+
+    if (lua_gettop(l) != 2)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.item_get(page, index) takes 2 arguments.");
+
+    const char *page = luaL_checkstring(l, 1);
+    int index = (int)luaL_checkinteger(l, 2);
+
+    const cpymo_ui_patch *patch = &e->lua.ui_patch;
+    const cpymo_ui_patch_entry *item = cpymo_ui_patch_entry_at(patch, page, index);
+    const cpymo_ui_patch_entry *extra = NULL;
+    int extra_index = -1;
+
+    size_t base = cpymo_ui_patch_get_base(patch, page);
+    if (base != (size_t)-1 && index >= (int)base) {
+        extra_index = index - (int)base;
+        extra = cpymo_ui_patch_extra_entry(patch, page, (size_t)extra_index);
+    }
+
+    if (item == NULL && extra == NULL) {
+        lua_pushnil(l);
+        return 1;
+    }
+
+    const cpymo_ui_patch_entry *src = extra != NULL ? extra : item;
+
+    lua_newtable(l);
+
+    lua_pushinteger(l, index);
+    lua_setfield(l, -2, "index");
+
+    if (src != NULL && src->text != NULL) lua_pushstring(l, src->text);
+    else lua_pushnil(l);
+    lua_setfield(l, -2, "text");
+
+    lua_pushboolean(l, extra == NULL && item != NULL && item->hidden);
+    lua_setfield(l, -2, "hidden");
+
+    lua_pushboolean(l, extra != NULL);
+    lua_setfield(l, -2, "extra");
+
+    lua_pushinteger(l, extra_index);
+    lua_setfield(l, -2, "extra_index");
+
+    return 1;
+}
+
+static int cpymo_lua_api_ui_items(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+
+    if (lua_gettop(l) != 1)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.items(page) takes 1 argument.");
+
+    const char *page = luaL_checkstring(l, 1);
+    const cpymo_ui_patch *patch = &e->lua.ui_patch;
+
+    size_t base = cpymo_ui_patch_get_base(patch, page);
+    size_t patched = cpymo_ui_patch_patched_count(patch, page);
+    size_t extras = cpymo_ui_patch_extra_count(patch, page);
+
+    lua_newtable(l);
+
+    lua_pushstring(l, page);
+    lua_setfield(l, -2, "page");
+
+    if (base == (size_t)-1) lua_pushnil(l);
+    else lua_pushinteger(l, (lua_Integer)base);
+    lua_setfield(l, -2, "base");
+
+    lua_pushinteger(l, (lua_Integer)patched);
+    lua_setfield(l, -2, "count");
+
+    lua_pushinteger(l, (lua_Integer)extras);
+    lua_setfield(l, -2, "extra_count");
+
+    int limit = (int)(base != (size_t)-1 ? base : 0);
+    for (const cpymo_ui_patch_entry *it = patch->entries; it; it = it->next) {
+        if (it->extra < 0 && it->index + 1 > limit) limit = it->index + 1;
+    }
+
+    lua_newtable(l);
+    int n = 0;
+    for (int i = 0; i < limit; ++i) {
+        const cpymo_ui_patch_entry *item = cpymo_ui_patch_entry_at(patch, page, i);
+        if (item == NULL) continue;
+
+        lua_newtable(l);
+
+        lua_pushinteger(l, i);
+        lua_setfield(l, -2, "index");
+
+        if (item->text != NULL) lua_pushstring(l, item->text);
+        else lua_pushnil(l);
+        lua_setfield(l, -2, "text");
+
+        lua_pushboolean(l, item->hidden);
+        lua_setfield(l, -2, "hidden");
+
+        lua_rawseti(l, -2, (lua_Integer)(++n));
+    }
+    lua_setfield(l, -2, "entries");
+
+    lua_newtable(l);
+    for (size_t i = 0; i < extras; ++i) {
+        const cpymo_ui_patch_entry *x = cpymo_ui_patch_extra_entry(patch, page, i);
+
+        lua_newtable(l);
+
+        lua_pushinteger(l, (lua_Integer)(base == (size_t)-1 ? 0 : base + i));
+        lua_setfield(l, -2, "index");
+
+        lua_pushstring(l, x != NULL && x->text != NULL ? x->text : "");
+        lua_setfield(l, -2, "text");
+
+        lua_pushboolean(l, 1);
+        lua_setfield(l, -2, "extra");
+
+        lua_rawseti(l, -2, (lua_Integer)(i + 1));
+    }
+    lua_setfield(l, -2, "extras");
+
+    return 1;
+}
+
+static int cpymo_lua_api_ui_pages(lua_State *l)
+{
+    if (lua_gettop(l) != 0)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.pages() takes no argument.");
+
+    static const char *const pages[] = {
+        CPYMO_UI_PATCH_PAGE_CONFIG,
+        CPYMO_UI_PATCH_PAGE_SAVE,
+        CPYMO_UI_PATCH_PAGE_LOAD,
+        CPYMO_UI_PATCH_PAGE_MUSIC,
+        CPYMO_UI_PATCH_PAGE_BACKLOG,
+        CPYMO_UI_PATCH_PAGE_ALBUM,
+        CPYMO_UI_PATCH_PAGE_SELECT,
+        CPYMO_UI_PATCH_PAGE_MSGBOX,
+        CPYMO_UI_PATCH_PAGE_RMENU,
+    };
+
+    lua_newtable(l);
+    for (size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); ++i) {
+        lua_pushstring(l, pages[i]);
+        lua_rawseti(l, -2, (lua_Integer)(i + 1));
+    }
+
+    return 1;
+}
+
 static int cpymo_lua_api_ui_on_item_click(lua_State *l)
 {
     cpymo_engine *e = cpymo_lua_state_get_engine(l);
@@ -362,6 +515,184 @@ static int cpymo_lua_api_ui_on_item_click(lua_State *l)
 
     return 0;
 }
+
+static char *cpymo_lua_ui_patch_dupstr(const char *s)
+{
+    if (s == NULL) return NULL;
+    size_t n = strlen(s) + 1;
+    char *r = (char *)malloc(n);
+    if (r != NULL) memcpy(r, s, n);
+    return r;
+}
+
+static void cpymo_lua_ui_patch_read_page(lua_State *l, int tbl, char *out, size_t out_len)
+{
+    out[0] = '\0';
+    lua_getfield(l, tbl, "page");
+    if (lua_isstring(l, -1)) {
+        const char *ps = lua_tostring(l, -1);
+        size_t n = strlen(ps);
+        if (n + 1 <= out_len) memcpy(out, ps, n + 1);
+    }
+    lua_pop(l, 1);
+}
+
+static void cpymo_lua_ui_patch_push_entry(
+    lua_State *l, const cpymo_ui_patch_entry *it)
+{
+    lua_newtable(l);
+
+    lua_pushstring(l, it->page);
+    lua_setfield(l, -2, "page");
+
+    lua_pushinteger(l, it->index);
+    lua_setfield(l, -2, "index");
+
+    if (it->text != NULL) lua_pushstring(l, it->text);
+    else lua_pushnil(l);
+    lua_setfield(l, -2, "text");
+
+    lua_pushboolean(l, it->hidden);
+    lua_setfield(l, -2, "hidden");
+
+    lua_pushboolean(l, it->extra >= 0);
+    lua_setfield(l, -2, "extra");
+}
+
+static int cpymo_lua_api_ui_export_patch(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 0)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.export_patch() takes no argument.");
+
+    const cpymo_ui_patch *patch = &e->lua.ui_patch;
+
+    lua_newtable(l);
+
+    lua_newtable(l);
+    int n = 0;
+
+    for (const cpymo_ui_patch_entry *it = patch->entries; it; it = it->next) {
+        if (it->extra >= 0) continue;
+
+        cpymo_lua_ui_patch_push_entry(l, it);
+        lua_rawseti(l, -2, (lua_Integer)(++n));
+    }
+
+    /* 链表是头插：顺序遍历得到的是追加的逆序，按它导入会颠倒页内顺序。
+       追加项改为按 extra 升序输出（选择排序，条目数为个位，代价可忽略）。 */
+    int last_extra = -1;
+    for (;;) {
+        const cpymo_ui_patch_entry *pick = NULL;
+
+        for (const cpymo_ui_patch_entry *it = patch->entries; it; it = it->next) {
+            if (it->extra < 0) continue;
+            if (it->extra <= last_extra) continue;
+            if (pick == NULL || it->extra < pick->extra) pick = it;
+        }
+
+        if (pick == NULL) break;
+
+        cpymo_lua_ui_patch_push_entry(l, pick);
+        lua_rawseti(l, -2, (lua_Integer)(++n));
+        last_extra = pick->extra;
+    }
+
+    lua_setfield(l, -2, "entries");
+
+    lua_newtable(l);
+    n = 0;
+    for (const cpymo_ui_patch_base *b = patch->bases; b; b = b->next) {
+        lua_newtable(l);
+
+        lua_pushstring(l, b->page);
+        lua_setfield(l, -2, "page");
+
+        lua_pushinteger(l, (lua_Integer)b->count);
+        lua_setfield(l, -2, "count");
+
+        lua_rawseti(l, -2, (lua_Integer)(++n));
+    }
+    lua_setfield(l, -2, "bases");
+
+    return 1;
+}
+
+static int cpymo_lua_api_ui_import_patch(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 1 || !lua_istable(l, 1))
+        CPYMO_LUA_PANIC(l, "cpymo.ui.import_patch(t) takes 1 table argument.");
+
+    cpymo_ui_patch *patch = &e->lua.ui_patch;
+    cpymo_ui_patch_free(patch);
+    cpymo_ui_patch_init(patch);
+
+    lua_getfield(l, 1, "entries");
+    if (lua_istable(l, -1)) {
+        size_t count = lua_rawlen(l, -1);
+        for (size_t i = 1; i <= count; ++i) {
+            lua_rawgeti(l, -1, (lua_Integer)i);
+            if (lua_istable(l, -1)) {
+                char page[64];
+                cpymo_lua_ui_patch_read_page(l, -1, page, sizeof(page));
+
+                char *text = NULL;
+                lua_getfield(l, -1, "text");
+                if (lua_isstring(l, -1)) text = cpymo_lua_ui_patch_dupstr(lua_tostring(l, -1));
+                lua_pop(l, 1);
+
+                lua_getfield(l, -1, "index");
+                int index = (int)lua_tointeger(l, -1);
+                lua_pop(l, 1);
+
+                lua_getfield(l, -1, "hidden");
+                bool hidden = lua_toboolean(l, -1) != 0;
+                lua_pop(l, 1);
+
+                lua_getfield(l, -1, "extra");
+                bool extra = lua_toboolean(l, -1) != 0;
+                lua_pop(l, 1);
+
+                if (page[0] != '\0') {
+                    if (extra)
+                        cpymo_ui_patch_add_extra(patch, page, text != NULL ? text : "");
+                    else {
+                        if (text != NULL) cpymo_ui_patch_set(patch, page, index, text);
+                        if (hidden) cpymo_ui_patch_hide(patch, page, index);
+                    }
+                }
+
+                if (text != NULL) free(text);
+            }
+            lua_pop(l, 1);
+        }
+    }
+    lua_pop(l, 1);
+
+    lua_getfield(l, 1, "bases");
+    if (lua_istable(l, -1)) {
+        size_t count = lua_rawlen(l, -1);
+        for (size_t i = 1; i <= count; ++i) {
+            lua_rawgeti(l, -1, (lua_Integer)i);
+            if (lua_istable(l, -1)) {
+                char page[64];
+                cpymo_lua_ui_patch_read_page(l, -1, page, sizeof(page));
+
+                lua_getfield(l, -1, "count");
+                size_t base_count = (size_t)lua_tointeger(l, -1);
+                lua_pop(l, 1);
+
+                if (page[0] != '\0') cpymo_ui_patch_set_base(patch, page, base_count);
+            }
+            lua_pop(l, 1);
+        }
+    }
+    lua_pop(l, 1);
+
+    return 0;
+}
+
 
 void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
 {
@@ -391,6 +722,11 @@ void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
         { "item_clear", &cpymo_lua_api_ui_item_clear },
         { "item_add", &cpymo_lua_api_ui_item_add },
         { "on_item_click", &cpymo_lua_api_ui_on_item_click },
+        { "item_get", &cpymo_lua_api_ui_item_get },
+        { "items", &cpymo_lua_api_ui_items },
+        { "pages", &cpymo_lua_api_ui_pages },
+        { "export_patch", &cpymo_lua_api_ui_export_patch },
+        { "import_patch", &cpymo_lua_api_ui_import_patch },
         { NULL, NULL }
     };
     luaL_setfuncs(l, funcs, 0);

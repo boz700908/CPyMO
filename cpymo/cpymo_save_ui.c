@@ -260,6 +260,9 @@ error_t cpymo_save_ui_enter(cpymo_engine *e, bool is_load_ui)
 		(int)first, CPYMO_MAX_SAVES - 1);
 	if (start_visible < 0) start_visible = (int)first;
 
+	cpymo_ui_patch_set_base(
+		CPYMO_SAVE_UI_PATCH(e), cpymo_save_ui_page(is_load_ui), CPYMO_MAX_SAVES);
+
 	error_t err = cpymo_list_ui_enter(
 		e,
 		(void **)&ui,

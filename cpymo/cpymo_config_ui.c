@@ -966,6 +966,9 @@ error_t cpymo_config_ui_enter(cpymo_engine *e)
 	cpymo_list_ui_set_selection_changed_callback(e, &cpymo_config_ui_visual_im_help_selection_changed_callback);
 #endif
 
+	cpymo_ui_patch_set_base(
+		CPYMO_CONFIG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_CONFIG, CONFIG_ITEMS);
+
 	/* 整屏恰好 CONFIG_ITEMS 行，追加项在屏外，必须开启滚动才可见。 */
 	cpymo_list_ui_set_scroll_enabled(
 		e, cpymo_ui_patch_extra_count(

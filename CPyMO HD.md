@@ -309,12 +309,12 @@ CPyMO默认将会把`main`设置为一个空表。
 
 #### 改写界面条目
 
-自带页面里的每一条都可以按“页面键 + 序号”改写文本或隐藏，不改变游戏逻辑，也不写入存档。
+自带页面里的每一条都可以按“页面键 + 序号”改写文本、隐藏或追加，不改变游戏逻辑，也不写入存档。
 
 * `item_set(page: string, index: int, text: string)`
   - 把第`index`条显示为`text`
   - `text`传空串表示撤销改写，恢复原文
-  - 仅对运行时绘制文字的条目有效；纯图片条目（图片选项）没有文字可改，会被忽略
+  - 仅对运行时绘制文字的条目有效；纯图片条目（图片选项、相册缩略图）没有文字可改，会被忽略
   - 改写在关闭页面后依然保留
 * `item_hide(page: string, index: int)`
   - 隐藏第`index`条，不再绘制，键盘导航会跳过它
@@ -324,17 +324,68 @@ CPyMO默认将会把`main`设置为一个空表。
   - 清除该页面的全部改写、隐藏和追加项
 * `item_add(page: string, text: string) : int`
   - 在页面末尾追加一条文字条目，返回它的序号
-  - 目前只有存读档界面有空余行可追加
+  - 序号 = 该页的容量编号起点 + 它在追加列表中的位置；起点由引擎按页面登记：存读档`31`、设置`6`（Switch 且开启无障碍时`12`）、音乐鉴赏为曲目数、回想`64`、右键菜单`9`、脚本选项为候选数、消息框`3`、相册为当前页的 CG 数
+  - 会真正显示出来的页面是设置、存档、读档、音乐鉴赏、回想、消息框与文本型选项菜单；相册是预先烘焙好的 5×5 图格、右键菜单是固定条目，这两页只占序号，追加项不会出现
+  - 列表页行高固定，追加项要滚动才能看到，不会压缩原有行
 * `on_item_click(page: string, callback: int -> void)`
-  - 注册追加项的点击回调，`callback`收到被点击追加项的序号
+  - 注册追加项的点击回调，`callback`收到被点击追加项的序号，与`item_add`的返回值一致
+  - 同一页面重复注册会替换之前的回调
 
-页面键：
+页面键与序号：
 
-* `config` - 设置界面
-* `save`、`load` - 存档、读档界面（追加项序号从`CPYMO_MAX_SAVES`起）
-* `rmenu` - 右键菜单，序号固定为
-  0 自动、1 存档、2 读档、3 快进、4 隐藏窗口、5 回想、6 设置、7 重开、8 返回游戏
+* `config` - 设置界面，序号与界面上从上到下的顺序一致
+* `save`、`load` - 存档、读档界面，追加项序号从`CPYMO_MAX_SAVES`起
+* `music` - 音乐鉴赏界面，序号为曲目在列表中的位置
+* `backlog` - 回想界面，`0`是最早的一条
+* `album` - 相册，序号为当前页内 CG 的位置（从左上到右下）
 * `select` - 脚本选项与`cpymo.select_img`创建的选项菜单
+* `msgbox` - 消息框，`0`正文、`1`确定、`2`取消，`3`起为追加按钮
+* `rmenu` - 右键菜单，序号固定为 0 自动、1 存档、2 读档、3 快进、4 隐藏窗口、5 回想、6 设置、7 重开、8 返回游戏
+
+查询：
+
+* `item_get(page: string, index: int) : table?`
+  - 返回`{index, text, hidden, extra, extra_index}`，该条没有任何改写时返回`nil`
+  - `text`为`nil`表示没有被改写；`hidden`只对真实条目有意义
+  - `extra_index`是追加项在追加列表中的位置，真实条目为`-1`
+* `items(page: string) : table`
+  - 返回`{page, base, count, extra_count, entries, extras}`
+  - `base`是该页的容量编号起点（该页面还没被打开过时为`nil`），`count`是被改写的真实条目数，`extras`是该页全部的追加项
+* `pages() : string[]` - 返回全部页面键
+
+#### 保留与持久化
+
+改写在内存里，跟随引擎生命周期：关闭页面、切换场景、重进脚本都不会丢，但引擎不会自动把它写进存档——是否持久化、存在哪里由开发者决定。引擎只提供纯粹的导出与导入：
+
+* `export_patch() : table` - 把当前全部改写与追加导出成纯数据表`{entries = {...}, bases = {...}}`，里面只有数字、字符串与布尔值
+* `import_patch(t: table)` - 用表的内容替换当前全部改写（先清空再写入，不是合并）
+
+表就是普通 Lua 表，可以直接交给引擎自带的序列化函数：
+
+```lua
+local text = cpymo.serialize(cpymo.ui.export_patch())   -- 变成一个字符串
+cpymo.ui.import_patch(cpymo.deserialize(text))          -- 读回成表并应用
+```
+
+要跟着存档走，就在主 actor 的`save` / `load`里各加一行——引擎存的就是`save()`的返回值：
+
+```lua
+function save()
+    return { ui_patch = cpymo.ui.export_patch() }
+end
+
+function load(t)
+    if t and t.ui_patch then cpymo.ui.import_patch(t.ui_patch) end
+end
+```
+
+要写进独立文件，用 Lua 的文件接口（宿主的 Lua 打开了`io`库时）：
+
+```lua
+local f = io.open("ui_patch.txt", "w")
+f:write(cpymo.serialize(cpymo.ui.export_patch()))
+f:close()
+```
 
 ### `cpymo.select_img`
 

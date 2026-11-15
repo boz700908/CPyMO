@@ -297,6 +297,7 @@ void cpymo_select_img_configuare_end(cpymo_select_img *sel, cpymo_wait *wait, st
 	assert(sel->current_selection == (int)sel->all_selections);
 
 	sel->current_selection = init_position >= 0 ? init_position : 0;
+	cpymo_ui_patch_set_base((cpymo_ui_patch *)sel->patch, sel->patch_page, sel->all_selections);
 	sel->save_enabled = init_position == -1;
 
 	if (sel->current_selection >= (int)sel->all_selections)
@@ -719,6 +720,8 @@ void cpymo_select_img_configuare_select_text_hint_pic(cpymo_engine * engine, cpy
 void cpymo_select_img_configuare_end_select_text(
 	cpymo_select_img *sel, cpymo_wait *waiter, cpymo_engine *e, float x1, float y1, float x2, float y2, cpymo_color col, int init_pos, bool show_option_background)
 {
+	cpymo_ui_patch_set_base((cpymo_ui_patch *)sel->patch, sel->patch_page, sel->all_selections);
+
 	/* 文本型菜单可以追加条目：扩容 selections 后接在脚本选项之后。 */
 	{
 		const int extra_n = (sel->patch && sel->patch_page)

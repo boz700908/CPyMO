@@ -465,6 +465,10 @@ error_t cpymo_backlog_ui_enter(cpymo_engine *e)
 	if (first) first--;
 	else first = CPYMO_BACKLOG_MAX_RECORDS - 1;
 
+	cpymo_ui_patch_set_base(
+		CPYMO_BACKLOG_UI_PATCH(e), CPYMO_UI_PATCH_PAGE_BACKLOG,
+		CPYMO_BACKLOG_MAX_RECORDS);
+
 	error_t err = cpymo_list_ui_enter(
 		e,
 		(void **)&ui,

@@ -1323,11 +1323,17 @@ void cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index)
     lua_State *L = l->lua_state;
     int top = lua_gettop(L);
 
+    /* 各页派发过来的是「页内追加项序号」，回调统一收全局序号，
+       与 cpymo.ui.item_add 的返回值一致。 */
+    size_t base = cpymo_ui_patch_get_base(&l->ui_patch, page);
+    int global_index = index;
+    if (base != (size_t)-1 && index >= 0) global_index = (int)base + index;
+
     lua_rawgeti(L, LUA_REGISTRYINDEX, l->ui_click_ref);
     lua_getfield(L, -1, page);
     if (lua_isfunction(L, -1)) {
         lua_pushstring(L, page);
-        lua_pushinteger(L, index);
+        lua_pushinteger(L, global_index);
         if (lua_pcall(L, 2, 0, 0) != LUA_OK) {
             const char *err = lua_tostring(L, -1);
             printf("[cpymo] on_item_click(%s, %d) failed: %s\n",

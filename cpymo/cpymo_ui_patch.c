@@ -76,6 +76,7 @@ void cpymo_ui_patch_init(cpymo_ui_patch *patch)
 {
     if (patch == NULL) return;
     patch->entries = NULL;
+    patch->bases = NULL;
     patch->extra_count = 0;
 }
 
@@ -90,7 +91,16 @@ void cpymo_ui_patch_free(cpymo_ui_patch *patch)
         e = next;
     }
 
+    cpymo_ui_patch_base *b = patch->bases;
+    while (b) {
+        cpymo_ui_patch_base *next = b->next;
+        free(b->page);
+        free(b);
+        b = next;
+    }
+
     patch->entries = NULL;
+    patch->bases = NULL;
     patch->extra_count = 0;
 }
 
@@ -254,6 +264,88 @@ const char *cpymo_ui_patch_extra_text(
         }
 
         if (rank == n) return e->text;
+    }
+
+    return NULL;
+}
+
+void cpymo_ui_patch_set_base(cpymo_ui_patch *patch, const char *page, size_t count)
+{
+    if (patch == NULL || page == NULL) return;
+
+    for (cpymo_ui_patch_base *b = patch->bases; b; b = b->next) {
+        if (strcmp(b->page, page) == 0) {
+            b->count = count;
+            return;
+        }
+    }
+
+    cpymo_ui_patch_base *b = (cpymo_ui_patch_base *)malloc(sizeof(*b));
+    if (b == NULL) return;
+
+    b->page = cpymo_ui_patch_strdup(page);
+    if (b->page == NULL) {
+        free(b);
+        return;
+    }
+
+    b->count = count;
+    b->next = patch->bases;
+    patch->bases = b;
+}
+
+size_t cpymo_ui_patch_get_base(const cpymo_ui_patch *patch, const char *page)
+{
+    if (patch == NULL || page == NULL) return (size_t)-1;
+
+    for (const cpymo_ui_patch_base *b = patch->bases; b; b = b->next) {
+        if (strcmp(b->page, page) == 0) return b->count;
+    }
+
+    return (size_t)-1;
+}
+
+const cpymo_ui_patch_entry *cpymo_ui_patch_entry_at(
+    const cpymo_ui_patch *patch, const char *page, int index)
+{
+    if (patch == NULL || page == NULL || index < 0) return NULL;
+
+    for (const cpymo_ui_patch_entry *e = patch->entries; e; e = e->next) {
+        if (e->extra < 0 && e->index == index && cpymo_ui_patch_page_is(e, page)) {
+            return e;
+        }
+    }
+
+    return NULL;
+}
+
+size_t cpymo_ui_patch_patched_count(const cpymo_ui_patch *patch, const char *page)
+{
+    if (patch == NULL || page == NULL) return 0;
+
+    size_t count = 0;
+    for (const cpymo_ui_patch_entry *e = patch->entries; e; e = e->next) {
+        if (e->extra < 0 && cpymo_ui_patch_page_is(e, page)) count++;
+    }
+
+    return count;
+}
+
+const cpymo_ui_patch_entry *cpymo_ui_patch_extra_entry(
+    const cpymo_ui_patch *patch, const char *page, size_t n)
+{
+    if (patch == NULL || page == NULL) return NULL;
+
+    for (const cpymo_ui_patch_entry *e = patch->entries; e; e = e->next) {
+        if (e->extra < 0 || !cpymo_ui_patch_page_is(e, page)) continue;
+
+        size_t rank = 0;
+        for (const cpymo_ui_patch_entry *f = patch->entries; f; f = f->next) {
+            if (f->extra < 0 || !cpymo_ui_patch_page_is(f, page)) continue;
+            if (f->extra < e->extra) rank++;
+        }
+
+        if (rank == n) return e;
     }
 
     return NULL;
