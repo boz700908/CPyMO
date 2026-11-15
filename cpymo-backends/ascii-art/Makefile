@@ -27,6 +27,17 @@ endif
 
 LDFLAGS += -g -lm
 
+ifeq ($(shell uname -s),Darwin)
+# software 后端同样没有实现 cpymo_backend_input_text_{begin,end,poll}。
+# 即便头文件里把声明写成 weak_import，Mach-O 的 ld 仍不接受「已声明但从未定义」，
+# 所以在 macOS 上显式允许这三个符号缺失（与 text 后端同一处理）。
+LDFLAGS += \
+	-Wl,-U,_cpymo_backend_input_text_begin \
+	-Wl,-U,_cpymo_backend_input_text_end \
+	-Wl,-U,_cpymo_backend_input_text_poll \
+	-Wl,-undefined,dynamic_lookup
+endif
+
 TARGET := cpymo-ascii-art
 
 build: $(TARGET)

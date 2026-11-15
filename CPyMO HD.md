@@ -44,6 +44,22 @@ CPyMO HD将引擎扩展功能划分为四个功能级别，每个级别都基于
 
 * 支持Lua语言，在pymo脚本中新增`#lua`命令，此行后面的部分会被直接当作lua代码执行
 
+## 在 YukimiScript 中使用
+
+`libpymo.ykm` 已声明 `- extern lua code`（`@__type code string`），把 Lua 送进引擎就是一行：
+
+```
+@lua "cpymo.a11y.speak('第一章')"
+```
+
+三条限制来自编译器，不是 CPyMO 的：
+
+* 代码必须是双引号字符串。PyMO 代码生成器只认识 `true`、`false`、`null`、`a`、`BG_*`、`cm0`~`cm6` 这些裸符号，其余裸符号会让编译直接失败（`Unsupported PyMO keyword`）。
+* 一条 `@lua` 只能占一行。YukimiScript 会解码字符串里的 `\n`，但生成器不会把它重新转义，换行会把生成的那一行撕开；多条语句请用 `;` 连接。
+* 命令名本身没有白名单，但每个命令都必须在 `libpymo.ykm` 里 `extern` 声明过，否则编译报 `ExternCommandDefinationNotFoundException`；参数个数与类型也在编译期检查，参数顺序按声明顺序重排，具名参数可以乱序。
+
+`#lua` 之后整行余下的部分原样交给 Lua，引擎不按逗号切分，所以代码里的逗号和括号都不用转义。Level 0 构建不认识 `#lua`，只会打印未知命令警告后继续执行。
+
 ## Actor抽象
 
 
@@ -270,6 +286,29 @@ CPyMO默认将会把`main`设置为一个空表。
   - `bg_image`为system目录下背景图的文件名
   - 该命令在有提前渲染好的缓存图片的情况下会调用缓存图片，否则会创建缓存图片
 * `open_load_yesnobox(save_id: int)` - 打开读档的“是否”对话框
+
+### `cpymo.select_img`
+
+把引擎内建的图片选择界面（脚本里的`select_img`/`select_imgs`命令）交给Lua驱动：Lua给出候选、位置与可用状态，界面本身仍由引擎绘制与操作，因此焦点移动的提示音、朗读、鼠标悬停与存档标记等行为与脚本路径完全一致。
+
+* `begin(filename: string, count: int)`
+  - 开始配置一次选择，`filename`为`system`目录下的选项图文件名，`count`为候选数量
+  - 已有一个未结束的选择界面时返回`CPYMO_ERR_INVALID_ARG`
+* `select(x: number, y: number, enabled: bool [, hash: int])`
+  - 追加一个候选，必须恰好调用`begin`给出的`count`次
+  - `x`/`y`为选项图左上角的位置，`enabled`为`false`的候选不会显示
+  - `hash`用于记录“该选项曾被选过”，省略时按`0`处理。Lua无法复现脚本侧由命令名、序号与文件名算出的hash，因此这条路径与脚本路径的“已选过”标记不互通，需要时请自行约定固定值
+* `finish(init_pos: int [, callback: function])`
+  - 结束配置并进入等待；候选数量与`begin`不一致时返回`CPYMO_ERR_INVALID_ARG`
+  - `init_pos`为初始焦点序号；传`-1`表示允许玩家在等待中滚轮查看回想、右键打开菜单并对此选择存档，与脚本命令传`-1`等价
+  - `callback(sel: int, hash: int, save_enabled: bool)`在选择被确认后调用，参数是引擎写回的信息
+* `active() : bool` - 当前是否有选择界面在配置或等待
+* `current() : int` - 当前焦点序号，没有界面时为`-1`
+* `cancel()` - 丢弃当前界面；若正在等待，等待会立即结束，脚本继续向下执行
+
+确认选择时引擎先执行默认行为（播放确认音、按`save_enabled`记录hash、把序号写入PyMO变量`FSEL`），再调用`callback`。因此带`callback`与不带时的变量与存档行为相同，只是多了一次回调。
+
+`finish`之后不必在Lua里绘制或推进这个界面：引擎主循环无条件更新并绘制它，Lua只需在`callback`里处理自己的后续逻辑。
 
 ### `cpymo.flags`
 

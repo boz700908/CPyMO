@@ -491,3 +491,21 @@
 - extern input var prompt=""
 @__type var symbol
 @__type prompt string
+
+# VII. Lua (CPyMO only, FEATURE_LEVEL 1)
+#
+# Executes the rest of the line as Lua code.  Available only on a build made with
+# CPYMO_FEATURE_LEVEL >= 1 (ENABLE_LUA); below that level the engine prints an
+# unknown-command warning and continues, so leaving @lua out of a script is all it
+# takes to stay compatible with Level 0 builds.
+#
+# The code has to be a double-quoted string: the PyMO generator rejects bare
+# symbols whose names it does not know.  YukimiScript decodes \n, \t, \r, \" and
+# \\ inside a string, but the generator does not escape them again on output, so a
+# newline would tear the generated line apart.  Write one line per call and
+# separate statements with ';'.  Commas need no escaping: the engine hands the
+# whole remainder of the line to Lua untouched.
+#     @lua "cpymo.a11y.speak('第一章')"
+#     @lua "cpymo.select_img.begin('bg.png', 2); cpymo.select_img.select(120, 300, true)"
+- extern lua code
+@__type code string
