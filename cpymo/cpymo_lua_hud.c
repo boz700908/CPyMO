@@ -139,7 +139,7 @@ error_t cpymo_lua_hud_set(
 
         /* The existing accessibility layer reads the new value out; the script
          * does not have to speak it itself. */
-        if (!item->silent && item->text[0]) cpymo_a11y_speak(item->text);
+        if (!item->silent && item->text[0]) { cpymo_a11y_speak(item->text); }
     }
     else free(newtext);
 
