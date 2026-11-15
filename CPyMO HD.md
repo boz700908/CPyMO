@@ -146,6 +146,7 @@ CPyMO默认将会把`main`设置为一个空表。
 * `is_skipping() : bool` - 检查是否正在跳过
 * `extract_text(string)` - 导出游戏文本以供游戏在CUI模式下运行或提供给视障人员，需要多次调用后使用`extract_text_submit`来进行一次导出
 * `extract_text_submit()` - 提交一次`extract_text`导出的文本
+  - 只负责朗读通道，不会自动朗读`cpymo.render`绘制的文本，详见`cpymo.a11y`
 * `serialize(serializable) : string` - 将lua值序列化为lua表达式字符串
 * `deserialize(string) : serializable` - 将序列化后的lua表达式字符串反序列化为lua值
 * `exit()` - 退出游戏
@@ -301,11 +302,13 @@ CPyMO默认将会把`main`设置为一个空表。
 * `skip` - 跳过键
 * `hide_window` - 隐藏对话框键
 * `mouse_button` - 鼠标左键/触摸屏幕是否按下
+* `copy` - 复制键（读屏辅助按键，可能由无障碍手势触发）
+* `append_copy` - 追加复制键（读屏辅助按键，可能由无障碍手势触发）
 * `mouse_position_useable` - 鼠标指针坐标是否可用/触摸屏坐标是否可用
 
 以下值为`number`类型：
 
-* `mouse_x`, `mouse_y` - 鼠标坐标/触摸坐标，仅在`mouse_position_usable`为`true`时可用
+* `mouse_x`, `mouse_y` - 鼠标坐标/触摸坐标，仅在`mouse_position_useable`为`true`时可用
 * `mouse_wheel_delta` - 鼠标滚轮在上一瞬间滑动量
 
 #### `cpymo.input.prev`
@@ -319,6 +322,20 @@ CPyMO默认将会把`main`设置为一个空表。
 #### `cpymo.input.just_released`
 
 该包内存放了所有刚刚松开的按钮，包括上述`cpymo.input.now`中所有bool类型的值。
+
+### `cpymo.a11y`
+
+无障碍支持入口，用于让Lua自建的界面接入读屏、提示音与振动。
+
+仅在启用无障碍文本导出的构建（`ENABLE_TEXT_EXTRACT`）中真正生效；其它构建中三个函数都是静默无效的空操作，因此脚本可以无条件调用，不需要自行判断平台。
+
+* `speak(string)` - 朗读一段文本，使用与游戏正文完全相同的通道，打断、去重与排队规则与正文一致
+* `sound(type)` - 播放一次无障碍提示音，`type`取`cpymo.a11y.SOUND_ENTER`、`cpymo.a11y.SOUND_MENU`或`cpymo.a11y.SOUND_SELECT`
+* `vibrate(milliseconds)` - 振动指定毫秒数，取值`1`至`1000`；平台不支持时静默忽略
+
+常量：`SOUND_ENTER`(1) 进入新界面、`SOUND_MENU`(2) 打开或关闭菜单、`SOUND_SELECT`(3) 焦点移动。
+
+注意：`cpymo.render`绘制的文本不会被引擎自动朗读。Lua自建的界面必须在内容变化或焦点改变时自行调用`cpymo.a11y.speak`；引擎原生界面（存读档、设置、回想、音乐鉴赏等，通过`cpymo.ui`打开）已经自带朗读。
 
 ### `cpymo.script`
 

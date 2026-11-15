@@ -10,6 +10,7 @@
     D_BOOL(mouse_button); \
     D_BOOL(up); D_BOOL(down); D_BOOL(left); D_BOOL(right); \
     D_BOOL(ok); D_BOOL(cancel); D_BOOL(hide_window); D_BOOL(skip); \
+    D_BOOL(copy); D_BOOL(append_copy); \
     D_BOOL(mouse_position_useable); \
     \
     D_FLOAT(mouse_x); D_FLOAT(mouse_y); D_FLOAT(mouse_wheel_delta); \
