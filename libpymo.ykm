@@ -456,3 +456,38 @@
 @date bg x y color
 
 - extern config
+
+
+# VI. CPyMO Extensions
+#
+# The commands below are provided by CPyMO only.
+# Original PyMO does not know them: it prints an unknown-command warning and
+# continues with the next line, so scripts that never use them behave exactly
+# as before.
+#
+# Rich text inline markup (CPyMO only), usable inside say / intro / text content:
+#     [文字](style=color~#FF0000)   renders "文字" in that color
+#     [漢字](ruby=かんじ)            strips the markup and keeps "漢字"
+# Both key names must match exactly, otherwise the brackets are printed as is.
+
+- extern intro content
+@__type content string
+
+- extern filmmode mode
+@__type_symbol mode on
+@__type_symbol mode off
+
+- extern avatar name=""
+@__type name string
+
+- macro avatar_off
+@avatar ""
+
+- extern chara_scale charaID scale time=0
+@__type charaID int
+@__type scale number
+@__type time int
+
+- extern input var prompt=""
+@__type var symbol
+@__type prompt string
