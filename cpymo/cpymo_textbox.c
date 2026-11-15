@@ -20,6 +20,225 @@ typedef union cpymo_textbox_storage_alignment {
     cpymo_textbox_line line;
 } cpymo_textbox_storage_alignment;
 
+/* ---- 富文本内联标记 ------------------------------------------------ */
+
+struct cpymo_textbox_col_run {
+	size_t begin;
+	size_t end;
+	cpymo_color color;
+};
+
+static bool cpymo_textbox_parse_hex_color(cpymo_str s, cpymo_color *out)
+{
+	if (s.len < 2 || s.begin[0] != '#') return false;
+	s.begin++;
+	s.len--;
+	if (s.len != 3 && s.len != 6) return false;
+
+	unsigned v[6];
+	size_t i;
+	for (i = 0; i < s.len; ++i) {
+		char ch = s.begin[i];
+		if (ch >= '0' && ch <= '9') v[i] = (unsigned)(ch - '0');
+		else if (ch >= 'a' && ch <= 'f') v[i] = (unsigned)(ch - 'a' + 10);
+		else if (ch >= 'A' && ch <= 'F') v[i] = (unsigned)(ch - 'A' + 10);
+		else return false;
+	}
+
+	if (s.len == 3) {
+		out->r = (uint8_t)(v[0] * 17);
+		out->g = (uint8_t)(v[1] * 17);
+		out->b = (uint8_t)(v[2] * 17);
+	}
+	else {
+		out->r = (uint8_t)(v[0] * 16 + v[1]);
+		out->g = (uint8_t)(v[2] * 16 + v[3]);
+		out->b = (uint8_t)(v[4] * 16 + v[5]);
+	}
+	return true;
+}
+
+/* 注音：ruby=读音。视觉层不做小字排版——真注音要抬高行高，会改动
+ * max_lines 与每行基线的生成，旧脚本的排版就变了。这里只负责把标记
+ * 剥离，让正文照常显示，读音不进视觉。 */
+static bool cpymo_textbox_parse_ruby(cpymo_str arg)
+{
+	static const char prefix[] = "ruby=";
+	if (!cpymo_str_starts_with_str(arg, prefix)) return false;
+	return arg.len > sizeof(prefix) - 1;
+}
+
+/* 键名必须精确是 style、子键必须精确是 color~#hex，否则一律当普通文字。 */
+static bool cpymo_textbox_parse_style_color(cpymo_str arg, cpymo_color *out)
+{
+	static const char prefix[] = "style=color~";
+	if (!cpymo_str_starts_with_str(arg, prefix)) return false;
+
+	cpymo_str v = arg;
+	v.begin += sizeof(prefix) - 1;
+	v.len -= sizeof(prefix) - 1;
+	if (v.len == 0) return false;
+	return cpymo_textbox_parse_hex_color(v, out);
+}
+
+static bool cpymo_textbox_push_col_run(
+	cpymo_textbox *o, size_t begin, size_t end, cpymo_color col, size_t *cap)
+{
+	if (o->col_run_count == *cap) {
+		size_t n = *cap == 0 ? 4 : *cap * 2;
+		struct cpymo_textbox_col_run *runs =
+			(struct cpymo_textbox_col_run *)realloc(o->col_runs, n * sizeof(*runs));
+		if (runs == NULL) return false;
+		o->col_runs = runs;
+		*cap = n;
+	}
+
+	o->col_runs[o->col_run_count].begin = begin;
+	o->col_runs[o->col_run_count].end = end;
+	o->col_runs[o->col_run_count].color = col;
+	++o->col_run_count;
+	return true;
+}
+
+/* 把 run 表的字节偏移换算成字符序号，与 chars_pool 的索引对齐。 */
+/* cols_pool 的下标是字符序号，run 记的是字节偏移，这里统一换算。 */
+static size_t cpymo_textbox_byte_to_char(cpymo_str s, size_t byte_offset)
+{
+	size_t consumed = 0, chars = 0;
+	while (consumed < byte_offset && s.len > 0) {
+		cpymo_str tail = s;
+		cpymo_str ch = cpymo_str_utf8_try_head(&tail);
+		if (ch.len == 0) break;
+		consumed += ch.len;
+		++chars;
+		s = tail;
+	}
+	return chars;
+}
+
+static void cpymo_textbox_col_runs_to_char_index(cpymo_textbox *o)
+{
+	if (o->col_run_count == 0) return;
+
+	cpymo_str s;
+	s.begin = o->owned_text;
+	s.len = strlen(o->owned_text);
+
+	size_t i;
+	for (i = 0; i < o->col_run_count; ++i) {
+		o->col_runs[i].begin = cpymo_textbox_byte_to_char(s, o->col_runs[i].begin);
+		o->col_runs[i].end = cpymo_textbox_byte_to_char(s, o->col_runs[i].end);
+	}
+}
+
+/* 就地压缩 [文字](style=color~#hex) 为「文字」，返回压缩后的长度。
+ * 四条任一不满足就整段原样输出：键名不是 style、子键不是 color~、
+ * 颜色解析失败、中括号内没有文字。因此不含标记的脚本字节不变。 */
+static size_t cpymo_textbox_parse_rich(cpymo_textbox *o)
+{
+	if (o->owned_text == NULL) return 0;
+
+	char *s = o->owned_text;
+	size_t len = strlen(s);
+	size_t r = 0, w = 0, cap = 0;
+
+	while (r < len) {
+		if (s[r] != '[') { s[w++] = s[r++]; continue; }
+
+		size_t inner_begin = r + 1;
+		size_t q = inner_begin;
+		while (q < len && s[q] != ']') ++q;
+		if (q >= len) { s[w++] = s[r++]; continue; }
+		if (q + 1 >= len || s[q + 1] != '(') { s[w++] = s[r++]; continue; }
+
+		size_t arg_begin = q + 2;
+		size_t p = arg_begin;
+		while (p < len && s[p] != ')') ++p;
+		if (p >= len) { s[w++] = s[r++]; continue; }
+
+		cpymo_str arg;
+		arg.begin = s + arg_begin;
+		arg.len = p - arg_begin;
+
+		size_t inner_len = q - inner_begin;
+		cpymo_color col;
+
+		if (inner_len == 0) {
+			s[w++] = s[r++];
+			continue;
+		}
+
+		if (cpymo_textbox_parse_style_color(arg, &col)) {
+			if (!cpymo_textbox_push_col_run(o, w, w + inner_len, col, &cap)) {
+				s[w++] = s[r++];
+				continue;
+			}
+		}
+		else if (!cpymo_textbox_parse_ruby(arg)) {
+			/* 既不是颜色也不是注音：整段当普通文字。 */
+			s[w++] = s[r++];
+			continue;
+		}
+
+		memmove(s + w, s + inner_begin, inner_len);
+		w += inner_len;
+		r = p + 1;
+	}
+
+	s[w] = '\0';
+
+	if (o->col_run_count > 0)
+		cpymo_textbox_col_runs_to_char_index(o);
+
+	return w;
+}
+
+static cpymo_color cpymo_textbox_color_at(
+	const cpymo_textbox *tb, size_t char_index)
+{
+	cpymo_color col = tb->col;
+	size_t i;
+	for (i = 0; i < tb->col_run_count; ++i) {
+		if (char_index >= tb->col_runs[i].begin && char_index < tb->col_runs[i].end) {
+			col = tb->col_runs[i].color;
+			break;
+		}
+	}
+	return col;
+}
+
+/* 无障碍层拿到的是脚本原文，直接上报会把 [文字](ruby=…) 这类标记也念出来。
+ * 这里复用同一套解析规则剥离标记；不含标记的文本不走这条路径。 */
+char *cpymo_textbox_strip_rich_text(const char *text, size_t len)
+{
+	if (text == NULL || len == 0) return NULL;
+
+	bool has_mark = false;
+	const char *p = text;
+	while ((p = strstr(p, "](")) != NULL) {
+		if (strncmp(p, "](style=color~", 14) == 0 ||
+			strncmp(p, "](ruby=", 7) == 0) {
+			has_mark = true;
+			break;
+		}
+		++p;
+	}
+	if (!has_mark) return NULL;
+
+	char *copy = (char *)malloc(len + 1);
+	if (copy == NULL) return NULL;
+	memcpy(copy, text, len);
+	copy[len] = '\0';
+
+	cpymo_textbox tmp;
+	memset(&tmp, 0, sizeof(tmp));
+	tmp.owned_text = copy;
+	cpymo_textbox_parse_rich(&tmp);
+	if (tmp.col_runs) free(tmp.col_runs);
+
+	return copy;
+}
+
 error_t cpymo_textbox_init(
     cpymo_textbox *o, 
     float x, float y, 
@@ -34,6 +253,9 @@ error_t cpymo_textbox_init(
     if (o->max_lines < 1) o->max_lines = 1;
 
     o->owned_text = NULL;
+    o->col_runs = NULL;
+    o->col_run_count = 0;
+    o->col_char_offset = 0;
     if (text.len > 0) {
         char *copy = (char *)malloc(text.len + 1);
         if (copy == NULL) return CPYMO_ERR_OUT_OF_MEM;
@@ -103,6 +325,12 @@ error_t cpymo_textbox_init(
     o->alpha = alpha;
     o->typing_x = x;
     o->col = col;
+    /* 富文本预处理：标记成功剥离时，后面的逐字显示用压缩后的文本。 */
+    if (o->owned_text) {
+        size_t rich_len = cpymo_textbox_parse_rich(o);
+        text.begin = o->owned_text;
+        text.len = rich_len;
+    }
     o->remain_text = text;
     o->backlog = backlog;
 
@@ -127,6 +355,10 @@ error_t cpymo_textbox_init(
 
 static void cpymo_textbox_clear_chars_pool_and_lines(cpymo_textbox *tb)
 {
+    /* 翻页时 chars_pool 序号会归零，但颜色 run 记的是整段的字符序号，
+     * 这里把已消耗的字符数累加进 col_char_offset，draw 时补上。 */
+    tb->col_char_offset += tb->chars_pool_size;
+
     for (size_t i = 0; i < tb->chars_pool_size; ++i)
         if (tb->chars_pool[i])
             cpymo_backend_text_free(tb->chars_pool[i]);
@@ -150,6 +382,9 @@ void cpymo_textbox_free(cpymo_textbox *tb, cpymo_backlog *write_to_backlog)
     tb->backlog_buf = NULL;
     if (tb->owned_text) free(tb->owned_text);
     tb->owned_text = NULL;
+    if (tb->col_runs) free(tb->col_runs);
+    tb->col_runs = NULL;
+    tb->col_run_count = 0;
     tb->lines = NULL;
     tb->chars_pool = NULL;
     tb->chars_x_pool = NULL;
@@ -202,8 +437,12 @@ void cpymo_textbox_draw(
             assert(char_index < tb->chars_pool_size);
             float x_pos = tb->chars_x_pool[char_index];
             cpymo_backend_text ch = tb->chars_pool[char_index];
+            cpymo_color ch_col = tb->col;
+            if (tb->col_run_count)
+                ch_col = cpymo_textbox_color_at(
+                    tb, char_index + tb->col_char_offset);
             cpymo_backend_text_draw(
-                ch, x_pos, line->y, tb->col, tb->alpha, drawtype);
+                ch, x_pos, line->y, ch_col, tb->alpha, drawtype);
         }
     }
 }

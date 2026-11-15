@@ -6,6 +6,7 @@
 #include "cpymo_config_ui.h"
 #include "cpymo_save_ui.h"
 #include "cpymo_save.h"
+#include "cpymo_textbox.h"
 #include "cpymo_movie.h"
 #include "cpymo_localization.h"
 #include <string.h>
@@ -227,7 +228,11 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		cpymo_engine_extract_text(engine, name_or_text);
 		if (name_or_text.len)
 			cpymo_engine_extract_text_cstr(engine, "\n");
-		cpymo_engine_extract_text(engine, text);
+		/* 富文本标记不该被朗读：剥离后再上报，无标记时沿用原串。 */
+		char *a11y_plain = cpymo_textbox_strip_rich_text(text.begin, text.len);
+		cpymo_engine_extract_text(
+		    engine, a11y_plain ? cpymo_str_pure(a11y_plain) : text);
+		free(a11y_plain);
 		cpymo_engine_extract_text_submit(engine);
 
 		if (IS_EMPTY(text)) {

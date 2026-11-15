@@ -7,6 +7,7 @@
 struct cpymo_engine;
 
 struct cpymo_textbox_line;
+struct cpymo_textbox_col_run;
 
 typedef struct {
 	size_t chars_pool_max_size, chars_pool_size, max_lines;
@@ -19,6 +20,14 @@ typedef struct {
 	bool prev_is_space;
 	float word_remain_w;
 	cpymo_color col;
+
+	/* 富文本内联标记 [文字](style=color~#rrggbb)：init 时就地剥离标记，
+	 * 颜色变化点按字符序号记入 run 表。没有标记时 col_run_count 为 0，
+	 * 绘制路径与旧版本逐字节一致。 */
+	struct cpymo_textbox_col_run *col_runs;
+	size_t col_run_count;
+	/* 翻页后 chars_pool 序号归零，颜色 run 需要这个已消耗字符数做偏移。 */
+	size_t col_char_offset;
 	cpymo_str remain_text;
 
 	/* issue #57：文本副本。textbox 只保存切片指针，调用方传入栈或短命缓冲
@@ -33,6 +42,10 @@ typedef struct {
 
 	cpymo_backlog *backlog;
 } cpymo_textbox;
+
+/* 供无障碍层使用：返回剥离富文本标记后的新串（调用方 free）；
+ * 不含标记时返回 NULL，调用方沿用原串。 */
+char *cpymo_textbox_strip_rich_text(const char *text, size_t len);
 
 error_t cpymo_textbox_init(
 	cpymo_textbox *out,
