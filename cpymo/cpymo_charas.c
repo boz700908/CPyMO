@@ -431,11 +431,14 @@ static bool cpymo_charas_wait_for_anime(cpymo_engine *e, float delta_time)
 
 		if (c->anime_pos_current >= c->anime_pos_count) {
 			c->anime_pos_current = 0;
-			c->anime_loop--;
+
+			// loop_num 为负表示无限循环：不递减，永远不满足结束条件，
+			// 直到玩家按下继续键（函数开头）或 LOW_FRAME_RATE 直接返回。
+			if (c->anime_loop > 0) c->anime_loop--;
 		}
 	}
 
-	return c->anime_loop <= 0;
+	return c->anime_loop == 0;
 }
 
 void cpymo_charas_play_anime(

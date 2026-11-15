@@ -631,7 +631,7 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 			offsets++;
 		}
 
-		if (offsets > 0 || loops <= 0) {
+		if (offsets > 0 || loops == 0) {
 			cpymo_charas_play_anime(
 				engine,
 				(float)cpymo_str_atoi(peroid_str) / 1000.0f,
