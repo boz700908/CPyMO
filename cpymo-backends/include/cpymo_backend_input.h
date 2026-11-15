@@ -64,7 +64,13 @@ cpymo_input cpymo_input_snapshot();
  * 后端可以完全不实现：下面用弱符号声明，链接后地址为 NULL 时引擎侧
  * 打一条警告并跳过该命令。不支持弱符号的编译器（MSVC）下是普通声明。
  */
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__APPLE__) && !defined(CPYMO_BACKEND_INPUT_TEXT_IMPL)
+/* Mach-O 的 ld 不接受「弱声明但从未定义」的符号（ELF 上会解析为 NULL）。
+ * weak_import 声明的缺失符号在 Darwin 上同样解析为 NULL，语义一致。
+ * 实现方在 include 前定义 CPYMO_BACKEND_INPUT_TEXT_IMPL 关闭该属性，
+ * 因为 weak_import 不允许出现在定义上。 */
+#define CPYMO_BACKEND_INPUT_TEXT_WEAK __attribute__((weak_import))
+#elif defined(__GNUC__) || defined(__clang__)
 #define CPYMO_BACKEND_INPUT_TEXT_WEAK __attribute__((weak))
 #else
 #define CPYMO_BACKEND_INPUT_TEXT_WEAK

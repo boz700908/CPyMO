@@ -1,4 +1,5 @@
-﻿#include "../../cpymo/cpymo_prelude.h"
+﻿#define CPYMO_BACKEND_INPUT_TEXT_IMPL
+#include "../../cpymo/cpymo_prelude.h"
 #include "../../cpymo/cpymo_engine.h"
 #include "../include/cpymo_backend_input.h"
 #include "cpymo_import_sdl2.h"
