@@ -61,6 +61,12 @@ void cpymo_say_init(cpymo_say *out)
 	out->current_say_is_already_read = true;
 	out->auto_mode = false;
 	out->auto_mode_timer = -1;
+
+	out->no_box = false;
+	out->film_mode = false;
+	out->avatar = NULL;
+	out->avatar_w = out->avatar_h = 0;
+	out->avatar_name = NULL;
 }
 
 void cpymo_say_free(cpymo_say *say)
@@ -71,6 +77,8 @@ void cpymo_say_free(cpymo_say *say)
 	if (say->namebox) cpymo_backend_image_free(say->namebox);
 	if (say->msg_cursor) cpymo_backend_image_free(say->msg_cursor);
 	if (say->msgbox_name) free(say->msgbox_name);
+	if (say->avatar) cpymo_backend_image_free(say->avatar);
+	if (say->avatar_name) free(say->avatar_name);
 	if (say->namebox_name) free(say->namebox_name);
 
 	if (say->current_name) free(say->current_name);
@@ -98,79 +106,92 @@ void cpymo_say_draw(const struct cpymo_engine *e)
 
 		const cpymo_color gray = { 127, 127, 127 };
 
-		if (e->say.msgbox) {
-#ifdef DISABLE_IMAGE_SCALING
-			const float screen_w = e->gameconfig.imagesize_w;
-			const float screen_h = e->gameconfig.imagesize_h;
-			cpymo_backend_image_draw(
-				screen_w / 2 - (float)e->say.msgbox_w / 2,
-				screen_h - (float)e->say.msgbox_h,
-				e->say.msgbox_w, e->say.msgbox_h,
-				e->say.msgbox,
-				0, 0, e->say.msgbox_w, e->say.msgbox_h, 1.0f,
-				cpymo_backend_image_draw_type_text_say_textbox);
-#else
-			cpymo_backend_image_draw(
-				0, y, (float)e->gameconfig.imagesize_w, msg_h,
-				e->say.msgbox, 0, 0, e->say.msgbox_w, e->say.msgbox_h,
-				1.0f, cpymo_backend_image_draw_type_text_say_textbox);
-#endif
-		}
-		else {
-			float xywh[] = {
-				0,
-				e->gameconfig.imagesize_h * 0.75f,
-				(float)e->gameconfig.imagesize_w,
-				e->gameconfig.imagesize_h * 0.25f
-			};
-
-			cpymo_backend_image_fill_rects(xywh, 1, gray, 0.5f, cpymo_backend_image_draw_type_text_say_textbox);
-		}
-
-		if (e->say.name) {
-			float name_x = namebox_x;
-
-			switch (e->gameconfig.namealign)
-			{
-				case 0:	// middle
-					name_x += namebox_w / 2 - (float)e->say.name_width / 2;
-					break;
-				case 1:	// left
-					name_x += cpymo_gameconfig_font_size(&e->gameconfig) / 2;
-					break;
-				case 2:	// right
-					name_x += namebox_w - (float)e->say.name_width;
-					break;
-			}
-
-			if (e->say.namebox) {
-#ifdef DISABLE_IMAGE_SCALING
+		if (!e->say.no_box) {
+			if (e->say.msgbox) {
+	#ifdef DISABLE_IMAGE_SCALING
+				const float screen_w = e->gameconfig.imagesize_w;
+				const float screen_h = e->gameconfig.imagesize_h;
 				cpymo_backend_image_draw(
-					namebox_x + (namebox_w - e->say.namebox_w) / 2,
-					namebox_y + (namebox_h - e->say.namebox_h) / 2,
-					e->say.namebox_w, 
-					e->say.namebox_h,
-					e->say.namebox, 0, 0, e->say.namebox_w, e->say.namebox_h, 1.0f,
+					screen_w / 2 - (float)e->say.msgbox_w / 2,
+					screen_h - (float)e->say.msgbox_h,
+					e->say.msgbox_w, e->say.msgbox_h,
+					e->say.msgbox,
+					0, 0, e->say.msgbox_w, e->say.msgbox_h, 1.0f,
 					cpymo_backend_image_draw_type_text_say_textbox);
-#else
+	#else
 				cpymo_backend_image_draw(
-					namebox_x, namebox_y, namebox_w, namebox_h,
-					e->say.namebox, 0, 0, e->say.namebox_w, e->say.namebox_h, 1.0f,
-					cpymo_backend_image_draw_type_text_say_textbox);
-#endif
+					0, y, (float)e->gameconfig.imagesize_w, msg_h,
+					e->say.msgbox, 0, 0, e->say.msgbox_w, e->say.msgbox_h,
+					1.0f, cpymo_backend_image_draw_type_text_say_textbox);
+	#endif
 			}
 			else {
-				float xywh[] = { namebox_x, namebox_y, namebox_w, namebox_h };
+				float xywh[] = {
+					0,
+					e->gameconfig.imagesize_h * 0.75f,
+					(float)e->gameconfig.imagesize_w,
+					e->gameconfig.imagesize_h * 0.25f
+				};
+
 				cpymo_backend_image_fill_rects(xywh, 1, gray, 0.5f, cpymo_backend_image_draw_type_text_say_textbox);
 			}
 
-			cpymo_backend_text_draw(
-				e->say.name,
-				name_x, namebox_y + cpymo_gameconfig_font_size(&e->gameconfig) / 10.0f * 9.0f,
-				e->gameconfig.textcolor,
-				e->say.current_say_is_already_read ? 
-					already_read_text_alpha : 1, 
-				cpymo_backend_image_draw_type_text_say);
+			if (e->say.name) {
+				float name_x = namebox_x;
+
+				switch (e->gameconfig.namealign)
+				{
+					case 0:	// middle
+						name_x += namebox_w / 2 - (float)e->say.name_width / 2;
+						break;
+					case 1:	// left
+						name_x += cpymo_gameconfig_font_size(&e->gameconfig) / 2;
+						break;
+					case 2:	// right
+						name_x += namebox_w - (float)e->say.name_width;
+						break;
+				}
+
+				if (e->say.namebox) {
+	#ifdef DISABLE_IMAGE_SCALING
+					cpymo_backend_image_draw(
+						namebox_x + (namebox_w - e->say.namebox_w) / 2,
+						namebox_y + (namebox_h - e->say.namebox_h) / 2,
+						e->say.namebox_w, 
+						e->say.namebox_h,
+						e->say.namebox, 0, 0, e->say.namebox_w, e->say.namebox_h, 1.0f,
+						cpymo_backend_image_draw_type_text_say_textbox);
+	#else
+					cpymo_backend_image_draw(
+						namebox_x, namebox_y, namebox_w, namebox_h,
+						e->say.namebox, 0, 0, e->say.namebox_w, e->say.namebox_h, 1.0f,
+						cpymo_backend_image_draw_type_text_say_textbox);
+	#endif
+				}
+				else {
+					float xywh[] = { namebox_x, namebox_y, namebox_w, namebox_h };
+					cpymo_backend_image_fill_rects(xywh, 1, gray, 0.5f, cpymo_backend_image_draw_type_text_say_textbox);
+				}
+
+				cpymo_backend_text_draw(
+					e->say.name,
+					name_x, namebox_y + cpymo_gameconfig_font_size(&e->gameconfig) / 10.0f * 9.0f,
+					e->gameconfig.textcolor,
+					e->say.current_say_is_already_read ? 
+						already_read_text_alpha : 1, 
+					cpymo_backend_image_draw_type_text_say);
+			}
+		}
+
+		if (e->say.avatar) {
+			/* 小头像坐在对话框左上角外侧，不压住正文。 */
+			float ah = msg_h * 0.8f;
+			float aw = e->say.avatar_h > 0
+				? ah * (float)e->say.avatar_w / (float)e->say.avatar_h : ah;
+			cpymo_backend_image_draw(
+				0, y - ah, aw, ah,
+				e->say.avatar, 0, 0, e->say.avatar_w, e->say.avatar_h,
+				1.0f, cpymo_backend_image_draw_type_text_say);
 		}
 
 		if (e->say.textbox_usable) {
@@ -427,9 +448,11 @@ static error_t cpymo_say_wait_text_fadein_callback(cpymo_engine *e)
 	return CPYMO_ERR_SUCC;
 }
 
-error_t cpymo_say_start(cpymo_engine *e, cpymo_str name, cpymo_str text)
+static error_t cpymo_say_start_impl(
+	cpymo_engine *e, cpymo_str name, cpymo_str text, bool no_box)
 {
 	cpymo_say_lazy_init(&e->say, &e->assetloader);
+	e->say.no_box = no_box;
 
 	uint64_t hash;
 	cpymo_str_hash_init(&hash);
@@ -486,31 +509,41 @@ error_t cpymo_say_start(cpymo_engine *e, cpymo_str name, cpymo_str text)
 	float msgtb_t = (float)e->gameconfig.msgtb_t * e->gameconfig.imagesize_h / 360.0f;
 	float msgtb_b = (float)e->gameconfig.msgtb_b * e->gameconfig.imagesize_h / 360.0f;
 
-#ifndef DISABLE_IMAGE_SCALING
-	float ratio = (float)e->gameconfig.imagesize_w / (float)e->say.msgbox_w;
-	float msg_h = (float)e->say.msgbox_h * ratio;
-	float x = msglr_l;
-	float w = (float)e->gameconfig.imagesize_w - msglr_l - msglr_r;
-#else
-	float msg_h = (float)e->say.msgbox_h;
-	float x = (e->gameconfig.imagesize_w - e->say.msgbox_w) / 2 + msglr_l;
-	float w = e->say.msgbox_w - msglr_l - msglr_r;
-#endif
+	float x, y, w, h;
+	if (no_box) {
+		/* intro：不画对话框，文字直接排在屏幕中部。 */
+		x = (float)e->gameconfig.imagesize_w * 0.1f;
+		w = (float)e->gameconfig.imagesize_w * 0.8f;
+		y = (float)e->gameconfig.imagesize_h * 0.25f;
+		h = (float)e->gameconfig.imagesize_h * 0.5f;
+	}
+	else {
+	#ifndef DISABLE_IMAGE_SCALING
+		float ratio = (float)e->gameconfig.imagesize_w / (float)e->say.msgbox_w;
+		float msg_h = (float)e->say.msgbox_h * ratio;
+		x = msglr_l;
+		w = (float)e->gameconfig.imagesize_w - msglr_l - msglr_r;
+	#else
+		float msg_h = (float)e->say.msgbox_h;
+		x = (e->gameconfig.imagesize_w - e->say.msgbox_w) / 2 + msglr_l;
+		w = e->say.msgbox_w - msglr_l - msglr_r;
+	#endif
 
-	float y = (float)e->gameconfig.imagesize_h - msg_h + msgtb_t;
-	float h = msg_h - msgtb_t - msgtb_b;
+		y = (float)e->gameconfig.imagesize_h - msg_h + msgtb_t;
+		h = msg_h - msgtb_t - msgtb_b;
 
-	/* Safe Area（issue #57）：刘海、圆角与系统手势条会遮住贴边的文字，
-	 * 把文本区从这些区域里缩回来；没有安全区的平台 insets 全为 0。 */
-	{
-		cpymo_safe_area safe_area;
-		cpymo_safe_area_get(&safe_area, 
-			e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
-		x += safe_area.left;
-		w -= safe_area.left + safe_area.right;
-		h -= safe_area.bottom;
-		if (w < 1.0f) w = 1.0f;
-		if (h < 1.0f) h = 1.0f;
+		/* Safe Area（issue #57）：刘海、圆角与系统手势条会遮住贴边的文字，
+		 * 把文本区从这些区域里缩回来；没有安全区的平台 insets 全为 0。 */
+		{
+			cpymo_safe_area safe_area;
+			cpymo_safe_area_get(&safe_area, 
+				e->gameconfig.imagesize_w, e->gameconfig.imagesize_h);
+			x += safe_area.left;
+			w -= safe_area.left + safe_area.right;
+			h -= safe_area.bottom;
+			if (w < 1.0f) w = 1.0f;
+			if (h < 1.0f) h = 1.0f;
+		}
 	}
 
 	const float text_alpha = 
@@ -545,3 +578,65 @@ void cpymo_say_hidewindow_until_click(cpymo_engine * e)
 	cpymo_engine_request_redraw(e);
 }
 
+error_t cpymo_say_start(cpymo_engine *e, cpymo_str name, cpymo_str text)
+{
+	return cpymo_say_start_impl(e, name, text, false);
+}
+
+error_t cpymo_say_start_intro(cpymo_engine *e, cpymo_str text)
+{
+	return cpymo_say_start_impl(e, cpymo_str_pure(""), text, true);
+}
+
+void cpymo_say_film_mode(cpymo_engine *e, bool on)
+{
+	e->say.film_mode = on;
+	cpymo_engine_request_redraw(e);
+}
+
+error_t cpymo_say_set_avatar(cpymo_engine *e, cpymo_str name)
+{
+	cpymo_say *say = &e->say;
+
+	if (say->avatar) cpymo_backend_image_free(say->avatar);
+	say->avatar = NULL;
+	say->avatar_w = say->avatar_h = 0;
+	if (say->avatar_name) { free(say->avatar_name); say->avatar_name = NULL; }
+	cpymo_engine_request_redraw(e);
+
+	if (name.len == 0) return CPYMO_ERR_SUCC;
+
+	error_t err = cpymo_assetloader_load_system_image(
+		&say->avatar, &say->avatar_w, &say->avatar_h,
+		name, &e->assetloader, true);
+
+	if (err != CPYMO_ERR_SUCC) {
+		say->avatar = NULL;
+		return err;
+	}
+
+	char *n = (char *)malloc(name.len + 1);
+	if (n) {
+		cpymo_str_copy(n, name.len + 1, name);
+		say->avatar_name = n;
+	}
+
+	return CPYMO_ERR_SUCC;
+}
+
+void cpymo_say_dialog_ext_draw(const struct cpymo_engine *e)
+{
+	if (!e->say.film_mode) return;
+
+	/* 上下黑边，构成电影画幅：画在所有内容之上。 */
+	const float bar = (float)e->gameconfig.imagesize_h * 0.125f;
+	const cpymo_color black = { 0, 0, 0 };
+	float xywh[] = {
+		0, 0, (float)e->gameconfig.imagesize_w, bar,
+		0, (float)e->gameconfig.imagesize_h - bar,
+		(float)e->gameconfig.imagesize_w, bar
+	};
+
+	cpymo_backend_image_fill_rects(
+		xywh, 2, black, 1.0f, cpymo_backend_image_draw_type_effect);
+}

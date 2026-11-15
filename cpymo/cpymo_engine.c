@@ -587,6 +587,7 @@ void cpymo_engine_draw(const cpymo_engine *engine)
 
 	cpymo_text_draw(engine);
 	cpymo_say_draw(engine);
+	cpymo_say_dialog_ext_draw(engine);
 }
 
 void cpymo_engine_trim_memory(cpymo_engine *e)

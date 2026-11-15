@@ -244,6 +244,41 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 		return cpymo_say_start(engine, name_or_text, text);
 	}
 
+		/* 对话框附加层（WebGAL 的 filmMode / miniAvatar / intro）。
+		 * 都是新命令名，旧脚本不会用到；未知命令本来就只警告并跳过，
+		 * 所以旧游戏的解析结果一处未变。 */
+	D("filmmode") {
+		POP_ARG(v); ENSURE(v);
+		cpymo_interpreter_checkpoint(interpreter);
+		cpymo_say_film_mode(engine, cpymo_str_equals_str(v, "on"));
+		CONT_NEXTLINE;
+	}
+
+	D("avatar") {
+		POP_ARG(name);
+		cpymo_interpreter_checkpoint(interpreter);
+		err = cpymo_say_set_avatar(engine, name);
+		if (err != CPYMO_ERR_SUCC)
+			printf("[Warning] Can not load avatar image.\n");
+		CONT_NEXTLINE;
+	}
+
+	D("intro") {
+		cpymo_fade_reset(&engine->fade);
+		cpymo_interpreter_checkpoint(interpreter);
+		POP_ARG(text);
+		{
+			char *a11y_plain = cpymo_textbox_strip_rich_text(text.begin, text.len);
+			cpymo_engine_extract_text(
+			    engine, a11y_plain ? cpymo_str_pure(a11y_plain) : text);
+			free(a11y_plain);
+		}
+		cpymo_engine_extract_text_submit(engine);
+		if (IS_EMPTY(text)) text = cpymo_str_pure(" ");
+		cpymo_text_clear(&engine->text);
+		return cpymo_say_start_intro(engine, text);
+	}
+
 	D("text") {
 		POP_ARG(content); ENSURE(content);
 		POP_ARG(x1_str); ENSURE(x1_str);
