@@ -27,7 +27,8 @@ ifeq ($(shell uname -s),Darwin)
 LDFLAGS += \
 	-Wl,-U,_cpymo_backend_input_text_begin \
 	-Wl,-U,_cpymo_backend_input_text_end \
-	-Wl,-U,_cpymo_backend_input_text_poll
+	-Wl,-U,_cpymo_backend_input_text_poll \
+	-Wl,-undefined,dynamic_lookup
 endif
 
 ifeq ($(OS), Windows_NT)
