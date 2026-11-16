@@ -174,6 +174,21 @@ CPyMO默认将会把`main`设置为一个空表。
 * `timer_cancel(id: int)` - 取消一个由 `timer` 或 `every` 创建的定时器
 * `wait(seconds: number)` - 挂起当前 `#lua` 块 `seconds` 秒；只能写在 `#lua` 块里，写在定时器回调里会报错
 * `yield()` - 让出到下一帧，只能写在 `#lua` 块里
+* `timers() : table[]` - 只读，返回当前尚未结束的定时器，每项为`{id, repeating, interval, remaining}`
+  - `remaining`是距离下次触发还剩的游戏时间（秒），已到点但还没执行时为`0`
+  - `repeating`为`true`表示由`every`创建
+  - 正在执行回调的那个定时器不在列表里（一次性的已经出列，`every`的正在重排）
+* `audio() : table` - 只读，返回`{enabled, bgm, se, vo}`，其中`bgm`/`se`/`vo`各为`{volume, playing, looping, name}`
+  - `name`是当前音源文件名，该通道没有播放时为`nil`
+  - 以`DISABLE_AUDIO`或`DISABLE_FFMPEG_AUDIO`构建时`playing`恒为`false`、`looping`恒为`false`
+* `bg() : table?` - 只读，返回`{name, x, y, w, h, transforming, follow_chara_quake}`，没有背景时为`nil`
+  - `transforming`为`true`表示背景正在移动或缩放，此时`x`/`y`/`w`/`h`是当前插值结果
+* `charas() : table[]` - 只读，按引擎链表顺序返回场上角色，每项为`{name, id, layer, alive, x, y, alpha, scale, w, h, anime}`
+  - `x`/`y`/`alpha`/`scale`是当前插值结果，不是移动目标
+  - `anime`为`true`表示该角色正在播放动作
+* `gameconfig() : table` - 只读，返回引擎读到的`gameconfig.txt`与运行期配置
+  - 字段：`title`、`start_script`、`cg_prefix`、`platform`、`script_type`、`bg_format`、`font_size`、`font_size_scaled`、`width`、`height`、`text_speed`、`bgm_volume`、`vo_volume`、`name_align`、`hint`、`gray_selected`、`play_video`、`text_color`、`engine_version`
+  - `text_color`为`{r, g, b}`，`engine_version`为`{major, minor}`，`font_size_scaled`是按当前分辨率换算后的字号
 
 时序以游戏时间累加，菜单暂停时不走。定时器、挂起位置与常驻显示项都不写入存档，读档后需自行重建。
 为保证可移植性，`io.read`、`os.execute`、`io.popen`、`debug.sethook` 与不带参数的 `io.lines` 已被替换为报错，指引改用 `cpymo.wait` / `cpymo.yield`。
@@ -309,6 +324,8 @@ CPyMO默认将会把`main`设置为一个空表。
   - 只读：无论这条是否被改写过，都照实返回当前状态
   - `has_pos`为`false`表示脚本没给坐标，位置由引擎按右上角堆叠决定；`size`为`0`表示字号按屏幕高度推算；`color`是`{r, g, b}`；`silent`为`true`表示这条不朗读
 * `huds() : table[]` - 按创建顺序返回全部常驻显示项，每项结构同`hud_get`
+* `is_open() : bool` - 只读，当前是否有自带页面（设置、存档、读档、回想、音乐鉴赏、相册、消息框、右键菜单等）在显示
+  - 只知道有没有页面，无法得知是哪一页
 
 自带页面打开时脚本解释器暂停，但 `#lua` 协程与 `timer` / `every` 仍在运行，因此可以在任何页面上增删改常驻显示项；这些回调里不要假设脚本正在推进。
 
@@ -431,6 +448,9 @@ f:close()
 * `active() : bool` - 当前是否有选择界面在配置或等待
 * `current() : int` - 当前焦点序号，没有界面时为`-1`
 * `cancel()` - 丢弃当前界面；若正在等待，等待会立即结束，脚本继续向下执行
+* `options() : table[]` - 只读，按`select`的调用顺序返回本次已经配置的候选，每项为`{index, x, y, w, h, enabled, hash}`
+  - `index`是`select`的调用顺序（从`1`开始），不是`finish`的`callback`收到的`sel`，两者不要混用
+  - 界面结束后（确认或`cancel`）返回空表
 
 确认选择时引擎先执行默认行为（播放确认音、按`save_enabled`记录hash、把序号写入PyMO变量`FSEL`），再调用`callback`。因此带`callback`与不带时的变量与存档行为相同，只是多了一次回调。
 
@@ -450,6 +470,8 @@ f:close()
   - 仅`gameconfig.txt`中符合`cgprefix`条件的图片可被解锁
 * `lock_cg(cg_name: string)` - 重新锁定一个CG，不带扩展名
 * `cg_unlocked(cg_name: string) : bool` 检查这个CG是否被锁定
+* `list() : int[]` - 只读，返回当前所有已设置Flag的Hash值
+  - 底层只保存Hash，无法反推原来的字符串，因此这里返回的是整数
 
 
 ### `cpymo.input`
@@ -507,6 +529,8 @@ f:close()
 该包用于与PyMO脚本解释器交互：
 
 * `vars` - 这个表包含了所有的PyMO变量，仅可在其中读写整数，不可遍历
+* `vars_list(scope: string?) : table` - 只读，用于枚举变量，`scope`取`"global"`或`"local"`，省略时返回全部；结果形如`{ [变量名] = 值 }`
+  - `vars`表只做读写转发、不可遍历，要枚举变量必须用这个接口
 * `commands` - 这个表包含了所有新增或重载的PyMO脚本命令，可以在这里覆盖原有PyMO命令或添加新的脚本命令
   - 所有的PyMO参数都会以字符串传入，未匹配成功的参数将以nil传入
   - 如重载`bg`命令，则需要重载为`function cpymo.script.commands.bg(name, transition, time, x, y)`，所有的参数均为字符串，且返回值无意义
@@ -519,6 +543,8 @@ f:close()
   - 在其返回`true`之前不会继续工作，
   - 一旦`finished`返回`true`，则会调用`finish_callback`，并继续执行后面的PyMO代码
 
+* `position() : table?` - 只读，返回解释器当前位置`{script, line, depth}`，没有正在执行的脚本时为`nil`
+  - `script`是脚本名，`line`是当前行号（从`1`开始），`depth`是调用深度（`0`为最外层）
 ### `cpymo.save`
 
 * `save_global()` - 立刻保存全局存档
