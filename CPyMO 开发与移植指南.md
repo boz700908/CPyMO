@@ -496,7 +496,7 @@ BGM002,夏日回忆
 cpymo-tool gen-album-cache /path/to/MyGame
 ```
 
-它在游戏目录里生成缓存文件，之后再进鉴赏就不卡了。
+它把缓存写进游戏目录的 `system/`，文件名是 `<底图前缀>_<页码>.png`（**引擎**：`cpymo/cpymo_album.c` 的 `gen-album-cache` 分支用 `stbi_write_png` 落盘），之后再进鉴赏就直接加载这些图、不再现场缩放。删掉它们就退回现场缩放：那种兜底画法只在内存里存在，**不落盘**。
 
 ---
 
@@ -520,7 +520,7 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 ### 7.2 系统图片清单
 
-`system/` 下这些名字是引擎**直接按名字找**的（**引擎**：`cpymo_assetloader_load_system_image` 的各调用点）。除了 `albumbg_N` 的前缀能由脚本改（见 6.3），其余都是写死的常量：
+`system/` 下这些名字是引擎**直接按名字找**的（**引擎**：`cpymo_assetloader_load_system_image` 的各调用点）。下面这张表里的名字写死在 C 代码里（唯一例外是 `albumbg_N` 的前缀），而且**一张都不给也能跑**——缺图时引擎要么跳过、要么用内置画法凑合。另有几类图名由脚本命令的参数决定，见本节后半「跟着脚本参数走的系统图」：
 
 | 文件 | 谁在用 |
 | --- | --- |
@@ -536,6 +536,17 @@ cpymo-tool gen-album-cache /path/to/MyGame
 这些底图配一张同名 `_mask` 是老 PyMO 的约定，但 **CPyMO 只在 `platform` 写成 `s60v3` / `s60v5` 时才会加载 `_mask`**（与 2.2 的 `charamaskformat` 同一个门控），其它平台一律忽略。新游戏直接用带透明通道的 png 就行。
 
 只做新游戏时，这些图都可以先用纯色块顶替，跑通流程再换美术。
+
+**跟着脚本参数走的系统图**
+
+除上表的固定名字，还有四类图也在 `system/` 里，但名字由命令参数给，写什么就找什么（都走 `cpymo_assetloader_load_system_image`，png）：
+
+* **鉴赏底图** `albumbg_N`：前缀跟着 `#album` 的参数走（见 6.3）。
+* **`#date` 的日期背景**：`#date <底图名>,<x>,<y>,<颜色>`，第一个参数**必填**（引擎里是 `ENSURE(date_bg)`），直接按这个名字找 `system/<底图名>.png`。显示的月/日取自变量 `FMONTH` / `FDATE`，没设过就是 0。
+* **`#anime_on` 的动画图**：`#anime_on <帧数>,<图名>,<x>,<y>,<每帧毫秒>,<是否循环>`。`system/<图名>.png` 是**一张竖排拼图**（spritesheet），引擎按「图片高度 ÷ 帧数」切成等高帧依次播放，**不是多张序列图**；`LOW_FRAME_RATE` 构建下这条命令整条跳过。
+* **选项提示图**：只有 `#sel`（和 `sel_do`）收这个参数——`#sel <选项数>,<提示图前缀>`。引擎找 `system/<前缀>0.png` 到 `<前缀>3.png` 四张，**从 0 起顺序加载，缺一张就停在那里**。真正画哪两张由选项文本的**首字符**决定（**引擎**：`cpymo_interpreter.c` 的 `D("sel")`）：`○`(U+25CB) 用 0/1，`×`(U+00D7) 用 2/3，其它首字符给了提示图也不画；同一组两张交替闪烁，分别当「未选中 / 选中」。所以要么四张都给，要么只给 0/1 并保证这些选项都以 `○` 开头。`gameconfig` 的 `hint` 写 0 时一张都不读（`cpymo_select_img_configuare_select_text_hint_pic` 开头就 return）。
+
+`#select_text` / `#select_var` / `select_img` 族**没有**提示图参数，hint 恒为 nohint。
 
 **游戏图标不在 `system/` 下**：它是游戏根目录的 `<游戏目录>/icon.png`，与 `gameconfig.txt` 同级——老手册的两处写法（目录树里的 `icon.png 游戏图标`、6.7 节的「必须为 57×57」）指的都是这个文件。它不参与任何脚本命令，引擎在三处用到它（**引擎**：`cpymo/cpymo_assetloader.c` 的 `cpymo_assetloader_load_icon_pixels`，按 `<gamedir>/icon.png` 读）：
 
@@ -781,7 +792,7 @@ PyMO 游戏通常是两种形态之一：
 | 局部染色 / 注音 | 富文本标记 `[文字](style=color~#RRGGBB)`、`[汉字](ruby=…)`，`say` / `intro` / `text` 都能用 | 只支持这两种；键名或值写错就整段原样显示 |
 | 自绘菜单 / 按钮 | 内置页面近似：选项用三个 `select_*` 族，图形式 UI 用 `select_img`，常驻文字用 `#text` 或 Level 1 的 `cpymo.ui.hud`（常驻文本 HUD） | 画不出真正的自由界面，按钮位置由菜单布局决定 |
 | 多层立绘 / 局部差分 | 多个槽位各放一张整图，`chara_multi` / `chara_y_multi` 族一次摆好 | 差分层要在外部烘成整图；同一槽位不能叠图 |
-| 立绘局部动画（眨眼、发丝） | `#chara_anime` 让整张图抖动，或 `#anime_on` 播 `system/` 下的序列图 | `#anime_on` 同屏只能一个、画在立绘之上；`#chara_anime` 移动的是整张图 |
+| 立绘局部动画（眨眼、发丝） | `#chara_anime` 让整张图抖动，或 `#anime_on` 把 `system/` 下一张竖排拼图按帧数切开循环播放 | `#anime_on` 同屏只能一个、画在立绘之上，拼图要在外部先烘好；`#chara_anime` 移动的是整张图 |
 | 定时器 / 并行 | `#wait` 阻塞等待；要并行只能上 Level 1 的 `cpymo.timer` / 协程 | 纯文本脚本没有并行 |
 | 选项按条件出现 | `#select_var`，变量为 0 的项不显示 | 不显示的项仍占 `FSEL` 编号 |
 | 已选项变灰、选择中存档 | `#select_var` 的 `init_position` 设 -1 | 只对 `sel` / `select_var` 有效 |
