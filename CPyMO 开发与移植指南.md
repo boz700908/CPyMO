@@ -599,7 +599,7 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 | --- | --- |
 | `unpack` | `unpack <pak> <扩展名带点> <输出目录>`，拆包 |
 | `pack` | `pack <输出.pak> <文件...>` 或 `pack <输出.pak> --file-list <list.txt>`，打包 |
-| `resize-image` | `resize-image <源> <目标> <宽> <高> [--load-mask [格式]] [--create-mask [格式]] [--out-format png/bmp/jpg]` |
+| `resize-image` | `resize-image <源> <目标> <比例宽> <比例高> [--load-mask [格式]] [--create-mask [格式]] [--out-format png/bmp/jpg]`。两个比例是**倍数**不是像素：`1` 原尺寸、`2` 放大一倍、`0.5` 减半 |
 | `pack-spritesheet` | `pack-spritesheet <输出> <列数> <文件...> [--load-mask] [--create-mask] [--out-format]` |
 | `gen-album-cache` | `gen-album-cache <游戏目录>`，生成鉴赏缩略图缓存 |
 | `strip` | `strip <游戏目录> <输出目录> [--pack]`，剔除未引用的资源 |
@@ -611,25 +611,34 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 
 ### 8.2 convert 的目标平台规格
 
-`convert` 按内置表改写所有图片尺寸并调整 `gameconfig.txt`（**引擎**：`cpymo_tool_convert.c` 的规格表）：
+`convert` 按内置表改写图片尺寸与 `gameconfig.txt`（**引擎**：`cpymo_tool_convert.c` 的 `cpymo_tool_convert_specs` 表）。下面每一列都能在代码里找到出处：
 
-| 目标 | 分辨率 | 生成遮罩 | 影片 | 等比适配 | 强制缩放 | 图片格式（bg/立绘/遮罩） | 写入的 platform |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `s60v3` | 320×240 | 是 | 是 | 否 | 是 | jpg / jpg / jpg | `s60v3` |
-| `s60v5` | 540×360 | 是 | 是 | 否 | 是 | jpg / jpg / jpg | `s60v5` |
-| `3ds` | 400×240 | 否 | 是 | 是 | 否 | jpg / png / 不生成 | `pygame` |
-| `pymo` | 800×600 | 否 | 是 | 否 | 否 | jpg / png / 不生成 | `pygame` |
-| `psp` | 480×272 | 否 | 否 | 否 | 是 | jpg / png / 不生成 | `pygame` |
-| `wii` | 640×480 | 否 | 否 | 否 | 是 | jpg / png / 不生成 | `pygame` |
+| 目标 | 参考分辨率 | 生成立绘遮罩 | 强制音频转码 | 缩放取 | bg / 立绘 / 系统图 / 遮罩 | 写入的 platform |
+| --- | --- | --- | --- | --- | --- | --- |
+| `s60v3` | 320×240 | 是 | 是 | 小比例 | jpg / jpg / png / jpg | `s60v3` |
+| `s60v5` | 540×360 | 是 | 是 | 小比例 | jpg / jpg / png / jpg | `s60v5` |
+| `3ds` | 400×240 | 否 | 否 | 大比例 | jpg / png / png / 不生成 | `pygame` |
+| `pymo` | 800×600 | 否 | 否 | 小比例 | jpg / png / png / 不生成 | `pygame` |
+| `psp` | 480×272 | 否 | 是 | 小比例 | jpg / png / png / 不生成 | `pygame` |
+| `wii` | 640×480 | 否 | 是 | 小比例 | jpg / png / png / 不生成 | `pygame` |
+
+**缩放只有一套比例，不是逐图适配。** 比例由 `gameconfig` 的 `imagesize` 与目标分辨率算出：`3ds` 取两个方向里的**大**比例（铺满屏幕，超出的部分看不到），其余目标取**小**比例（整张装进屏幕，可能留边）。bg、立绘、系统图共用这一个比例，所以 1000×200 的长条背景和小图标会被同倍数缩放。`imagesize` 本身也会乘上同一比例写回——800×600 转 `3ds` 时 max(400/800, 240/600) = 0.5，结果是 400×300，不是 400×240。
 
 几点值得注意：
 
-* `3ds` 会**等比适配**（加黑边），`psp` / `wii` / `s60v3` / `s60v5` 是**强制拉伸**。竖构图的立绘在强制拉伸后会变形，移植前先决定要不要自己重做素材。
-* 只有 `s60v3` / `s60v5` 会**生成立绘遮罩**。其他目标保持你原来的遮罩设置。
-* 除了 `s60v3` / `s60v5`，其他目标把 `platform` 写成 `pygame`。`platform` 在 CPyMO 里只有两个用途：塞班遮罩门控，以及 `cpymohd1/2/3` 这三个值用来选 feature level（见 2.2）。**注意 `convert` 会把输出目录的 `platform` 覆盖成上表的值**，所以转换完再手工把 `platform` 改成 `cpymohd1` 之类，否则 Level 1 的脚本跑不起来。
+* **系统图一律重存为 png**，与目标无关；立绘遮罩只有 `s60v3` / `s60v5` 生成，格式 jpg。
+* `3ds` 铺满意味着竖构图的立绘会超出上下边界，移植前先决定要不要自己重做素材。
+* 除了 `s60v3` / `s60v5`，其他目标把 `platform` 写成 `pygame`。`platform` 在 CPyMO 里只有两个用途：塞班遮罩门控，以及 `cpymohd1/2/3` 这三个值用来选 feature level（见 2.2）。**`convert` 会把输出目录的 `platform` 覆盖成上表的值**，所以转换完要手工改回，否则 Level 1 的脚本跑不起来。
 * PSP 的游戏数据包必须用 `convert psp` 转换过才能跑（README 的 PSP 章节明确要求）。
+* `convert` 会顺手把 `icon.png` 与 `system/default.ttf` 复制到输出目录（前者失败只警告）。
 
-音频格式不在上表里，但转换时会按目标的可用解码能力筛：`s60v3` / `s60v5` / `3ds` / `psp` 这四个接受 OGG/MP3/WAV，`pymo` 与 `wii` 只接受 OGG/WAV。老手册说 pymo 支持 `wav`/`mp3`/`amr`/`aac`/`midi`。`amr` 与 `aac` 任何 CPyMO 后端都解不了（SDL_mixer 没有这两个解码器）。`midi` 要看构建：SDL2 后端确实请求了 `MIX_INIT_MID`（`cpymo_backend_audio_sdl2_mixer.c:63-68`），但真能出声取决于 SDL_mixer 编译时带没带 timidity / fluidsynth，不能指望。移植别人的游戏时统一先转成 OGG 或 MP3 最省事。
+**音频筛不过就转码。** `s60v3` / `s60v5` / `3ds` / `psp` 接受 OGG / MP3 / WAV，`pymo` 与 `wii` 只接受 OGG / WAV；`s60v3` / `s60v5` / `psp` / `wii` 的「强制音频转码」为真，即格式本来就支持也统一转。输出扩展按 OGG > MP3 > WAV 挑，而六个目标都支持 OGG，所以只要 ffmpeg 在，最终一律是 ogg。`bgm`、`se`、`voice` 各按自己的现有格式判断，转完写回 `bgmformat` / `seformat` / `voiceformat`。
+
+**视频不看平台表。** 只要 ffmpeg 在，视频一律转 mp4（`-c:v mpeg4 -c:a aac`）并按同一比例缩放；规格表里那个「是否播影片」的字段在代码里没有被读取过，改不了任何东西。
+
+**ffmpeg 是唯一的依赖，缺了也不报错。** 找不到 ffmpeg 时音频与视频原样复制，只打印 `[Warning] ffmpeg not found...`，而 `gameconfig` 里的格式键仍写成目标值——配置说 ogg、文件还是 mp3，游戏里就是没声音。转完务必核对配置与文件后缀。
+
+老手册说 pymo 支持 `wav`/`mp3`/`amr`/`aac`/`midi`。`amr` 与 `aac` 任何 CPyMO 后端都解不了（SDL_mixer 没有这两个解码器）；`midi` 要看构建：SDL2 后端确实请求了 `MIX_INIT_MID`（`cpymo_backend_audio_sdl2_mixer.c:63-68`），但真能出声取决于 SDL_mixer 编译时带没带 timidity / fluidsynth，不能指望。移植别人的游戏时统一先转成 OGG 或 MP3 最省事——有 ffmpeg 的话 `convert` 会替你转，没有就自己先转。
 
 ### 8.3 一个完整的发布流程
 
@@ -726,6 +735,26 @@ PyMO 游戏通常是两种形态之一：
 * 存档与鉴赏：`#load`、`#album`、`#music`、`#date`
 * 变量输入：`#input`
 
+**能做到，但得绕。** 下面这些在原引擎里往往是一行代码，在 CPyMO 里要用现成命令拼出来。清单按「绕法 → 代价」写，能接受代价再动手：
+
+| 想要的效果 | CPyMO 里的绕法 | 代价 |
+| --- | --- | --- |
+| 函数 / 子程序 | `#call` 进一个脚本文件，`#ret` 回来 | 没有参数表与返回值，靠全局变量约定；最小单位是一个脚本文件，不能在一个文件里定义多个函数 |
+| 循环 | 计数器变量 + `#if_goto` 跳回标签 | 没有 `break` / `continue`；次数必须能写成整数比较 |
+| 数组 / 字典 | 展平成 `v0`、`v1`……，取值用 `#if` 链或 `#select_var` 分派 | 没有长度、没有遍历，每加一格多写一条命令 |
+| 浮点 | 乘 100 或 1000 存整数 | 所有公式手工定标；`#chara_scale` 是唯一吃小数的命令 |
+| 任意排版 | 一条 `#say` 只放一段；别处的文字用 `#text`（x1,y1,x2,y2 百分比 + 颜色 + 字号） | `#text` 不记入对话记录、不写存档，玩家回看不到 |
+| 局部染色 / 注音 | 富文本标记 `[文字](style=color~#RRGGBB)`、`[汉字](ruby=…)`，`say` / `intro` / `text` 都能用 | 只支持这两种；键名或值写错就整段原样显示 |
+| 自绘菜单 / 按钮 | 内置页面近似：选项用三个 `select_*` 族，图形式 UI 用 `select_img`，常驻文字用 `#text` 或 Level 1 的 `cpymo.ui.hud`（常驻文本 HUD） | 画不出真正的自由界面，按钮位置由菜单布局决定 |
+| 多层立绘 / 局部差分 | 多个槽位各放一张整图，`chara_multi` / `chara_y_multi` 族一次摆好 | 差分层要在外部烘成整图；同一槽位不能叠图 |
+| 立绘局部动画（眨眼、发丝） | `#chara_anime` 让整张图抖动，或 `#anime_on` 播 `system/` 下的序列图 | `#anime_on` 同屏只能一个、画在立绘之上；`#chara_anime` 移动的是整张图 |
+| 定时器 / 并行 | `#wait` 阻塞等待；要并行只能上 Level 1 的 `cpymo.timer` / 协程 | 纯文本脚本没有并行 |
+| 选项按条件出现 | `#select_var`，变量为 0 的项不显示 | 不显示的项仍占 `FSEL` 编号 |
+| 已选项变灰、选择中存档 | `#select_var` 的 `init_position` 设 -1 | 只对 `sel` / `select_var` 有效 |
+| 数字输入（密码、金额） | `#input 变量[,提示]` | 只收数字、最长 16 字符，没有文本输入 |
+| CG / 音乐鉴赏 | `#album` + `album_list.txt`、`#music` | 音乐鉴赏没有解锁判定，列出来就能听；CG 只收 `chara/` 里的图（6.1） |
+| 一次点击触发多处变化 | 逐条发命令：`#bg` 一条、`#chara` 一条、`#se` 一条 | 命令逐条执行，只有带时间的命令会阻塞 |
+
 格式上的硬线在 7.4 与 8.2：图片格式由 `bgformat`、`charaformat` 等键决定；音频只认 ogg / mp3 / wav（`amr`、`aac` 不认，`midi` 看后端的 SDL_mixer 构建）；影片要后端链了 FFmpeg 才能播。74 条命令的完整参数见 [CPyMO 指令参考.md](CPyMO%20指令参考.md)。
 
 ### 9.6 其他引擎：素材提取与格式统一
@@ -778,15 +807,26 @@ PyMO 游戏通常是两种形态之一：
 
 ### 9.9 转到 YukimiScript（可选）
 
-两条路都适用。如果打算长期维护这份移植，可以把文本脚本转成 YukimiScript：仓库根有 `pymo2ykm.ps1`（PowerShell，UTF-16LE 编码），它把 `#命令` 逐条翻成 `@命令`。
+两条路都适用。如果打算长期维护这份移植，可以把文本脚本转成 YukimiScript：仓库根有 `pymo2ykm.ps1`（PowerShell，UTF-16LE 编码），用法 `pymo2ykm.ps1 <pymoscript.txt> <输出.ykm>`，逐行读、逐条翻，产出 UTF-8 文本。
 
-它**不做的**事情：
+**它替你做的事**（以下每条都在脚本里能查到）：
 
-* 不认识的命令会降级成 `#` 注释，静默丢掉。转换完必须全文搜一遍 `#` 开头的行。
-* 老的 `#lua` 写法不会自动改写，要手动换成 `@lua "..."`。
-* `say` 变成文本行 `符号:正文`，`label` 变成 `- scene "名字"`，`goto` 变成 `@goto "名字"`。
+* 先扫一遍全脚本，把每个出现过的角色名定义成 `c0`、`c1`……，写在文件开头（`@__define_character c0 "角色"`）。
+* `#say 角色,正文` → 正文行 `c0:正文`；正文含换行的拆成多条。单参数的 `#say 正文` 就是纯文本行。
+* `#label 名字` → `@goto "名字"` + 空行 + `- scene "名字"` 三行；`#goto 名字` → `@goto "名字"`。
+* 文件开头自动补 `- scene "<脚本名>"`。若第一个 `label` 与脚本同名就跳过这一条，免得重名；否则主场景名改成 `OLD_<脚本名>`，并把同名 `label` / `goto` / `if` 里的引用一起改掉。
+* 颜色参数里的 `#` 换成 `0x`（`#FF0000` → `0xFF0000`）；布尔参数 `0` → `false`、其余 → `true`。
+* `#lua` **会被翻译**：整行原样取走（不按 `;` 切注释、不按 `,` 切参数），输出 `@lua "…"`，引号与反斜杠转义。
+* 文本做全角替换：`[`→`「`、`]`→`」`、`<`→`〈`、`>`→`〉`、`--`→`——`、`"`→`“`；富文本标记 `[文字](style=color~#RRGGBB)` 与 `[汉字](ruby=…)` 原样保留。
+
+**它不替你做的事**：
+
+* 不认识的命令会打印 `Warning: In line N, xxx is not supported.`，并写成 `#命令 参数` 注释行。**语义丢了、行还在**，所以转换完必须全文搜一遍 `^#`。
+* 不校验参数个数与类型：缺参会翻成空值，写错的引用会原样翻过去，到 `ykmc` 编译时才报。
+* 不搬资源、不改名：`#bg` 里的名字是什么，`@bg` 里还是什么。
 
 转换后再用 `ykmc` 编译回 `script/*.txt`，游戏就能跑。这条路的好处是能用到 Feature Level 1 的 Lua 扩展和新命令；坏处是多一层工具链。小规模移植建议先保持文本脚本，跑通了再说。
+
 
 ---
 
