@@ -111,8 +111,8 @@ voiceformat,mp3
 | --- | --- | --- |
 | `gametitle` | 空 | 标题，最长 255 字节。可以含 `\n` 换行 |
 | `startscript` | 空（必须自己写） | 启动脚本名，最长 63 字节 |
-| `scripttype` | 空 | 固定写 `pym`（三个字母）。写错不会崩，但启动时会弹一条「非 PyMO 脚本」警告（**引擎**：`cpymo_engine.c` 只比较前四个字符是否为 `p y m \0`） |
-| `platform` | `pygame` | 平台标记，只影响两件事：① 等于 `s60v3` / `s60v5` 时启用塞班那套 `_mask` 遮罩（见 `charamaskformat`）；② 等于 `cpymohd1` / `cpymohd2` / `cpymohd3` 时把 feature level 设成 1 / 2 / 3（`cpymo_engine.c:116-124`），也就是**用这一行给游戏开 Level 1 的 Lua 能力**。其它值一律 Level 0。Level 2 / 3 的能力规划见仓库根的 `CPyMO HD.md` |
+| `scripttype` | 空 | 写 `pym`。字段只有 4 字节，解析时只留前 3 个字符并强制补 `\0`（`cpymo_str_copy`），所以 `pym` / `pymo` / `pymx` 存下来一模一样；**留空才**会在启动时弹「非 PyMO 脚本」警告（`cpymo_engine.c:271-274` 逐字节比对 `p y m \0`） |
+| `platform` | `pygame` | 平台标记，只影响两件事：① 等于 `s60v3` / `s60v5` 时启用塞班那套 `_mask` 遮罩（见 `charamaskformat`）；② 等于 `cpymohd1` / `cpymohd2` / `cpymohd3` 时把 feature level 设成 1 / 2 / 3（`cpymo_engine.c:116-124`），也就是**用这一行给游戏开 Level 1 的 Lua 能力**。其它值一律 Level 0。Level 2 / 3 的能力规划见仓库根的 `CPyMO HD.md`。**注意**：`cpymo-tool` 的 `strip` / `convert` 只接受 `pygame` / `s60v3` / `s60v5`，遇到 `cpymohd1/2/3` 会打印 `[Error] Platform ... is not supported.` 直接退出——要过工具链就先把它临时改成 `pygame`（删掉这一行也等于 `pygame`） |
 | `engineversion` | 空 | 形如 `1.2`，按 `.` 拆成主次版本 |
 | `imagesize` | `0,0` | 逻辑分辨率，`宽,高` |
 | `bgformat` | 空 | 背景扩展名，`jpg` 或 `.jpg` 都行 |
@@ -605,9 +605,22 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 | `strip` | `strip <游戏目录> <输出目录> [--pack]`，剔除未引用的资源 |
 | `convert` | `convert <目标平台> <游戏目录> <输出目录> [--pack]`，一把梭：缩放图片、改配置、可选打包 |
 
-`strip` 很有用：它扫脚本找出真正引用到的资源名，把没用到的文件删掉。发布前跑一次常常能省一半体积。**但要先备份**，脚本里用变量拼出来的资源名它可能认不出来。
+**`strip` 做的是裁剪，不是压缩。** 它从 `gameconfig` 的 `startscript` 出发解析脚本，遇到 `#call` / `#change` 跟到被调用的脚本（`#goto` 只是同脚本内跳转，不用跟），把真正被引用到的资源名收成集合，然后只复制这些文件：
 
-不带 `--pack` 时，这两个命令保持输入的形态：源目录散着就给散文件，源目录有 pak 就写回 pak。
+* 七类资源各扫各的：`bg`、`bgm`、`chara`、`se`、`voice`、`video`、`script`。`#bg xxx BG_FADE` 这种第二参数是转场名的写法它认得，不会把 `BG_FADE` 当图片名。
+* `system/` 只保留脚本实际用到的用途图（选择高亮、选项框、CG 缩略图、消息光标、曲目列表）；`icon.png` 与 `system/default.ttf` 无条件复制。
+* `gameconfig.txt` 无条件复制，**内容一字不改**。
+* 不生成任何 `_mask` 遮罩——遮罩只有 `convert` 转塞班时才有。
+* 用变量拼出来的资源名（`set A,bg01` 之后 `#bg ${A}`）它认不出来，这类资源会被当成没引用而丢掉。发布前先备份。
+
+**`--pack` 只对四类资源生效。** 过滤器里每类资源带一个 `packable` 开关：`bg`、`chara`、`se`、`voice` 可打包，`bgm`、`video`、`script`、`system` 永远是散文件。所以 CPyMO 里没有「全打成包」这回事，`bgm/` 那一堆文件始终留在磁盘上。
+
+* 包位置固定为 `<输出目录>/<类型>/<类型>.pak`（`bg/bg.pak`、`chara/chara.pak`……），不能自定义包名。
+* 包内条目名取文件**基名、去掉扩展名、转大写**，最长 31 字符，超了打印 `[Warning] File name ... is too long!`。pak 里不存扩展名，后缀由 `gameconfig` 的 `*format` 决定——这也是为什么换格式要改配置而不是改包。
+* `unpack <pak> <扩展名> <输出目录>` 反过来：条目名转小写，直接接上你给的字符串，**必须自己带点**（`.jpg`），它不做任何补全。
+* `pack <输出.pak> --file-list <列表>` 的列表是**一行一个磁盘路径**（`/`、`\` 都行），空行跳过、每行首尾空白会 trim；条目名照样只看基名，所以 pak 里没有目录层级，拆出来是一个平铺目录。
+
+不带 `--pack` 时，`strip` 与 `convert` 保持输入的形态：源目录散着就给散文件，源目录有 pak 就写回 pak。
 
 ### 8.2 convert 的目标平台规格
 
@@ -632,6 +645,8 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 * PSP 的游戏数据包必须用 `convert psp` 转换过才能跑（README 的 PSP 章节明确要求）。
 * `convert` 会顺手把 `icon.png` 与 `system/default.ttf` 复制到输出目录（前者失败只警告）。
 
+**`convert` 会把 `gameconfig.txt` 整份重写。** 它按引擎规则解析原配置，再按固定字段表写一份新的（`cpymo_tool_gameconfig_write_to_file`，顺序就是写文件的顺序）：`gametitle`、`platform`、`engineversion`、`scripttype`、六个格式键、`font`、`fontsize`、`fontaa`、`hint`、`prefetching`、`grayselected`、`playvideo`、`textspeed`、`bgmvolume`、`vovolume`、`imagesize`、`startscript`、`nameboxorig`、`cgprefix`、`textcolor`、`msgtb`、`msglr`、`namealign`。写死的几项：`scripttype` 一律写 `pymo`（4 字节字段只留 3 个字符，存进去还是 `pym`，与手写等价）、格式键带前导点（`.jpg`）、`font` 写 `-1`、`fontaa` 与 `prefetching` 写 `1`、`namealign` 写 `middle` / `left` / `right`、`textcolor` 写成小写 `#rrggbb`。`font`、`fontaa`、`prefetching` 这三个键 CPyMO 引擎不认（见 2.3），写了只是留给上游 PyMO。**原文件里的注释行、`#` 开头的行、引擎不认识的键，转换后全部消失**——要留着就转换后再手工补回。
+
 **音频筛不过就转码。** `s60v3` / `s60v5` / `3ds` / `psp` 接受 OGG / MP3 / WAV，`pymo` 与 `wii` 只接受 OGG / WAV；`s60v3` / `s60v5` / `psp` / `wii` 的「强制音频转码」为真，即格式本来就支持也统一转。输出扩展按 OGG > MP3 > WAV 挑，而六个目标都支持 OGG，所以只要 ffmpeg 在，最终一律是 ogg。`bgm`、`se`、`voice` 各按自己的现有格式判断，转完写回 `bgmformat` / `seformat` / `voiceformat`。
 
 **视频不看平台表。** 只要 ffmpeg 在，视频一律转 mp4（`-c:v mpeg4 -c:a aac`）并按同一比例缩放；规格表里那个「是否播影片」的字段在代码里没有被读取过，改不了任何东西。
@@ -655,7 +670,7 @@ cpymo-tool gen-album-cache MyGame-3ds
 # 4. 把 MyGame-3ds 整个目录拷到目标设备的约定位置
 ```
 
-`--pack` 会把 `bg`/`chara`/`se`/`voice` 打成 pak，其余目录仍是散文件。
+`--pack` 会把 `bg`/`chara`/`se`/`voice` 打成 pak，`bgm` / `video` / `script` / `system` 仍是散文件。
 
 ---
 
@@ -826,9 +841,6 @@ PyMO 游戏通常是两种形态之一：
 * 不搬资源、不改名：`#bg` 里的名字是什么，`@bg` 里还是什么。
 
 转换后再用 `ykmc` 编译回 `script/*.txt`，游戏就能跑。这条路的好处是能用到 Feature Level 1 的 Lua 扩展和新命令；坏处是多一层工具链。小规模移植建议先保持文本脚本，跑通了再说。
-
-
----
 
 ---
 
