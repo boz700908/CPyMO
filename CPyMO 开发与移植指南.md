@@ -639,7 +639,7 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 - PSV：`ux0:/pymogames`
 - Wii：`sd:/pymogames/`
 - PSP：`PSP/GAME/CPYMO/`，并且资源必须先过一遍 `cpymo-tool convert psp`
-- Android：`/sdcard/pymogames/`
+- Android：`/sdcard/pymogames/`（`cpymo-backends/android/app/src/main/cpp/CMakeLists.txt` 里的 `GAME_SELECTOR_DIR` 就是它；README 第 707 行另给了 `/storage/emulated/0/pymogames/`，多数机器上两者指同一处存储，按前者准备即可）
 - iOS：iTunes 文件共享的文档目录
 
 ---
@@ -834,7 +834,7 @@ PyMO 游戏通常是两种形态之一：
 四步，顺序不要跳：
 
 1. **先解包拿到散文件。** 各引擎都有自己的封包（KiriKiri 的 `.xp3`、Ren'Py 的 `.rpa`、NScripter 的 `.nsa`/`.sar`、RPG Maker 的加密包、Unity 的 AssetBundle、自研格式）。用各社区现成的解包工具，不要自己写解析器——这件事投入产出比最差。这一阶段只求「能拿到原始图片、音频、脚本」。
-2. **摊平成 CPyMO 的目录。** 引擎喜欢用子目录、差分后缀、数字 id 组织资源，CPyMO 只按名字在这几处找：`bg/<名字>.<bgformat>`、`chara/<名字>.<charaformat>`、`se/`、`voice/`、`system/`（系统图清单见 7.2）。资源名是扁平字符串，写不进目录，所以改名是必经一步；给自己留一张「原文件 → 新路径」的映射表。
+2. **摊平成 CPyMO 的目录。** 引擎喜欢用子目录、差分后缀、数字 id 组织资源，CPyMO 只按名字在这几处找：`bg/<名字>.<bgformat>`、`chara/<名字>.<charaformat>`、`bgm/`、`se/`、`voice/`、`system/`（系统图清单见 7.2）、`video/`（只认 `.mp4`，见 7.4）。资源名是扁平字符串，写不进目录，所以改名是必经一步；给自己留一张「原文件 → 新路径」的映射表。
 3. **统一尺寸与格式。** `imagesize` 定一次参考分辨率，所有图跟它对上。老游戏是 640×480 或 4:3 就别改图，改 `imagesize`——坐标是百分比（3.1），立绘位置不会因此错。批量转码用 `cpymo-tool convert`（8.2），剩下的边角用 ffmpeg 或 ImageMagick 补。
 4. **统一音频。** 只留 ogg / mp3 / wav，其余（amr、aac、部分 midi）先转掉；音量交给 `bgmvolume`、`vovolume`（2.2）。
 
