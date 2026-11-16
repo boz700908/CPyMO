@@ -778,6 +778,8 @@ cd到`cpymo-backends/sdl1`，执行`make -j -f Makefile.Wii`即可生成dol文�
 
 [CPyMO-YukimiScript-Template](https://github.com/Strrationalism/CPyMO-YukimiScript-Template)是一套使用YukimiScript语言和Pipe构建系统的CPyMO项目模板，我们建议你基于它来开发游戏。
 
+本文档仓库根的 [`CPyMO 指令参考.md`](CPyMO%20%E6%8C%87%E4%BB%A4%E5%8F%82%E8%80%83.md) 逐条列出引擎实际支持的全部脚本命令，每条同时给出 PyMO（`#命令`）与 YukimiScript（`@命令`）两种写法。
+
 除此之外，我们建议你使用以下格式：
 
 * 分辨率：CPyMO没有分辨率限制，你可以根据自己的需要选择分辨率
