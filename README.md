@@ -75,6 +75,8 @@ CPyMO 用编译期常量 `CPYMO_FEATURE_LEVEL` 标记一个构建支持到哪一
 - **Level 1**：在 Level 0 之上接入 Lua 5.4（`#lua` 块与 `cpymo.*` 系列 API）。渲染后端与 Level 0 完全一致，不需要更强的硬件，只是多占一点内存。完全不用 `#lua` 的游戏在两级下表现相同。
 - **Level 2 / 3**：图形后端增强（旋转、缩放、加法混合等），**尚未实现**，目前没有任何平台的产物到这两级。
 
+Level 2 / 3 的完整设计与排期见 [`CPyMO HD.md`](CPyMO%20HD.md)。
+
 平台 | 级别 | 说明
 ---- | ---- | ----
 Windows x64 / x86 / ARM64 / ARM64EC | Level 1 | 普通版与无障碍版都是
@@ -123,7 +125,7 @@ Nintendo 3DS / Wii / UWP / SDL 1.2 桌面 / CPyMO Text / ASCII Art | 不支持 |
 
 # 平台支持列表
 
-### 第一梯队
+## 第一梯队
 
 **CPyMO主要在这些平台上开发，并将主要在这些平台上进行测试和除错。**
 
@@ -133,7 +135,7 @@ Windows           | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 加载系统字体   
 Nintendo 3DS      | 3DS  | FFmpeg   | FFmpeg             | 自带字体          | 游戏选择器
 Sony PSP          | SDL2 | 无       | FFmpeg             | 外置字体          | 游戏选择器
 
-### 第二梯队
+## 第二梯队
 
 **CPyMO可以编译到这些平台，但没有进行全面的测试。**
 
@@ -147,7 +149,7 @@ UWP             | SDL2 | FFmpeg   | FFmpeg             | 加载系统字体  | �
 Emscripten      | SDL2 | FFmpeg   | FFmpeg, SDL2_mixer | 外置字体     | 视障帮助
 Android         | SDL2 | FFmpeg   | FFmpeg             | 外置字体     | 游戏选择器,视障帮助
 
-### 第三梯队
+## 第三梯队
 
 **CPyMO可以编译到这些平台，但可能有部分次要功能不可用。**
 
@@ -1106,7 +1108,7 @@ Level 1 与两种后端配置互斥，会在 `cpymo/cpymo_prelude.h` 的预处�
 
 3DS、Wii、Switch、PSP、Android、UWP 后端没有接入这套开关，保持 Feature Level 0。
 
-各功能级别的完整规划见 `CPyMO HD.md`。
+各功能级别的完整规划见 [`CPyMO HD.md`](CPyMO%20HD.md)。
 
 # 关于“Song of PyMO”
 

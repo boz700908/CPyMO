@@ -111,7 +111,7 @@ voiceformat,mp3
 | `gametitle` | 空 | 标题，最长 255 字节。可以含 `\n` 换行 |
 | `startscript` | 空（必须自己写） | 启动脚本名，最长 63 字节 |
 | `scripttype` | 空 | 固定写 `pym`（三个字母）。写错不会崩，但启动时会弹一条「非 PyMO 脚本」警告（**引擎**：`cpymo_engine.c` 只比较前四个字符是否为 `p y m \0`） |
-| `platform` | `pygame` | 平台标记，只影响两件事：① 等于 `s60v3` / `s60v5` 时启用塞班那套 `_mask` 遮罩（见 `charamaskformat`）；② 等于 `cpymohd1` / `cpymohd2` / `cpymohd3` 时把 feature level 设成 1 / 2 / 3（`cpymo_engine.c:116-124`），也就是**用这一行给游戏开 Level 1 的 Lua 能力**。其它值一律 Level 0 |
+| `platform` | `pygame` | 平台标记，只影响两件事：① 等于 `s60v3` / `s60v5` 时启用塞班那套 `_mask` 遮罩（见 `charamaskformat`）；② 等于 `cpymohd1` / `cpymohd2` / `cpymohd3` 时把 feature level 设成 1 / 2 / 3（`cpymo_engine.c:116-124`），也就是**用这一行给游戏开 Level 1 的 Lua 能力**。其它值一律 Level 0。Level 2 / 3 的能力规划见仓库根的 `CPyMO HD.md` |
 | `engineversion` | 空 | 形如 `1.2`，按 `.` 拆成主次版本 |
 | `imagesize` | `0,0` | 逻辑分辨率，`宽,高` |
 | `bgformat` | 空 | 背景扩展名，`jpg` 或 `.jpg` 都行 |

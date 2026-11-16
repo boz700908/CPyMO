@@ -173,8 +173,24 @@ make
 - `LINK_WITH_ONELUA` - Compile the bundled single-file Lua 5.4 (`lua/onelua.c`) instead of linking an external liblua
 
 ### Accessibility Features
+- `ENABLE_ACCESSIBILITY=ON` - CMake option to enable unified accessibility features (TTS, sound effects, vibration)
 - `ENABLE_TEXT_EXTRACT_COPY_TO_CLIPBOARD=1` - Export game text to clipboard for visually impaired players
 - `ENABLE_EXIT_CONFIRM=1` - Prompt confirmation on exit
+
+### Accessibility Build Configuration
+- **CMAKE**: `-DENABLE_ACCESSIBILITY=ON` enables platform-specific accessibility
+  - Windows: Tolk-based TTS via screen readers (NVDA, JAWS, ZDSR, BoyCtrl); prebuilt Tolk DLLs vendored for x86/x64/ARM64/ARM64EC
+  - macOS: NSSpeechSynthesizer TTS
+  - Linux: speech-dispatcher TTS
+  - iOS: AVSpeechSynthesizer TTS + VoiceOver + custom gesture recognizers
+  - Android: TextToSpeech API + TalkBack gestures
+- **Sound effects**: WAV files (enter.wav, menu.wav, select.wav) bundled with accessibility builds
+- **Vibration**: Light 10ms (select), Medium 20ms (skip hold), Heavy 50ms (cancel). Falls back to gamepad rumble on desktop platforms without haptic hardware.
+- **Unified API**: `cpymo/cpymo_accessibility.h` provides `cpymo_accessibility_play_sound(X)` and `cpymo_accessibility_vibrate(X)` macros that abstract platform differences. Sound types: `SOUND_ENTER=1`, `SOUND_MENU=2`, `SOUND_SELECT=3`.
+- **Unified input**: Native gesture adapters and SDL2 copy shortcuts enqueue `cpymo_accessibility_action` values through `cpymo_backend_input.h`; `cpymo_input_snapshot()` is the only consumer. Pending actions are merged atomically so a hold-end action cannot be overwritten by a following gesture. Copy and append-copy must be edge-triggered, never inferred from a continuously polled key or controller state. Do not synthesize keyboard events, mutate engine state, or maintain a platform-local copy cache in a gesture bridge.
+- **Feedback compatibility**: Keep each backend's existing sound asset, volume/gain, and haptic duration unchanged when modifying accessibility behavior.
+- **Auto-read**: All pages (game selector, save/load, music box, settings) auto-read first item on entry.
+- **Settings pages**: Read "name+value" when browsing, read "value only" when changing.
 
 ### Performance Tuning
 - `DISABLE_VSYNC=1` - Disable vertical sync for maximum framerate
@@ -206,7 +222,7 @@ git submodule update --init --recursive
 ### Testing
 - No formal unit test suite
 - Manual testing via game execution
-- CI builds 15+ platforms (see `.github/workflows/ci.yml`)
+- CI builds 15+ platforms (see `.github/workflows/ci.yml`), including separate Accessibility builds for Windows, macOS, Linux, iOS, and Android
 - For desktop: Build and copy executable to game directory, run with game assets
 
 ### Game Assets Preparation
@@ -216,7 +232,7 @@ git submodule update --init --recursive
 ## Platform-Specific Notes
 
 ### Desktop (Windows/Linux/macOS)
-- Full feature set: video playback, system font loading, accessibility features
+- Full feature set: video playback, system font loading, accessibility features (TTS, sound effects, vibration)
 - Alt+Enter toggles fullscreen
 - Visual Studio integration via CMakeSettings.json
 
