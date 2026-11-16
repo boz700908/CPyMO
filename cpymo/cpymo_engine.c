@@ -585,6 +585,10 @@ error_t cpymo_engine_update(cpymo_engine *engine, float delta_time_sec, bool * r
 #endif
 
 	if (cpymo_ui_enabled(engine)) {
+		/* 自带页面打开时不再驱动 cpymo_wait_update，输入框没人 poll，
+		   但后端仍处于文本输入态会吞掉所有按键；这里直接取消输入。 */
+		cpymo_input_text_cancel(engine);
+
 		#if CPYMO_FEATURE_LEVEL >= 1
 		/* 自带页面(存档/设置/回想/音乐鉴赏/相册/消息框等)打开时解释器暂停，
 		   但 #lua 协程与帧驱动定时器继续跑：常驻 HUD 的增删改在任何页面上都要能发生。 */

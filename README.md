@@ -111,7 +111,8 @@ CPyMO Text | Level 0 | 构建脚本固定 `-DLOW_FRAME_RATE`，与 Level 1 编�
 Windows / Linux / macOS | 支持 | 物理键盘
 Android / iOS | 支持 | 调用系统软键盘
 Web（Emscripten） | 支持 | 浏览器输入法
-Nintendo Switch / Sony PSP / PS Vita | 预期不可用 | 后端有输入代码，但实现依赖 SDL2 上报的文本输入事件；这三台没有软键盘，预期收不到字符、只能用 ESC 取消。未在真机验证。
+Nintendo Switch | 预期支持 | 复用 SDL2 后端，`begin()` 会调用 `SDL_StartTextInput()`，devkitPro 的移植把它映射到系统软键盘；万一收不到字符，仍可用 ESC 取消。未在真机验证。
+Sony PSP / PS Vita | 不支持 | 后端只编译各自目录的 `.c`，没有这三个弱符号的实现，命令被跳过（见上文警告）
 Nintendo 3DS / Wii / UWP / SDL 1.2 桌面 / CPyMO Text / ASCII Art | 不支持 | 后端未实现，命令被跳过（见上文警告）
 
 ## 在3DS/PSP/Wii上运行游戏时，我需要对游戏的数据包进行转换？

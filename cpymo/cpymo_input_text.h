@@ -43,6 +43,9 @@ void cpymo_input_text_free(cpymo_input_text *it);
 error_t cpymo_input_text_start(
 	struct cpymo_engine *e, cpymo_str var_name, cpymo_str prompt);
 
+/* 终止输入且不写变量（内置页面抢键盘、引擎关闭时用）。 */
+void cpymo_input_text_cancel(struct cpymo_engine *e);
+
 /* cpymo_wait_for 回调：处理本帧输入，完成时写变量并返回 true。 */
 bool cpymo_input_text_wait_for(struct cpymo_engine *e, float delta_time);
 

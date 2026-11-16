@@ -8,6 +8,7 @@
 #include "../cpymo-backends/include/cpymo_backend_image.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static void release_prompt_text(cpymo_input_text *it)
 {
@@ -92,14 +93,17 @@ error_t cpymo_input_text_start(
 	cpymo_str_copy(it->var_name, sizeof(it->var_name), var_name);
 	if (prompt.len > 0) cpymo_str_copy(it->prompt, sizeof(it->prompt), prompt);
 
+	if (cpymo_backend_input_text_begin == NULL) {
+		printf("[Warning] Backend does not support text input, "
+			"the \"input\" command is skipped.\n");
+		return CPYMO_ERR_SUCC;
+	}
+
 	it->active = true;
 	it->dirty = true;
+	cpymo_backend_input_text_begin();
 
-	if (cpymo_backend_input_text_begin) cpymo_backend_input_text_begin();
-	else printf("[Warning] Backend does not support text input, "
-		"the \"input\" command will be skipped.\n");
-
-	if (it->prompt[0]) cpymo_a11y_speak(it->prompt);
+	if (it->prompt[0]) { cpymo_a11y_speak(it->prompt); }
 
 	rebuild_texts(it, e);
 	cpymo_engine_request_redraw(e);
@@ -121,12 +125,22 @@ static void drop_last_char(cpymo_input_text *it)
 	it->dirty = true;
 }
 
+/* 把输入框文本转成整数：超长与越界都夹进 int32 范围，避免
+   cpymo_str_atoi 的定长缓冲截断与 atoi 溢出的未定义行为。 */
+static cpymo_val input_text_parse_value(const char *text)
+{
+	long long v = strtoll(text, NULL, 10);
+	if (v > 2147483647LL) v = 2147483647LL;
+	else if (v < -2147483648LL) v = -2147483648LL;
+	return (cpymo_val)v;
+}
+
 static void finish_input(struct cpymo_engine *e, bool confirmed)
 {
 	cpymo_input_text *it = &e->input_text;
 
 	if (confirmed) {
-		cpymo_val value = (cpymo_val)cpymo_str_atoi(cpymo_str_pure(it->text));
+		cpymo_val value = input_text_parse_value(it->text);
 		error_t err = cpymo_vars_set(
 			&e->vars, cpymo_str_pure(it->var_name), value);
 
@@ -170,7 +184,10 @@ bool cpymo_input_text_wait_for(struct cpymo_engine *e, float delta_time)
 		else if (c == '-' && it->text_len == 0) append_char(it, '-');
 	}
 
-	if (it->dirty && !finish_now) rebuild_value_text(it, e);
+	if (it->dirty && !finish_now) {
+		rebuild_value_text(it, e);
+		cpymo_engine_request_redraw(e);
+	}
 
 	if (finish_now) {
 		finish_input(e, confirmed);
@@ -178,6 +195,12 @@ bool cpymo_input_text_wait_for(struct cpymo_engine *e, float delta_time)
 	}
 
 	return false;
+}
+
+/* 终止输入且不写变量：内置页面抢走键盘、或引擎不再驱动等待时用。 */
+void cpymo_input_text_cancel(struct cpymo_engine *e)
+{
+	if (e->input_text.active) finish_input(e, false);
 }
 
 void cpymo_input_text_draw(

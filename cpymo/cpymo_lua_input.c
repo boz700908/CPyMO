@@ -36,9 +36,6 @@ static int cpymo_lua_api_input_index(lua_State *l)
     cpymo_input *input = *(cpymo_input **)lua_touserdata(l, -2);
 
     uint64_t key_hash = cpymo_str_hash_cstr(key);
-    cpymo_lua_context *c = cpymo_lua_state_get_lua_context(l);
-    
-        
     #define D_BOOL(K) \
         if (key_hash == cpymo_lua_api_input_keyname_hash_ ## K) { \
             lua_pushboolean(l, input->K); \

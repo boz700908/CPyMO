@@ -498,6 +498,7 @@ jobs:
       env:
         ENABLE_TEXT_EXTRACT: 1
         ENABLE_TEXT_EXTRACT_ANDROID_ACCESSIBILITY: 1
+        ENABLE_LUA: 1
 
     - name: Upload
       uses: actions/upload-artifact@v6.0.0
