@@ -390,6 +390,7 @@ CPyMO默认将会把`main`设置为一个空表。
 * `items(page: string) : table`
   - 返回`{page, base, count, extra_count, entries, extras, on_click}`
   - `on_click`是这一页`on_item_click`注册的回调，没注册时为`nil`
+  - `on_item_click(page, fn)`只接受函数，要停用某页的追加项回调就注册一个不返回`true`的空函数；传`nil`取消只适用于`item_on_click`
   - `base`是该页的容量编号起点（该页面还没被打开过时为`nil`），`count`是被改写的真实条目数，`extras`是该页全部的追加项
   - `entries`列出该页的全部真实条目，没被改写的也在其中；每项含`index`、`text`、`hidden`、`rewritten`与`on_click`，没有改写时`text`取自引擎实际绘制的文本
 * `pages() : string[]` - 返回全部页面键

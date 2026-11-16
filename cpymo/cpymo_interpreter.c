@@ -158,6 +158,7 @@ error_t cpymo_interpreter_execute_step(cpymo_interpreter * interpreter, cpymo_en
 #if CPYMO_FEATURE_LEVEL >= 1
 	if (engine->feature_level >= 1 &&
 		cpymo_lua_context_has_pending(&engine->lua) &&
+		command.len > 0 &&
 		!cpymo_str_equals_str(command, "lua")) {
 		printf(
 			"[lua] %s(%d): incomplete #lua block discarded.\n",
@@ -2388,6 +2389,10 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 			cpymo_parser_curline_readuntil(&interpreter->script_parser, '\0');
 
 		cpymo_str_trim(&lua_code);
+		/* readuntil('\0') consumed the whole line, so cur_pos already points at the
+		   next line while is_line_end is still true. Reset it, otherwise the next
+		   execute_step pops an empty command and discards the pending #lua block. */
+		interpreter->script_parser.is_line_end = false;
 		return cpymo_lua_context_execute_script_block(
 			&engine->lua,
 			lua_code,
