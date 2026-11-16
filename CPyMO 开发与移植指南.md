@@ -611,7 +611,7 @@ stb_truetype 那份的查找顺序（**引擎**：`cpymo_backend_font.c` 的 `cp
 
 | 事情 | 哪些后端支持 |
 | --- | --- |
-| 影片（`movie`） | 解码在引擎侧：`cpymo/cpymo_movie.c` 直接调 libavformat/libavcodec，桌面 CMake 是 `find_package(FFMPEG REQUIRED)`。`DISABLE_MOVIE` 打开的构建没有视频，ascii-art、SDL1、PSP、PSV、Wii、Emscripten 的 Makefile 都开着。片源扩展名写死在引擎里：`#movie <名>` 只找 `video/<名>.mp4`，参数别自带 `.mp4`。`gameconfig` 的 `playvideo` 写 `0` 时这条命令静默跳过——跳过前会先把 bgm、se、voice 停掉，只留一句 `[Info] Playvideo is disabled in gameconfig.` |
+| 影片（`movie`） | 解码在引擎侧：`cpymo/cpymo_movie.c` 直接调 libavformat/libavcodec，桌面 CMake 是 `find_package(FFMPEG REQUIRED)`。要不要影片只看构建里的 `DISABLE_MOVIE`，与图形后端无关。**固定没有视频**：ascii-art、text、PSP、PSV、Wii（`sdl1/Makefile.Wii:29`）、Windows 的 `sdl2/Makefile.Win32`（`:39`）。**默认有、但在某些音频选项下被关掉**：`sdl2/Makefile` 与 `sdl1/Makefile`（加 `DISABLE_AUDIO=1`、或改用 `USE_SDL2_MIXER=1` / `USE_SDL_MIXER=1` 音频时就带上 `-DDISABLE_MOVIE`）、Emscripten（只有 `AUDIO_BACKEND=ffmpeg` 才有影片）。**有视频**：桌面与 iOS 的 CMake、Switch、3DS、libretro。片源扩展名写死在引擎里：`#movie <名>` 只找 `video/<名>.mp4`，参数别自带 `.mp4`。`gameconfig` 的 `playvideo` 写 `0` 时这条命令静默跳过——跳过前会先把 bgm、se、voice 停掉，只留一句 `[Info] Playvideo is disabled in gameconfig.` |
 | 文本输入（`input`） | 只有实现了 SDL_TEXTINPUT 的后端 |
 | 立绘遮罩（`_mask`） | 与后端无关，只跟 `platform` 有关（见 7.2） |
 | 语音/音效 | 需要有音频后端，ascii-art 后端没有 |
