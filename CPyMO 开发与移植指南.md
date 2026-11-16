@@ -620,18 +620,23 @@ stb_truetype 那份的查找顺序（**引擎**：`cpymo_backend_font.c` 的 `cp
 
 ### 7.5 怎么把游戏跑起来
 
-所有后端都只接受「游戏目录」这一个位置参数，不给就当作当前目录：
+桌面与终端后端（SDL2 的 CMake / Makefile、SDL1、ascii-art、text）读命令行参数，但**只认正好一个**：`argc == 2` 时才用 `argv[1]`，一个不给、或者给多了，都回落到当前目录（`sdl2/main.c:464-470`、`ascii-art/main.c:106-108`、`text/main.c:178-181`）。
 
 ```bash
 cpymo-sdl2      /path/to/MyGame   # SDL2 桌面版
 cpymo-ascii-art /path/to/MyGame   # 纯文本后端
 ```
 
+定义了 `USE_GAME_SELECTOR` 的构建（PSP、PSV、Wii、Switch、Android、iOS）**完全不看 `argv`**：启动后在自己的固定目录里列出游戏，选中了才进。Emscripten 版同样没有参数可言，游戏目录是编译期常量 `EMSCRIPTEN_GAMEDIR`。所以对平台版来说，「把游戏放到哪个目录」是唯一要紧的事，见下面列表。
+
 ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpymo-ascii-art`。它把画面画成字符网格，所以只能验脚本流程、变量、分支和「不崩」，验不了美术效果（原因见 7.4）。按键：`W/S/A/D` 移动，空格或 `J` 确认，`K` 取消，`L` 跳过（后端对输入做了 `toupper`，小写一样管用）。
 
 平台版的游戏目录位置由各平台自己约定，多半在存储卡的固定位置，构建/部署细节见 README 的对应章节：
 
-- 3DS / Switch：`sdmc:/pymogames/` 下的游戏目录（3DS 还有路径长度限制，见 README）
+- 3DS：SD 卡的 `/pymogames/` 下，游戏目录名只能用半角英文、数字和下划线（README 的「3DS」节）
+- Switch：`sdmc:/pymogames/`
+- PSV：`ux0:/pymogames`
+- Wii：`sd:/pymogames/`
 - PSP：`PSP/GAME/CPYMO/`，并且资源必须先过一遍 `cpymo-tool convert psp`
 - Android：`/sdcard/pymogames/`
 - iOS：iTunes 文件共享的文档目录
