@@ -17,6 +17,8 @@
 
 如果你需要使用CPyMO制作游戏，可以参见[CPyMO + YukimiScript开发模板](https://github.com/Strrationalism/CPyMO-YukimiScript-Template)。
 
+仓库根另有两份中文文档：[`CPyMO 开发与移植指南.md`](CPyMO%20%E5%BC%80%E5%8F%91%E4%B8%8E%E7%A7%BB%E6%A4%8D%E6%8C%87%E5%8D%97.md) 讲从零写一个游戏、以及把别人的 PyMO 游戏移植过来的完整流程；[`CPyMO 指令参考.md`](CPyMO%20%E6%8C%87%E4%BB%A4%E5%8F%82%E8%80%83.md) 逐条列出引擎实际支持的脚本命令，PyMO 与 YukimiScript 两种写法并列。
+
 pymo参见：<https://github.com/pymo/pymo>
 
 # 常见问题
@@ -779,6 +781,8 @@ cd到`cpymo-backends/sdl1`，执行`make -j -f Makefile.Wii`即可生成dol文�
 [CPyMO-YukimiScript-Template](https://github.com/Strrationalism/CPyMO-YukimiScript-Template)是一套使用YukimiScript语言和Pipe构建系统的CPyMO项目模板，我们建议你基于它来开发游戏。
 
 本文档仓库根的 [`CPyMO 指令参考.md`](CPyMO%20%E6%8C%87%E4%BB%A4%E5%8F%82%E8%80%83.md) 逐条列出引擎实际支持的全部脚本命令，每条同时给出 PyMO（`#命令`）与 YukimiScript（`@命令`）两种写法。
+
+从目录结构、`gameconfig.txt` 到第一个能跑的游戏，看 [`CPyMO 开发与移植指南.md`](CPyMO%20%E5%BC%80%E5%8F%91%E4%B8%8E%E7%A7%BB%E6%A4%8D%E6%8C%87%E5%8D%97.md)。接手别人的老 PyMO 游戏时先读它的第 9 节（移植）。
 
 除此之外，我们建议你使用以下格式：
 
