@@ -662,7 +662,7 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 **`strip` 做的是裁剪，不是压缩。** 它从 `gameconfig` 的 `startscript` 出发解析脚本，遇到 `#call` / `#change` 跟到被调用的脚本（`#goto` 只是同脚本内跳转，不用跟），把真正被引用到的资源名收成集合，然后只复制这些文件：
 
 * 七类资源各扫各的：`bg`、`bgm`、`chara`、`se`、`voice`、`video`、`script`。`#bg xxx BG_FADE` 这种第二参数是转场名的写法它认得，不会把 `BG_FADE` 当图片名。
-* `system/` 只保留脚本实际用到的用途图（选择高亮、选项框、CG 缩略图、消息光标、曲目列表）；`icon.png` 与 `system/default.ttf` 无条件复制。
+* 系统图里有三张是写死无条件复制的：`system/menu`、`system/message`、`system/name`；`bg/logo1`、`bg/logo2` 同样无条件保留，哪怕脚本一次都没提过（`cpymo_tool_asset_analyzer.c:155-166`）。另有四张看脚本用没用：`sel_highlight`（`#say`、`#sel`、`#select_text` / `#select_var` 触发）、`message_cursor`（`#say`、`#text`）、`option`（`#sel`）、`cvThumb`（`#album`，不生成遮罩）。`#music` 出现时才保留 `script/music_list.txt`——它在 `script/` 下，不是系统图。`icon.png` 与 `system/default.ttf` 无条件复制。
 * `gameconfig.txt` 无条件复制，**内容一字不改**。
 * 不生成任何 `_mask` 遮罩——遮罩只有 `convert` 转塞班时才有。
 * 用变量拼出来的资源名（`set A,bg01` 之后 `#bg ${A}`）它认不出来，这类资源会被当成没引用而丢掉。发布前先备份。
@@ -718,7 +718,7 @@ cpymo-tool strip MyGame MyGame-stripped
 # 2. 按目标平台转换
 cpymo-tool convert 3ds MyGame-stripped MyGame-3ds --pack
 
-# 3. 生成鉴赏缓存（如果用了鉴赏）
+# 3. 生成鉴赏缓存（如果用了鉴赏；就地写进 MyGame-3ds/system/）
 cpymo-tool gen-album-cache MyGame-3ds
 
 # 4. 把 MyGame-3ds 整个目录拷到目标设备的约定位置
@@ -754,7 +754,7 @@ PyMO 游戏通常是两种形态之一：
 
 > 批量处理、用正则或 Python 写脚本做替换，不要一句一句手改。
 
-形态 2 可以直接跑，见 9.2。
+形态 2 可以直接跑，见 9.3。
 
 ### 9.3 老 PyMO：直接跑，先修四件事
 
@@ -780,7 +780,7 @@ PyMO 游戏通常是两种形态之一：
 | 满屏方框 | 字体缺字 | 见 7.3，把字体放进 `system/default.ttf` |
 | 影片播不出来 | 后端没链 FFmpeg | 见 7.4 |
 | 报「未知命令」但游戏能继续 | 该命令 CPyMO 没实现 | 引擎对未知命令只警告并跳过，不会崩；去 [CPyMO 指令参考.md](CPyMO%20指令参考.md) 查有没有替代写法 |
-| 资源找不到但文件在 | 大小写或扩展名 | 见 9.3 第 4 条 |
+| 资源找不到但文件在 | 大小写或扩展名 | 大小写见 9.3 第 4 条；扩展名本身不用管——引擎是按 `*format` 自己拼的，扩展名写错只会在配置上体现 |
 
 ### 9.5 其他引擎：CPyMO 能承载什么
 
@@ -928,6 +928,6 @@ PyMO 游戏通常是两种形态之一：
 ## 11. 接下来读什么
 
 * 具体命令怎么用：[CPyMO 指令参考.md](CPyMO%20指令参考.md)
-* YukimiScript 文法：仓库里的 `ykmc` 源码；服务器上另有一份 `YukimiScript_Wiki.md`（未随仓库分发）
+* YukimiScript 文法：**编译器 `ykmc` 不在本仓库**，它在另一个项目 `Strrationalism/YukimiScript` 里；本仓库只提供 `libpymo.ykm`（CPyMO 侧的命令声明，`- extern` 签名就在这个文件里，写 `.ykm` 的命令名和参数以它为准）。把老 PyMO 脚本转成 YukimiScript 用仓库根的 `pymo2ykm.ps1`，转完再用 `ykmc` 编译回 `script/*.txt`。服务器上另有一份 `YukimiScript_Wiki.md`（未随仓库分发）
 * 各平台的构建与部署要求：[README.md](README.md)
 * 想给游戏加无障碍（朗读、键盘导航）：README 的「视障帮助」章节，以及 `CPyMO HD.md` 里 Feature Level 的规划
