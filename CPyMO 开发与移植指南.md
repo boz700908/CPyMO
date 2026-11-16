@@ -51,6 +51,14 @@ MyGame/
 
 只有 `gameconfig.txt` 和 `script/` 是硬性要求，其余目录按你的游戏是否需要来建。缺目录不会报错，只是对应命令没有资源可用。
 
+`save/` 里实际会出现的三类文件（都在 `<游戏目录>/save/` 下，路径由后端的 `cpymo_backend_save.c` 拼 `<gamedir>/save/<文件名>`，目录本身由后端启动时 `mkdir`）：
+
+* `save-00.csav`、`save-01.csav` …… `save-30.csav` —— 对话界面「存档 / 读档」的 **31 个槽位**（`cpymo_save_ui.c` 里 `CPYMO_MAX_SAVES` 是 31，编号从 0 起，文件名格式 `save-%02d.csav`）。
+* `global.csav` —— `S` 开头的全局变量（见 5.3）。
+* `config.csav` —— 玩家在设置界面改过的字号、音量、打字速度等，它会盖掉一部分 `gameconfig.txt`（见 2.4）。
+
+这三个都只由引擎写，发布时不用预置；删掉等于重置。注意 `save-%02d` 是两位编号，但槽位到 30，所以是 `save-00` 到 `save-30`，不是三位数。
+
 ### 1.1 pak 打包（可选）
 
 **引擎**启动时按固定名字打开四个包（`cpymo_assetloader.c:30/40/50/60`）：
