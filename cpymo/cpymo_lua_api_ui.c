@@ -275,6 +275,82 @@ static int cpymo_lua_api_ui_hud_remove(lua_State *l)
 }
 
 
+static void cpymo_lua_api_ui_push_hud(
+    lua_State *l, const struct cpymo_lua_hud_info *h)
+{
+    lua_newtable(l);
+
+    lua_pushstring(l, h->id ? h->id : "");
+    lua_setfield(l, -2, "id");
+
+    lua_pushstring(l, h->text ? h->text : "");
+    lua_setfield(l, -2, "text");
+
+    lua_pushboolean(l, h->has_pos);
+    lua_setfield(l, -2, "has_pos");
+
+    lua_pushnumber(l, (lua_Number)h->x);
+    lua_setfield(l, -2, "x");
+
+    lua_pushnumber(l, (lua_Number)h->y);
+    lua_setfield(l, -2, "y");
+
+    /* 0 表示没指定字号，由屏幕高度推算。 */
+    lua_pushnumber(l, (lua_Number)h->size);
+    lua_setfield(l, -2, "size");
+
+    lua_newtable(l);
+    lua_pushinteger(l, (lua_Integer)h->color.r);
+    lua_setfield(l, -2, "r");
+    lua_pushinteger(l, (lua_Integer)h->color.g);
+    lua_setfield(l, -2, "g");
+    lua_pushinteger(l, (lua_Integer)h->color.b);
+    lua_setfield(l, -2, "b");
+    lua_setfield(l, -2, "color");
+
+    lua_pushboolean(l, h->silent);
+    lua_setfield(l, -2, "silent");
+}
+
+/* cpymo.ui.hud_get(id): 取一条常驻显示的当前内容，没有则 nil。 */
+static int cpymo_lua_api_ui_hud_get(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 1);
+
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    const char *id = luaL_checkstring(l, 1);
+
+    struct cpymo_lua_hud_info info;
+    if (!cpymo_lua_hud_get(e->lua.hud_items, id, &info)) {
+        lua_pushnil(l);
+        return 1;
+    }
+
+    cpymo_lua_api_ui_push_hud(l, &info);
+    return 1;
+}
+
+/* cpymo.ui.huds(): 按创建顺序列出全部常驻显示。 */
+static int cpymo_lua_api_ui_huds(lua_State *l)
+{
+    if (lua_gettop(l) != 0)
+        CPYMO_LUA_PANIC(l, "cpymo.ui.huds() takes no argument.");
+
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+
+    lua_newtable(l);
+
+    size_t n = cpymo_lua_hud_count(e->lua.hud_items);
+    for (size_t i = 0; i < n; ++i) {
+        struct cpymo_lua_hud_info info;
+        if (!cpymo_lua_hud_at(e->lua.hud_items, (int)i, &info)) continue;
+        cpymo_lua_api_ui_push_hud(l, &info);
+        lua_rawseti(l, -2, (lua_Integer)(i + 1));
+    }
+
+    return 1;
+}
+
 static int cpymo_lua_api_ui_item_set(lua_State *l)
 {
     cpymo_engine *e = cpymo_lua_state_get_engine(l);
@@ -341,6 +417,63 @@ static int cpymo_lua_api_ui_item_add(lua_State *l)
     return 1;
 }
 
+/* 把 page -> [index] 的 item_on_click 回调压栈；没有则压 nil。
+   只读查询：条目从未被改写、从未注册过回调时也如实返回 nil。 */
+static void cpymo_lua_api_ui_push_item_click(
+    lua_State *l, cpymo_lua_context *lua, const char *page, int index)
+{
+    int top = lua_gettop(l);
+
+    if (lua == NULL || page == NULL || index < 0
+        || lua->ui_item_click_ref == LUA_NOREF) {
+        lua_pushnil(l);
+        return;
+    }
+
+    lua_rawgeti(l, LUA_REGISTRYINDEX, lua->ui_item_click_ref);
+    if (lua_istable(l, -1)) {
+        lua_getfield(l, -1, page);
+        if (lua_istable(l, -1)) {
+            lua_rawgeti(l, -1, (lua_Integer)index);
+            if (lua_isfunction(l, -1)) {
+                lua_pushvalue(l, -1);
+                lua_insert(l, top + 1);
+                lua_settop(l, top + 1);
+                return;
+            }
+        }
+    }
+
+    lua_settop(l, top);
+    lua_pushnil(l);
+}
+
+/* 把 page 的 on_item_click 回调压栈；没有则压 nil。 */
+static void cpymo_lua_api_ui_push_page_click(
+    lua_State *l, cpymo_lua_context *lua, const char *page)
+{
+    int top = lua_gettop(l);
+
+    if (lua == NULL || page == NULL || lua->ui_click_ref == LUA_NOREF) {
+        lua_pushnil(l);
+        return;
+    }
+
+    lua_rawgeti(l, LUA_REGISTRYINDEX, lua->ui_click_ref);
+    if (lua_istable(l, -1)) {
+        lua_getfield(l, -1, page);
+        if (lua_isfunction(l, -1)) {
+            lua_pushvalue(l, -1);
+            lua_insert(l, top + 1);
+            lua_settop(l, top + 1);
+            return;
+        }
+    }
+
+    lua_settop(l, top);
+    lua_pushnil(l);
+}
+
 static int cpymo_lua_api_ui_item_get(lua_State *l)
 {
     cpymo_engine *e = cpymo_lua_state_get_engine(l);
@@ -400,6 +533,10 @@ static int cpymo_lua_api_ui_item_get(lua_State *l)
     lua_pushboolean(l, item != NULL || extra != NULL);
     lua_setfield(l, -2, "rewritten");
 
+    /* 该条现在挂着的 item_on_click 回调；没挂时是 nil 而不是缺字段。 */
+    cpymo_lua_api_ui_push_item_click(l, &e->lua, page, index);
+    lua_setfield(l, -2, "on_click");
+
     return 1;
 }
 
@@ -431,6 +568,10 @@ static int cpymo_lua_api_ui_items(lua_State *l)
 
     lua_pushinteger(l, (lua_Integer)extras);
     lua_setfield(l, -2, "extra_count");
+
+    /* 页级 on_item_click 回调（管追加项）；没注册时是 nil。 */
+    cpymo_lua_api_ui_push_page_click(l, &e->lua, page);
+    lua_setfield(l, -2, "on_click");
 
     int limit = (int)(base != (size_t)-1 ? base : 0);
     for (const cpymo_ui_patch_entry *it = patch->entries; it; it = it->next) {
@@ -467,6 +608,9 @@ static int cpymo_lua_api_ui_items(lua_State *l)
         lua_pushboolean(l, item != NULL);
         lua_setfield(l, -2, "rewritten");
 
+        cpymo_lua_api_ui_push_item_click(l, &e->lua, page, i);
+        lua_setfield(l, -2, "on_click");
+
         lua_rawseti(l, -2, (lua_Integer)(++n));
     }
     lua_setfield(l, -2, "entries");
@@ -485,6 +629,10 @@ static int cpymo_lua_api_ui_items(lua_State *l)
 
         lua_pushboolean(l, 1);
         lua_setfield(l, -2, "extra");
+
+        /* 追加项由页级 on_item_click 处理。 */
+        cpymo_lua_api_ui_push_page_click(l, &e->lua, page);
+        lua_setfield(l, -2, "on_click");
 
         lua_rawseti(l, -2, (lua_Integer)(i + 1));
     }
@@ -779,6 +927,8 @@ void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
         { "open_load_yesnobox", &cpymo_lua_ui_open_load_yesnobox },
         { "hud", &cpymo_lua_api_ui_hud },
         { "hud_remove", &cpymo_lua_api_ui_hud_remove },
+        { "hud_get", &cpymo_lua_api_ui_hud_get },
+        { "huds", &cpymo_lua_api_ui_huds },
         { "item_set", &cpymo_lua_api_ui_item_set },
         { "item_hide", &cpymo_lua_api_ui_item_hide },
         { "item_clear", &cpymo_lua_api_ui_item_clear },

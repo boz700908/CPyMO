@@ -5,6 +5,7 @@
 #include "cpymo_color.h"
 #include "cpymo_str.h"
 #include <stdbool.h>
+#include <stddef.h>
 
 /* Persistent, non-focusable on-screen readouts driven by Lua
  * (cpymo.ui.hud / cpymo.ui.hud_remove).
@@ -54,6 +55,33 @@ error_t cpymo_lua_hud_set(
 bool cpymo_lua_hud_remove(
     struct cpymo_lua_hud_item **head,
     const char *id);
+
+/* 查询用：一个 readout 的当前内容（cpymo.ui.hud_get / cpymo.ui.huds）。
+ * 只拷内容，不碰渲染缓存；size 为 0 表示按逻辑屏幕高度推算。 */
+struct cpymo_lua_hud_info {
+    const char *id;
+    const char *text;
+    bool has_pos;
+    float x, y;
+    float size;
+    cpymo_color color;
+    bool silent;
+};
+
+/* 按 id 取 readout 的当前内容；没有这一条时返回 false。 */
+bool cpymo_lua_hud_get(
+    const struct cpymo_lua_hud_item *head,
+    const char *id,
+    struct cpymo_lua_hud_info *out);
+
+/* 按创建顺序取第 index 个 readout；越界返回 false。 */
+bool cpymo_lua_hud_at(
+    const struct cpymo_lua_hud_item *head,
+    int index,
+    struct cpymo_lua_hud_info *out);
+
+/* 当前 readout 的条数。 */
+size_t cpymo_lua_hud_count(const struct cpymo_lua_hud_item *head);
 
 void cpymo_lua_hud_free_all(struct cpymo_lua_hud_item **head);
 

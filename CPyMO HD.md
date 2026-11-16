@@ -304,6 +304,11 @@ CPyMO默认将会把`main`设置为一个空表。
   - `text` 内容变化时通过无障碍通道朗读；只改位置或颜色不会朗读；空字符串不朗读
   - `options` 字段：`x`、`y`（屏幕坐标，省略时在右上角自上而下堆叠）、`size`（字号，省略时按屏幕高度推算）、`color`（color表）、`silent`（为 `true` 时不朗读）
 * `hud_remove(id: any)` - 移除一条常驻显示项
+* `hud_get(id: any) : table?` - 查询一条常驻显示项的当前内容
+  - 返回`{id, text, has_pos, x, y, size, color, silent}`；没有这个`id`时返回`nil`
+  - 只读：无论这条是否被改写过，都照实返回当前状态
+  - `has_pos`为`false`表示脚本没给坐标，位置由引擎按右上角堆叠决定；`size`为`0`表示字号按屏幕高度推算；`color`是`{r, g, b}`；`silent`为`true`表示这条不朗读
+* `huds() : table[]` - 按创建顺序返回全部常驻显示项，每项结构同`hud_get`
 
 自带页面打开时脚本解释器暂停，但 `#lua` 协程与 `timer` / `every` 仍在运行，因此可以在任何页面上增删改常驻显示项；这些回调里不要假设脚本正在推进。
 
@@ -359,15 +364,17 @@ CPyMO默认将会把`main`设置为一个空表。
 查询：
 
 * `item_get(page: string, index: int) : table?`
-  - 返回`{index, text, hidden, extra, extra_index, rewritten}`；序号落在该页容量内或是一条追加项时都能查到
+  - 返回`{index, text, hidden, extra, extra_index, rewritten, on_click}`；序号落在该页容量内或是一条追加项时都能查到
   - 完全没有改写时也返回该条现在的内容：`text`取自引擎实际绘制的文本，该条还没被绘制过时为`nil`
   - `rewritten`为`true`表示这一层存有该条的改写或隐藏；`hidden`只对真实条目有意义
   - `extra_index`是追加项在追加列表中的位置，真实条目为`-1`
+  - `on_click`是该条现在挂着的点击回调（`item_on_click`注册的），没挂时为`nil`，字段始终存在
   - 序号既不是真实条目也不是追加项时返回`nil`
 * `items(page: string) : table`
-  - 返回`{page, base, count, extra_count, entries, extras}`
+  - 返回`{page, base, count, extra_count, entries, extras, on_click}`
+  - `on_click`是这一页`on_item_click`注册的回调，没注册时为`nil`
   - `base`是该页的容量编号起点（该页面还没被打开过时为`nil`），`count`是被改写的真实条目数，`extras`是该页全部的追加项
-  - `entries`列出该页的全部真实条目，没被改写的也在其中；每项含`index`、`text`、`hidden`与`rewritten`，没有改写时`text`取自引擎实际绘制的文本
+  - `entries`列出该页的全部真实条目，没被改写的也在其中；每项含`index`、`text`、`hidden`、`rewritten`与`on_click`，没有改写时`text`取自引擎实际绘制的文本
 * `pages() : string[]` - 返回全部页面键
 
 #### 保留与持久化

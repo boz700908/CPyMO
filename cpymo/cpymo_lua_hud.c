@@ -236,3 +236,58 @@ void cpymo_lua_hud_draw_all(
         item = item->next;
     }
 }
+
+
+static void cpymo_lua_hud_info_of(
+    const struct cpymo_lua_hud_item *item,
+    struct cpymo_lua_hud_info *out)
+{
+    out->id = item->id;
+    out->text = item->text;
+    out->has_pos = item->has_pos;
+    out->x = item->x;
+    out->y = item->y;
+    out->size = item->size;
+    out->color = item->color;
+    out->silent = item->silent;
+}
+
+size_t cpymo_lua_hud_count(const struct cpymo_lua_hud_item *head)
+{
+    size_t n = 0;
+    for (; head; head = head->next) ++n;
+    return n;
+}
+
+bool cpymo_lua_hud_get(
+    const struct cpymo_lua_hud_item *head,
+    const char *id,
+    struct cpymo_lua_hud_info *out)
+{
+    if (!out || !id) return false;
+
+    const struct cpymo_lua_hud_item *item =
+        cpymo_lua_hud_find((struct cpymo_lua_hud_item *)head, id);
+    if (!item) return false;
+
+    cpymo_lua_hud_info_of(item, out);
+    return true;
+}
+
+bool cpymo_lua_hud_at(
+    const struct cpymo_lua_hud_item *head,
+    int index,
+    struct cpymo_lua_hud_info *out)
+{
+    if (!out || index < 0) return false;
+
+    int i = 0;
+    for (const struct cpymo_lua_hud_item *item = head; item; item = item->next) {
+        if (i++ == index) {
+            cpymo_lua_hud_info_of(item, out);
+            return true;
+        }
+    }
+
+    return false;
+}
