@@ -120,12 +120,12 @@ voiceformat,mp3
 | `gametitle` | 空 | 标题，最长 255 字节。可以含 `\n` 换行 |
 | `startscript` | 空（必须自己写） | 启动脚本名，最长 63 字节 |
 | `scripttype` | 空 | 写 `pym`。字段只有 4 字节，解析时只留前 3 个字符并强制补 `\0`（`cpymo_str_copy`），所以 `pym` / `pymo` / `pymx` 存下来一模一样；**留空才**会在启动时弹「非 PyMO 脚本」警告（`cpymo_engine.c:271-274` 逐字节比对 `p y m \0`） |
-| `platform` | `pygame` | 平台标记，只影响两件事：① 等于 `s60v3` / `s60v5` 时启用塞班那套 `_mask` 遮罩（见 `charamaskformat`）；② 等于 `cpymohd1` / `cpymohd2` / `cpymohd3` 时把 feature level 设成 1 / 2 / 3（`cpymo_engine.c:116-124`），也就是**用这一行给游戏开 Level 1 的 Lua 能力**。其它值一律 Level 0。Level 2 / 3 的能力规划见仓库根的 `CPyMO HD.md`。**注意**：`cpymo-tool` 的 `strip` / `convert` 只接受 `pygame` / `s60v3` / `s60v5`，遇到 `cpymohd1/2/3` 会打印 `[Error] Platform ... is not supported.` 直接退出——要过工具链就先把它临时改成 `pygame`（删掉这一行也等于 `pygame`） |
+| `platform` | `pygame` | 平台标记，只影响两件事：① 以 `s60v` 开头时启用塞班那套 `_mask` 遮罩（见 `charamaskformat`）；② 等于 `cpymohd1` / `cpymohd2` / `cpymohd3` 时把 feature level 设成 1 / 2 / 3（`cpymo_engine.c:116-124`），也就是**用这一行给游戏开 Level 1 的 Lua 能力**。其它值一律 Level 0。Level 2 / 3 的能力规划见仓库根的 `CPyMO HD.md`。**注意**：`cpymo-tool` 的 `strip` / `convert` 只接受 `pygame` / `s60v3` / `s60v5`，遇到 `cpymohd1/2/3` 会打印 `[Error] Platform ... is not supported.` 直接退出——要过工具链就先把它临时改成 `pygame`（删掉这一行也等于 `pygame`） |
 | `engineversion` | 空 | 形如 `1.2`，按 `.` 拆成主次版本 |
 | `imagesize` | `0,0` | 逻辑分辨率，`宽,高` |
 | `bgformat` | 空 | 背景扩展名，`jpg` 或 `.jpg` 都行 |
 | `charaformat` | 空 | 立绘扩展名，同上 |
-| `charamaskformat` | 空 | 立绘遮罩扩展名。**只有 `platform` 写成 `s60v3` / `s60v5` 时才会去加载 `<名字>_mask.<这个扩展名>`**，其它平台一律忽略（**引擎**：`cpymo_assetloader.c` 的 `cpymo_assetloader_load_image_with_mask` 先判 `cpymo_gameconfig_is_symbian`）。遮罩缺失不致命，会退回不带遮罩的普通图 |
+| `charamaskformat` | 空 | 立绘遮罩扩展名。**只有 `platform` 以 `s60v` 开头（不分大小写，实际就是 `s60v3` / `s60v5`）时才会去加载 `<名字>_mask.<这个扩展名>`**，其它平台一律忽略（**引擎**：`cpymo_assetloader.c` 的 `cpymo_assetloader_load_image_with_mask` 先判 `cpymo_gameconfig_is_symbian`）。遮罩缺失不致命，会退回不带遮罩的普通图 |
 | `bgmformat` | `mp3` | 背景音乐扩展名 |
 | `seformat` | `mp3` | 音效扩展名 |
 | `voiceformat` | `mp3` | 语音扩展名 |
@@ -529,7 +529,7 @@ cpymo-tool gen-album-cache /path/to/MyGame
 | --- | --- | --- |
 | 背景 | JPG | 640×480 或与你 `imagesize` 同比例 |
 | 立绘 | PNG（256 索引色或 RGBA） | 透明区域用 alpha，不要用纯色抠图 |
-| 立绘遮罩 | PNG 灰度图 | 与立绘同尺寸；**只有 `platform` 写成 `s60v3` / `s60v5` 时**才按 `charamaskformat` 去找 `_mask` 图 |
+| 立绘遮罩 | PNG 灰度图 | 与立绘同尺寸；**只有 `platform` 以 `s60v` 开头（不分大小写）时**才按 `charamaskformat` 去找 `_mask` 图 |
 | BGM | MP3 44100 Hz / 192 Kbps / 立体声 | — |
 | SE、语音 | MP3 或 WAV 22050 Hz / 48 Kbps / 单声道 | 语音一定单声道 |
 
@@ -552,14 +552,15 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 对话框底图（老游戏里叫 `message.png`）和名字框底图（`name.png`）**不是固定名字**：它们由 `#textbox <对话框图>,<名字框图>` 命令按名字指定，你想叫什么都可以。压根不调 `#textbox` 时，引擎用内置的画法，一个图都不需要（**引擎**：`cpymo_interpreter.c` 的 `D("textbox")` 把两个名字直接传给 `cpymo_say_load_msgbox_and_namebox_image`）。
 
-这些底图配一张 `<图名>_mask.png`（对话底图与名字框底图都在 `system/`）是老 PyMO 的约定，但 **CPyMO 只在 `platform` 写成 `s60v3` / `s60v5` 时才会加载 `_mask`**（与 2.2 的 `charamaskformat` 同一个门控），其它平台一律忽略。新游戏直接用带透明通道的 png 就行。
+这些底图配一张 `<图名>_mask.png`（对话底图与名字框底图都在 `system/`）是老 PyMO 的约定，但 **CPyMO 只在 `platform` 以 `s60v` 开头（不分大小写）时才会加载 `_mask`**（与 2.2 的 `charamaskformat` 同一个门控），其它平台一律忽略。新游戏直接用带透明通道的 png 就行。
 
 只做新游戏时，这些图都可以先用纯色块顶替，跑通流程再换美术。
 
 **跟着脚本参数走的系统图**
 
-除上表的固定名字，还有四类图也在 `system/` 里，但名字由命令参数给，写什么就找什么（都走 `cpymo_assetloader_load_system_image`，png）：
+除上表的固定名字，还有五类图也在 `system/` 里，但名字由命令参数给，写什么就找什么（都走 `cpymo_assetloader_load_system_image`，png）：
 
+* **`#bg` 的转场图**：`#bg <背景图>,<转场图>` 的第二个参数若不是空、也不是 `BG_NOFADE` / `BG_ALPHA` / `BG_FADE` 这三个关键字，就按这个名字找 `system/<转场图>.png`。
 * **鉴赏底图** `albumbg_N`：前缀跟着 `#album` 的参数走（见 6.3）。
 * **`#date` 的日期背景**：`#date <底图名>,<x>,<y>,<颜色>`，第一个参数**必填**（引擎里是 `ENSURE(date_bg)`），直接按这个名字找 `system/<底图名>.png`。显示的月/日取自变量 `FMONTH` / `FDATE`，没设过就是 0。
 * **`#anime_on` 的动画图**：`#anime_on <帧数>,<图名>,<x>,<y>,<每帧毫秒>,<是否循环>`。`system/<图名>.png` 是**一张竖排拼图**（spritesheet），引擎按「图片高度 ÷ 帧数」切成等高帧依次播放，**不是多张序列图**；`LOW_FRAME_RATE` 构建下这条命令整条跳过。
@@ -696,6 +697,8 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 * **系统图一律重存为 png**，与目标无关；立绘遮罩只有 `s60v3` / `s60v5` 生成，格式 jpg。
 * `3ds` 铺满意味着竖构图的立绘会超出上下边界，移植前先决定要不要自己重做素材。
 * 除了 `s60v3` / `s60v5`，其他目标把 `platform` 写成 `pygame`。`platform` 在 CPyMO 里只有两个用途：塞班遮罩门控，以及 `cpymohd1/2/3` 这三个值用来选 feature level（见 2.2）。**`convert` 会把输出目录的 `platform` 覆盖成上表的值**，所以转换完要手工改回，否则 Level 1 的脚本跑不起来。
+* **`playvideo` 转换后照抄原值。** 规格表里那个 `play_video` 字段从没被读取过——`convert` 里唯一提到它的一行是 `if (!cfg.playvideo) cfg.playvideo = false;`，等于什么都没干。想让掌机不播影片，得自己把配置改成 `playvideo,0`。
+* **非塞班目标的立绘遮罩格式是空的。** 表里 `charamaskformat` 只有 `s60v3` / `s60v5` 有值，其余目标是 `NULL`，写回时被清成空串，于是输出的 `gameconfig.txt` 里会出现一行 `charamaskformat,.`（只有一个点）。这不是工具出错，非塞班平台本来也不读它。
 * PSP 的游戏数据包必须用 `convert psp` 转换过才能跑（README 的 PSP 章节明确要求）。
 * `convert` 会顺手把 `icon.png` 与 `system/default.ttf` 复制到输出目录（前者失败只警告）。
 
