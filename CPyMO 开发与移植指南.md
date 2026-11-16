@@ -37,7 +37,7 @@
 ```
 MyGame/
 ├── gameconfig.txt          必须
-├── icon.png                可选，57×57
+├── icon.png                可选，图标，建议 57×57
 ├── bg/                     背景图
 ├── bgm/                    背景音乐
 ├── chara/                  立绘及其遮罩
@@ -524,7 +524,6 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 | 文件 | 谁在用 |
 | --- | --- |
-| `icon.png` | 图标，57×57（游戏选择器与打包用） |
 | `menu.png` | 菜单背景（`cpymo_rmenu.c`） |
 | `option.png` | `#sel` / `select_img` 的选项底图（`cpymo_select_img.c`） |
 | `sel_highlight.png` | 选中高亮条（同上） |
@@ -537,6 +536,14 @@ cpymo-tool gen-album-cache /path/to/MyGame
 这些底图配一张同名 `_mask` 是老 PyMO 的约定，但 **CPyMO 只在 `platform` 写成 `s60v3` / `s60v5` 时才会加载 `_mask`**（与 2.2 的 `charamaskformat` 同一个门控），其它平台一律忽略。新游戏直接用带透明通道的 png 就行。
 
 只做新游戏时，这些图都可以先用纯色块顶替，跑通流程再换美术。
+
+**游戏图标不在 `system/` 下**：它是游戏根目录的 `<游戏目录>/icon.png`，与 `gameconfig.txt` 同级——老手册的两处写法（目录树里的 `icon.png 游戏图标`、6.7 节的「必须为 57×57」）指的都是这个文件。它不参与任何脚本命令，引擎在三处用到它（**引擎**：`cpymo/cpymo_assetloader.c` 的 `cpymo_assetloader_load_icon_pixels`，按 `<gamedir>/icon.png` 读）：
+
+- **桌面窗口图标**：SDL2 后端启动时调 `set_window_icon`（`cpymo-backends/sdl2/main.c`），只在 Windows / Linux / macOS 上做，加载失败静默跳过；SDL1 后端另有一份读图代码，由 `-DLOAD_GAME_ICON` 打开（`cpymo-backends/sdl1/main.c`，读进来会缩到 32×32）。
+- **游戏选择器缩略图**：编进 `USE_GAME_SELECTOR` 时，列表里每款游戏显示这个图，加载失败就不显示（`cpymo/cpymo_game_selector.c`）。
+- **工具链复制**：`strip` 与 `convert` 无条件把它复制到输出目录，失败只打印 `[Warning] Can not copy icon.png`。
+
+57 是老塞班时代定的尺寸：**不合规只打印 `[Warning] Icon must be 57x57`，游戏照跑**；整个文件不提供也不影响启动，只是没有窗口图标和列表缩略图。它是 png，不受任何 `*format` 键影响，也不会被打进 pak。
 
 ### 7.3 字体
 
