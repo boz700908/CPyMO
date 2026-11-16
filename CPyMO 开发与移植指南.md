@@ -159,11 +159,20 @@ voiceformat,mp3
 
 反过来，CPyMO 有而手册没有的键：`cgprefix`、`msgtb`、`msglr`、`nameboxorig`、`textcolor`、`vovolume`。
 
-### 2.4 存档会覆盖一部分配置
+### 2.4 `save/config.csav` 会盖掉一部分配置
 
-`save/config.csav` 里存了玩家在设置界面改过的字号、音量、打字速度等。**玩家一旦进过设置界面，改 `gameconfig.txt` 就不再影响他的体验。** 调试时如果发现 `fontsize` 改了没反应，先删掉 `save/config.csav`。
+`save/config.csav` 里存了六个数（每个 `uint16`）：BGM / SE / VO 三路音量、`fontsize`、`textspeed`、还有「跳过已读文本」开关（`cpymo_save_global.c:175-182`）。**它一旦存在，这几个值就以它为准，改 `gameconfig.txt` 不再生效。**
 
-这条经常在测试里踩到：**跑测试游戏前先确认 `save/config.csav` 不存在**。
+关键在于它不是「玩家进过设置界面才有」的：
+
+* 关闭设置界面时会写一次（`cpymo_config_ui.c:341`）；
+* **引擎正常退出时也会写一次**（`cpymo_engine.c:307`，`while (engine->ui) cpymo_ui_exit` 之后）。
+
+所以只要跑过一次并正常退出，这个文件就在了。调试时如果发现 `fontsize`、`textspeed` 改了没反应，先删掉 `save/config.csav` 再跑。
+
+这条在测试里经常踩到：**跑测试游戏前先确认 `save/config.csav` 不存在**（跑完记得再删）。
+
+文件坏了不会崩：读失败只打印 `[Error] Config data broken!`（`cpymo_engine.c:254-256`），然后按 `gameconfig.txt` 的默认值继续。
 
 ---
 
