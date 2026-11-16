@@ -45,7 +45,7 @@ MyGame/
 ├── script/                 脚本
 ├── se/                     音效
 ├── system/                 界面图片与字体
-├── video/                  影片（需要后端支持）
+├── video/                  影片，只认 .mp4（DISABLE_MOVIE 构建不可用）
 └── voice/                  语音
 ```
 
@@ -428,7 +428,7 @@ make -j2
 
 ### 6.1 哪些图会进 CG 鉴赏
 
-**引擎**用 `cgprefix`（默认 `EV_`）判断：`bg` 与 `chara` 命令加载的资源名若以这个前缀开头，就会被标记为「可解锁 CG」（**引擎**：`cpymo_album_cg_unlock`，调用点在 `cpymo_interpreter.c` 的 `bg` 与 `chara` 分支）。所以：
+**引擎**用 `cgprefix`（默认 `EV_`）判断：`bg` 与 `chara` 命令加载的资源名若以这个前缀开头（**不区分大小写**），就会被标记为「可解锁 CG」（**引擎**：`cpymo_album_cg_unlock`，调用点在 `cpymo_interpreter.c` 的 `bg` 与 `chara` 分支）。所以：
 
 * 普通背景叫 `BG001`，永远不进鉴赏。
 * 想进鉴赏的图命名成 `EV_001`，并在 `gameconfig.txt` 里保留 `cgprefix,EV_`（或改成你自己的前缀）。
@@ -535,7 +535,7 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 对话框底图（老游戏里叫 `message.png`）和名字框底图（`name.png`）**不是固定名字**：它们由 `#textbox <对话框图>,<名字框图>` 命令按名字指定，你想叫什么都可以。压根不调 `#textbox` 时，引擎用内置的画法，一个图都不需要（**引擎**：`cpymo_interpreter.c` 的 `D("textbox")` 把两个名字直接传给 `cpymo_say_load_msgbox_and_namebox_image`）。
 
-这些底图配一张同名 `_mask` 是老 PyMO 的约定，但 **CPyMO 只在 `platform` 写成 `s60v3` / `s60v5` 时才会加载 `_mask`**（与 2.2 的 `charamaskformat` 同一个门控），其它平台一律忽略。新游戏直接用带透明通道的 png 就行。
+这些底图配一张 `<图名>_mask.png`（对话底图与名字框底图都在 `system/`）是老 PyMO 的约定，但 **CPyMO 只在 `platform` 写成 `s60v3` / `s60v5` 时才会加载 `_mask`**（与 2.2 的 `charamaskformat` 同一个门控），其它平台一律忽略。新游戏直接用带透明通道的 png 就行。
 
 只做新游戏时，这些图都可以先用纯色块顶替，跑通流程再换美术。
 
@@ -594,7 +594,7 @@ stb_truetype 那份的查找顺序（**引擎**：`cpymo_backend_font.c` 的 `cp
 
 | 事情 | 哪些后端支持 |
 | --- | --- |
-| 影片（`movie`） | 解码在引擎侧：`cpymo/cpymo_movie.c` 直接调 libavformat/libavcodec，桌面 CMake 是 `find_package(FFMPEG REQUIRED)`。`DISABLE_MOVIE` 打开的构建没有视频，ascii-art、SDL1、PSP、PSV、Wii、Emscripten 的 Makefile 都开着 |
+| 影片（`movie`） | 解码在引擎侧：`cpymo/cpymo_movie.c` 直接调 libavformat/libavcodec，桌面 CMake 是 `find_package(FFMPEG REQUIRED)`。`DISABLE_MOVIE` 打开的构建没有视频，ascii-art、SDL1、PSP、PSV、Wii、Emscripten 的 Makefile 都开着。片源扩展名写死在引擎里：`#movie <名>` 只找 `video/<名>.mp4`，参数别自带 `.mp4`。`gameconfig` 的 `playvideo` 写 `0` 时这条命令静默跳过——跳过前会先把 bgm、se、voice 停掉，只留一句 `[Info] Playvideo is disabled in gameconfig.` |
 | 文本输入（`input`） | 只有实现了 SDL_TEXTINPUT 的后端 |
 | 立绘遮罩（`_mask`） | 与后端无关，只跟 `platform` 有关（见 7.2） |
 | 语音/音效 | 需要有音频后端，ascii-art 后端没有 |

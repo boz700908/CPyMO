@@ -207,6 +207,9 @@ a:她把[Crimson](style=color~#DC143C)色的围巾系好。
 
 - PyMO：`#movie file`　ykm：`@movie "file"`
 
+- 片源路径写死为 `video/<file>.mp4`，`file` **不带扩展名**（写了 `.mp4` 会变成 `.mp4.mp4`）。
+- `gameconfig` 的 `playvideo` 写 `0` 时整条命令跳过，跳过前会停掉 bgm、se、voice。
+
 ### `textbox` — 更换对话框图片
 
 - PyMO：`#textbox message,name`　ykm：`@textbox [message="message"] [name="name"]`
