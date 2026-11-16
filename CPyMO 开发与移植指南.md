@@ -520,7 +520,7 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 ### 7.2 系统图片清单
 
-`system/` 下这些名字是引擎**直接按名字找**的（**引擎**：`cpymo_assetloader_load_system_image` 的各调用点）：
+`system/` 下这些名字是引擎**直接按名字找**的（**引擎**：`cpymo_assetloader_load_system_image` 的各调用点）。除了 `albumbg_N` 的前缀能由脚本改（见 6.3），其余都是写死的常量：
 
 | 文件 | 谁在用 |
 | --- | --- |
@@ -528,7 +528,7 @@ cpymo-tool gen-album-cache /path/to/MyGame
 | `option.png` | `#sel` / `select_img` 的选项底图（`cpymo_select_img.c`） |
 | `sel_highlight.png` | 选中高亮条（同上） |
 | `message_cursor.png` | 打字光标，约 24×24（`cpymo_say.c`） |
-| `albumbg_N.png` | 鉴赏每页背景，从 0 编号（`cpymo_album.c`） |
+| `albumbg_0.png`、`albumbg_1.png`… | 鉴赏每页底图，从 0 编号；**前缀跟着 `#album` 的参数走**（见 6.3，写 `#album album2` 就是 `album2_0.png`）。找不到时引擎用内置画法当场画一张凑合（`cpymo_album_generate_album_ui_image`），只在内存里用，不落盘 |
 | `cvThumb.png` | 未解锁 CG 的占位缩略图 |
 
 对话框底图（老游戏里叫 `message.png`）和名字框底图（`name.png`）**不是固定名字**：它们由 `#textbox <对话框图>,<名字框图>` 命令按名字指定，你想叫什么都可以。压根不调 `#textbox` 时，引擎用内置的画法，一个图都不需要（**引擎**：`cpymo_interpreter.c` 的 `D("textbox")` 把两个名字直接传给 `cpymo_say_load_msgbox_and_namebox_image`）。
@@ -547,19 +547,31 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 ### 7.3 字体
 
-字体不是 `gameconfig.txt` 管的，是**后端**在启动时加载的。SDL2 后端的查找顺序（**引擎**：`cpymo_backends/sdl2/cpymo_backend_font.c`）：
+字体不是 `gameconfig.txt` 管的，是**后端**在启动时加载的。桌面 SDL2 构建里有两份互斥的实现，靠宏二选一：
+
+* 默认是 `cpymo-backends/sdl2/cpymo_backend_font.c`（stb_truetype，整体裹在 `#ifndef DISABLE_STB_TRUETYPE` 里）；
+* 定义 `ENABLE_SDL2_TTF` 时换成 `cpymo-backends/sdl2/cpymo_backend_text_sdl2_ttf.c`（走 SDL_ttf），候选表里多一个 `.fnt`。
+
+`cpymo-backends/sdl2/CMakeLists.txt` 用 `file(GLOB ...)` 收下目录里所有 `.c`，所以两份文件都在编译单元里，选哪份完全看宏——不要同时开两个，它们定义的是同一组 `cpymo_backend_font_*` 符号。
+
+stb_truetype 那份的查找顺序（**引擎**：`cpymo_backend_font.c` 的 `cpymo_backend_font_init`）：
 
 1. `<游戏目录>/system/default.ttf`
 2. `<游戏目录>/system/default.otf`
-3. 编译期宏 `GAME_SELECTOR_DIR` 指向的目录（游戏选择器用；不定义就没有这一步）
-4. 各平台回退（Windows 会去系统字体目录，Android 去 `/sdcard/pymogames/default.ttf`，iOS 去文档目录）
+3. 编译期宏 `GAME_SELECTOR_DIR` 下的 `default.ttf` / `default.otf`（游戏选择器和掌机版用；不定义就没有这一步）
+4. 编译期宏 `GAME_SELECTOR_DIR_2` 下同样两个名字（只有 PSV 定义，指向 `ur0:/pymogames/`）
+5. 平台回退：Windows 扫 `%windir%\fonts` 里一串中文字体（`msyh.ttc`、`meiryo.ttc`、`mingliub.ttc` 等）；Linux 试 `/usr/share/fonts/opentype/noto/` 下 `NotoSansCJK-Regular.ttc`、`NotoSerifCJK-Regular.ttc`、`NotoSansCJK-Bold.ttc`、`NotoSerifCJK-Bold.ttc` 和 `/usr/share/fonts/truetype/unifont/unifont.ttf`；macOS 读 `STHeiti Medium.ttc` / `STHeiti Light.ttc`；iOS 读应用文档目录；Switch 借系统共享字体（跳过 0 号）
+
+`GAME_SELECTOR_DIR` 在构建脚本里值各不相同：Android 是 `/sdcard/pymogames`（`cpymo-backends/android/app/src/main/cpp/CMakeLists.txt`）、Switch 是 `sdmc:/pymogames/`、PSP 是 `./`、Wii 是 `sd:/pymogames/`、PSV 是 `ux0:/pymogames/`。指南前面几处提到的 `/sdcard/pymogames/default.ttf` 就是 Android 上的这一条，**不是**什么平台回退分支。
+
+**Android 没有系统字体可借**：上面五步全落空时只弹一句 `Can not find /sdcard/pymogames/default.ttf`，随后 `main.c:626` 打印 `[Error] Can not find font file, try put default.ttf into <gamedir>/system/.` 并退出。所以在 Android 上字体是必需品，要么塞进游戏目录的 `system/`，要么放一份到 `/sdcard/pymogames/`。
 
 所以**把字体放进游戏目录的 `system/default.ttf`** 是最省事的做法，游戏跟着目录走，换机器不会乱码。
 
 其他平台的约定位（README 各平台章节）：
 
 * 3DS：`sdmc:/pymogames/font.bcfnt` 优先，找不到用内置字体。
-* Switch：`/pymogames/default.ttf`；乱码就是它没放。
+* Switch：`sdmc:/pymogames/default.ttf`；这条也没有时会借系统共享字体，通常仍能显示。
 * PSP：`PSP/GAME/CPYMO/default.ttf`，建议小于 2MB。
 * iOS：应用文档目录下 `default.ttf`。
 
@@ -569,7 +581,7 @@ cpymo-tool gen-album-cache /path/to/MyGame
 
 | 事情 | 哪些后端支持 |
 | --- | --- |
-| 影片（`movie`） | 需要 FFmpeg；只链 SDL2_mixer 时没有视频 |
+| 影片（`movie`） | 解码在引擎侧：`cpymo/cpymo_movie.c` 直接调 libavformat/libavcodec，桌面 CMake 是 `find_package(FFMPEG REQUIRED)`。`DISABLE_MOVIE` 打开的构建没有视频，ascii-art、SDL1、PSP、PSV、Wii、Emscripten 的 Makefile 都开着 |
 | 文本输入（`input`） | 只有实现了 SDL_TEXTINPUT 的后端 |
 | 立绘遮罩（`_mask`） | 与后端无关，只跟 `platform` 有关（见 7.2） |
 | 语音/音效 | 需要有音频后端，ascii-art 后端没有 |
@@ -585,7 +597,7 @@ cpymo-sdl2      /path/to/MyGame   # SDL2 桌面版
 cpymo-ascii-art /path/to/MyGame   # 纯文本后端
 ```
 
-ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpymo-ascii-art`。它把画面画成字符网格，所以只能验脚本流程、变量、分支和「不崩」，验不了美术效果（原因见 7.4）。按键：`W/S/A/D` 移动，空格或 `J` 确认，`K` 取消，`L` 跳过。
+ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpymo-ascii-art`。它把画面画成字符网格，所以只能验脚本流程、变量、分支和「不崩」，验不了美术效果（原因见 7.4）。按键：`W/S/A/D` 移动，空格或 `J` 确认，`K` 取消，`L` 跳过（后端对输入做了 `toupper`，小写一样管用）。
 
 平台版的游戏目录位置由各平台自己约定，多半在存储卡的固定位置，构建/部署细节见 README 的对应章节：
 
