@@ -132,7 +132,7 @@ static float cpymo_msgbox_ui_buttons_y(
 	return vtop + (ui->cancel_btn ? vh * 0.5f : vh * 0.618f);
 }
 
-/* selection 编码：0 确认、1 取消、2+k 追加项 k，-1 尚未选中。 */
+/* selection 编码：CPYMO_MSGBOX_ITEM_OK=1 确认、_CANCEL=2 取消、_EXTRA_BASE=3 起为追加项，-1 尚未选中。 */
 static int cpymo_msgbox_ui_ordinal_of(const cpymo_msgbox_ui *ui, int sel)
 {
 	int ordinal = 0;
