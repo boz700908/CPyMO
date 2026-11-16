@@ -541,6 +541,43 @@ static int cpymo_lua_api_ui_on_item_click(lua_State *l)
     return 0;
 }
 
+/* cpymo.ui.item_on_click(page, index, fn): 给引擎自带条目挂点击回调。
+   fn 收 (page, index)，返回 true 表示吃掉这次点击、不再执行原生动作。
+   传 nil 取消该条目的回调。 */
+static int cpymo_lua_api_ui_item_on_click(lua_State *l)
+{
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    if (lua_gettop(l) != 3)
+        CPYMO_LUA_PANIC(l,
+            "cpymo.ui.item_on_click(page, index, fn) takes 3 arguments.");
+
+    const char *page = luaL_checkstring(l, 1);
+    lua_Integer index = luaL_checkinteger(l, 2);
+    if (index < 0)
+        CPYMO_LUA_PANIC(l,
+            "cpymo.ui.item_on_click(page, index, fn): index must be >= 0.");
+    if (!lua_isnoneornil(l, 3)) luaL_checktype(l, 3, LUA_TFUNCTION);
+
+    if (e->lua.ui_item_click_ref == LUA_NOREF) {
+        lua_newtable(l);
+        e->lua.ui_item_click_ref = luaL_ref(l, LUA_REGISTRYINDEX);
+    }
+
+    lua_rawgeti(l, LUA_REGISTRYINDEX, e->lua.ui_item_click_ref);
+    lua_getfield(l, -1, page);
+    if (!lua_istable(l, -1)) {
+        lua_pop(l, 1);
+        lua_newtable(l);
+        lua_pushvalue(l, -1);
+        lua_setfield(l, -3, page);
+    }
+    lua_pushvalue(l, 3);
+    lua_rawseti(l, -2, index);
+    lua_pop(l, 2);
+
+    return 0;
+}
+
 static char *cpymo_lua_ui_patch_dupstr(const char *s)
 {
     if (s == NULL) return NULL;
@@ -747,6 +784,7 @@ void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
         { "item_clear", &cpymo_lua_api_ui_item_clear },
         { "item_add", &cpymo_lua_api_ui_item_add },
         { "on_item_click", &cpymo_lua_api_ui_on_item_click },
+        { "item_on_click", &cpymo_lua_api_ui_item_on_click },
         { "item_get", &cpymo_lua_api_ui_item_get },
         { "items", &cpymo_lua_api_ui_items },
         { "pages", &cpymo_lua_api_ui_pages },

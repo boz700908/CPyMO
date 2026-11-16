@@ -431,6 +431,13 @@ static error_t cpymo_select_img_ok(cpymo_engine *e, int sel, uint64_t hash, cpym
 		return CPYMO_ERR_SUCC;
 	}
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	/* 自带选项的序号即全局序号，与 cpymo.ui.item_set 的下标一致。 */
+	if (o->patch_page &&
+		cpymo_lua_ui_item_click(&e->lua, o->patch_page, sel))
+		return CPYMO_ERR_SUCC;
+#endif
+
 	bool save_enabled = o->save_enabled;
 	cpymo_select_img_reset(o);
 

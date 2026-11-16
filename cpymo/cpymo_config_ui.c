@@ -863,6 +863,11 @@ static error_t cpymo_config_ui_ok(cpymo_engine *e, void *sel)
 
 	if (i >= CONFIG_ITEMS) return CPYMO_ERR_SUCC;
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (cpymo_lua_ui_item_click(&e->lua, CPYMO_UI_PATCH_PAGE_CONFIG, i))
+		return CPYMO_ERR_SUCC;
+#endif
+
 	return ui->items[i].show_inc_dec_button ?
 		CPYMO_ERR_SUCC :
 		cpymo_config_ui_item_inc(

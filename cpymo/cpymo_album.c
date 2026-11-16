@@ -743,6 +743,12 @@ static void cpymo_album_showing_cg_next(
 
 static error_t cpymo_album_select_ok(cpymo_engine *e, cpymo_album *a)
 {
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (cpymo_lua_ui_item_click(
+		&e->lua, CPYMO_UI_PATCH_PAGE_ALBUM, a->current_cg_selection))
+		return CPYMO_ERR_SUCC;
+#endif
+
 	if (cpymo_album_item_hidden(e, a, a->current_cg_selection)) {
 		int nxt = cpymo_album_step(e, a, a->current_cg_selection, 1);
 		if (nxt < 0) nxt = cpymo_album_step(e, a, a->current_cg_selection, -1);

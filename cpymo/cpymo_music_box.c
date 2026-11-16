@@ -165,6 +165,12 @@ static error_t cpymo_musicbox_ok(struct cpymo_engine *e, void *selected)
 		return CPYMO_ERR_SUCC;
 	}
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (cpymo_lua_ui_item_click(
+		&e->lua, CPYMO_UI_PATCH_PAGE_MUSIC, (int)node_index))
+		return CPYMO_ERR_SUCC;
+#endif
+
 	error_t err = cpymo_audio_bgm_play(e, box->music_filename[node_index], true);
 	if (err == CPYMO_ERR_SUCC) {
 		cpymo_accessibility_play_sound(SOUND_ENTER);

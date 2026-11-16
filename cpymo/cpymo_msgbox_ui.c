@@ -331,6 +331,10 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 				return cpymo_msgbox_ui_okcancel_finish(e, false);
 			return CPYMO_ERR_SUCC;
 		}
+		/* 确认 / 取消本身也可被接管。 */
+		if (cpymo_lua_ui_item_click(
+			&e->lua, CPYMO_UI_PATCH_PAGE_MSGBOX, ui->selection))
+			return CPYMO_ERR_SUCC;
 #endif
 		return cpymo_msgbox_ui_okcancel_finish(
 			e, ui->selection == CPYMO_MSGBOX_ITEM_OK);
@@ -350,6 +354,9 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 				return cpymo_msgbox_ui_okcancel_finish(e, false);
 			return CPYMO_ERR_SUCC;
 		}
+		if (cpymo_lua_ui_item_click(
+			&e->lua, CPYMO_UI_PATCH_PAGE_MSGBOX, mouse_sel))
+			return CPYMO_ERR_SUCC;
 #endif
 		return cpymo_msgbox_ui_okcancel_finish(
 			e, mouse_sel == CPYMO_MSGBOX_ITEM_OK);

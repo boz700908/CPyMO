@@ -295,6 +295,12 @@ static error_t cpymo_backlog_ui_ok(struct cpymo_engine *e, void *selected)
 		return CPYMO_ERR_SUCC;
 	}
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (cpymo_lua_ui_item_click(
+		&e->lua, CPYMO_UI_PATCH_PAGE_BACKLOG, (int)node_index))
+		return CPYMO_ERR_SUCC;
+#endif
+
 	const cpymo_backlog_record *rec = &e->backlog.records[node_index];
 	if (rec->vo_filename[0]) {
 		error_t err = cpymo_audio_vo_play(e, cpymo_str_pure(rec->vo_filename));

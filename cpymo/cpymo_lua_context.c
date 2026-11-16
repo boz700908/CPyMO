@@ -910,6 +910,7 @@ error_t cpymo_lua_context_init(cpymo_lua_context *l, cpymo_engine *e)
 {
     cpymo_ui_patch_init(&l->ui_patch);
     l->ui_click_ref = LUA_NOREF;
+    l->ui_item_click_ref = LUA_NOREF;
     l->pending_code = NULL;
     l->pending_len = 0;
     l->pending_cap = 0;
@@ -970,6 +971,11 @@ void cpymo_lua_context_free(cpymo_lua_context *l)
         if (l->lua_state && l->ui_click_ref != LUA_NOREF) {
         luaL_unref(l->lua_state, LUA_REGISTRYINDEX, l->ui_click_ref);
         l->ui_click_ref = LUA_NOREF;
+    }
+
+    if (l->lua_state && l->ui_item_click_ref != LUA_NOREF) {
+        luaL_unref(l->lua_state, LUA_REGISTRYINDEX, l->ui_item_click_ref);
+        l->ui_item_click_ref = LUA_NOREF;
     }
 
     lua_close(l->lua_state);
@@ -1347,6 +1353,42 @@ int cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index)
 
     lua_settop(L, top);
     return called;
+}
+
+/* 引擎自带条目的点击回调：page 键下的 [index] = function。回调的返回值即
+   「是否吃掉这次点击」，调用方据此决定要不要继续执行原生动作。 */
+int cpymo_lua_ui_item_click(cpymo_lua_context *l, const char *page, int index)
+{
+    if (l == NULL || l->lua_state == NULL) return 0;
+    if (l->ui_item_click_ref == LUA_NOREF) return 0;
+    if (page == NULL || index < 0) return 0;
+
+    lua_State *L = l->lua_state;
+    int top = lua_gettop(L);
+    int swallow = 0;
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, l->ui_item_click_ref);
+    if (lua_istable(L, -1)) {
+        lua_getfield(L, -1, page);
+        if (lua_istable(L, -1)) {
+            lua_rawgeti(L, -1, (lua_Integer)index);
+            if (lua_isfunction(L, -1)) {
+                lua_pushstring(L, page);
+                lua_pushinteger(L, (lua_Integer)index);
+                if (lua_pcall(L, 2, 1, 0) == LUA_OK) {
+                    swallow = lua_toboolean(L, -1) ? 1 : 0;
+                }
+                else {
+                    const char *err = lua_tostring(L, -1);
+                    printf("[cpymo] item_on_click(%s, %d) failed: %s\n",
+                        page, index, err ? err : "(unknown)");
+                }
+            }
+        }
+    }
+
+    lua_settop(L, top);
+    return swallow;
 }
 
 #endif

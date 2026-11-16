@@ -47,6 +47,10 @@ typedef struct {
     /* cpymo.ui.on_item_click 注册的回调表（page -> function），LUA_NOREF 表示未注册。 */
     int ui_click_ref;
 
+    /* cpymo.ui.item_on_click 注册的回调表（page -> { [index] = function }），
+       LUA_NOREF 表示未注册。 */
+    int ui_item_click_ref;
+
     /* Suspended #lua block. 0 means no block is waiting. */
     int block_co_ref;
     int block_line;
@@ -65,6 +69,10 @@ void cpymo_lua_context_free(cpymo_lua_context *l);
 /* Returns 1 when a handler was invoked and 0 when the page has none: a click
  * on an item added by the patch layer then has no effect at all. */
 int cpymo_lua_ui_page_click(cpymo_lua_context *l, const char *page, int index);
+
+/* 派发引擎自带条目（page + 全局序号）的点击回调（由 cpymo.ui.item_on_click 注册）。
+ * 返回 1 表示回调要求吃掉这次点击，调用方应跳过引擎原有动作；0 表示照常执行。 */
+int cpymo_lua_ui_item_click(cpymo_lua_context *l, const char *page, int index);
 
 void cpymo_lua_gc_full(cpymo_lua_context *l);
 

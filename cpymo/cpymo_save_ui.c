@@ -147,6 +147,12 @@ static error_t cpymo_save_ui_ok(cpymo_engine *e, void *selected)
 		return CPYMO_ERR_SUCC;
 	}
 
+#if CPYMO_FEATURE_LEVEL >= 1
+	if (cpymo_lua_ui_item_click(
+		&e->lua, cpymo_save_ui_page(ui->is_load_ui), (int)save_id))
+		return CPYMO_ERR_SUCC;
+#endif
+
 	if (ui->is_load_ui) {
 		if (!ui->items[save_id].is_empty_save) {
 			cpymo_list_ui_ignore_key_hold_exit_onetime(e);
