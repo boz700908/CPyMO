@@ -63,6 +63,57 @@ Nintendo Switch | `CPyMO for Nintendo Switch` | `CPyMO for Nintendo Switch (Acce
 
 3DS、PSP、PS Vita、Wii、UWP 以及 SDL 1.2 的两个桌面版本只发普通版。这些运行环境里没有可用的语音输出通道（Tolk、Speech Dispatcher、NSSpeechSynthesizer 与各主机原生 TTS 都没有对应实现），所以不另发一个「装了也不出声」的无障碍版。
 
+## 各平台的功能支持级别
+
+这一节的「级别」说的是构建支持的功能能力；下面「平台支持列表」里的三个梯队讲的是游戏能跑到什么程度，两者不是一回事。
+
+CPyMO 用编译期常量 `CPYMO_FEATURE_LEVEL` 标记一个构建支持到哪一级功能，级别越高能跑的脚本越多；低级别构建遇到不认识的命令只打印警告然后跳过，不会崩。
+
+- **Level 0**：原始 CPyMO 的引擎能力，直接运行 PyMO / YukimiScript 脚本。遇到 `#lua` 块会打印一条未知命令警告后继续。
+- **Level 1**：在 Level 0 之上接入 Lua 5.4（`#lua` 块与 `cpymo.*` 系列 API）。渲染后端与 Level 0 完全一致，不需要更强的硬件，只是多占一点内存。完全不用 `#lua` 的游戏在两级下表现相同。
+- **Level 2 / 3**：图形后端增强（旋转、缩放、加法混合等），**尚未实现**，目前没有任何平台的产物到这两级。
+
+平台 | 级别 | 说明
+---- | ---- | ----
+Windows x64 / x86 / ARM64 / ARM64EC | Level 1 | 普通版与无障碍版都是
+Linux x64 | Level 1 | 同上
+macOS x64 / Apple Silicon | Level 1 | 同上
+Android | Level 1 | 同上
+iOS | Level 1 | 同上
+Web（Emscripten） | Level 1 | 同上
+Windows（SDL 1.2） | Level 1 | 只发普通版
+Linux（SDL 1.2） | Level 1 | 只发普通版
+CPyMO ASCII Art | Level 1 | 终端后端，用于调试
+Nintendo Switch | Level 0 | 构建脚本没有 Lua 开关
+Nintendo 3DS | Level 0 | 同上
+Nintendo Wii | Level 0 | 同上
+Sony PSP | Level 0 | 同上
+Sony PS Vita | Level 0 | 构建脚本固定 `-DDISABLE_AUTOSAVE`，与 Level 1 编译期冲突
+Universal Windows Platform | Level 0 | 显式源文件清单，未接 Lua
+CPyMO Text | Level 0 | 构建脚本固定 `-DLOW_FRAME_RATE`，与 Level 1 编译期冲突
+
+切换级别只需改该平台的构建参数：CMake 用 `-DENABLE_LUA=ON`，Makefile 用 `LUA=1`，两者都会加上 `-DCPYMO_FEATURE_LEVEL=1 -DLINK_WITH_ONELUA`。上表里标 Level 0 的主机后端若要升级，得先解决它与 `-DDISABLE_AUTOSAVE` / `-DLOW_FRAME_RATE` 的编译期冲突。
+
+## 是否支持变量输入
+
+这里的「变量输入」指脚本命令 `input <变量> [提示]`：弹出一个输入框，把结果写进变量。CPyMO 的变量是 int32，所以只接受 0-9 与前导负号，退格删除，回车确认（空输入按 0），ESC 取消并保持原值。这条命令属于引擎核心，**与 Feature Level 无关**，Level 0 的产物同样可用；无障碍版还会把提示文本朗读一次。
+
+平台是否真能输入，取决于后端有没有实现 `cpymo_backend_input_text_begin / end / poll`。这三个函数是弱符号，没有实现的后端在运行期地址为 NULL，此时命令会打印
+
+```
+[Warning] Backend does not support text input, the "input" command is skipped.
+```
+
+然后不写变量、直接结束，脚本照常往下走，不会卡在输入框上。
+
+平台 | 变量输入 | 说明
+---- | -------- | ----
+Windows / Linux / macOS | 支持 | 物理键盘
+Android / iOS | 支持 | 调用系统软键盘
+Web（Emscripten） | 支持 | 浏览器输入法
+Nintendo Switch / Sony PSP / PS Vita | 预期不可用 | 后端有输入代码，但实现依赖 SDL2 上报的文本输入事件；这三台没有软键盘，预期收不到字符、只能用 ESC 取消。未在真机验证。
+Nintendo 3DS / Wii / UWP / SDL 1.2 桌面 / CPyMO Text / ASCII Art | 不支持 | 后端未实现，命令被跳过（见上文警告）
+
 ## 在3DS/PSP/Wii上运行游戏时，我需要对游戏的数据包进行转换？
 
 一般情况下，3DS和PSP版本CPyMO可以直接运行s60v5版本，如果你想获得更好的体验或者你在使用Wii，可以下载[CPyMO GUITool](https://github.com/PyMO-Ecosphere/CPyMO-GUITool)来创建面向3DS、PSP和Wii的游戏包。
