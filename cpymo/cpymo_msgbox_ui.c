@@ -8,7 +8,6 @@
 #include "cpymo_safe_area.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #ifdef __3DS__
 extern bool fill_screen_enabled;
@@ -300,13 +299,6 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 
 		cpymo_engine_request_redraw(e);
 		cpymo_accessibility_play_sound(SOUND_SELECT);
-		{
-			char _dbg[64];
-			snprintf(_dbg, sizeof _dbg, "sel %d of %d extra %d hide %d%d",
-				ui->selection, cpymo_msgbox_ui_selection_count(ui),
-				(int)ui->extra_count, (int)ui->hide_ok, (int)ui->hide_cancel);
-			cpymo_a11y_speak(_dbg);
-		}
 		cpymo_msgbox_ui_speak_selection(e, ui->selection);
 	}
 	else if (CPYMO_INPUT_JUST_PRESSED(e, ok)) {
