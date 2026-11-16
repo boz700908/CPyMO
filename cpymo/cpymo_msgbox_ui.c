@@ -286,11 +286,16 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 		if (CPYMO_MSGBOX_UI_PATCH(e) == NULL) {
 			/* 无补丁时保持上游行为。 */
 			if (ui->selection == -1) {
-				if (ui->cancel_btn) ui->selection = 1;
-				else ui->selection = 0;
+				if (ui->cancel_btn)
+					ui->selection = CPYMO_MSGBOX_ITEM_CANCEL;
+				else ui->selection = CPYMO_MSGBOX_ITEM_OK;
 			}
-			else if (ui->selection == 0 && ui->cancel_btn) ui->selection = 1;
-			else if (ui->selection == 1 && ui->cancel_btn) ui->selection = 0;
+			else if (ui->selection == CPYMO_MSGBOX_ITEM_OK &&
+				ui->cancel_btn)
+				ui->selection = CPYMO_MSGBOX_ITEM_CANCEL;
+			else if (ui->selection == CPYMO_MSGBOX_ITEM_CANCEL &&
+				ui->cancel_btn)
+				ui->selection = CPYMO_MSGBOX_ITEM_OK;
 		}
 		else {
 			const int dir = CPYMO_INPUT_JUST_PRESSED(e, up) ? -1 : 1;
@@ -303,7 +308,7 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 	}
 	else if (CPYMO_INPUT_JUST_PRESSED(e, ok)) {
 		if (ui->cancel_btn == NULL) {
-			ui->selection = 0;
+			ui->selection = CPYMO_MSGBOX_ITEM_OK;
 		}
 
 		cpymo_engine_request_redraw(e);
@@ -327,7 +332,8 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 			return CPYMO_ERR_SUCC;
 		}
 #endif
-		return cpymo_msgbox_ui_okcancel_finish(e, !ui->selection);
+		return cpymo_msgbox_ui_okcancel_finish(
+			e, ui->selection == CPYMO_MSGBOX_ITEM_OK);
 	}
 	else if (CPYMO_INPUT_JUST_RELEASED(e, mouse_button)) {
 		cpymo_engine_request_redraw(e);
@@ -345,7 +351,8 @@ static error_t cpymo_msgbox_ui_update(cpymo_engine *e, void *ui_data, float dt)
 			return CPYMO_ERR_SUCC;
 		}
 #endif
-		return cpymo_msgbox_ui_okcancel_finish(e, !mouse_sel);
+		return cpymo_msgbox_ui_okcancel_finish(
+			e, mouse_sel == CPYMO_MSGBOX_ITEM_OK);
 	}
 
 	if (cpymo_input_mouse_moved(e)) {
@@ -537,7 +544,7 @@ error_t cpymo_msgbox_ui_enter(
 	ui->okcancel_callback_data = okcancel_callback_data;
 	/* The visible and spoken first button is always Confirm.  Starting on
 	 * Cancel made directional navigation disagree with the dialog layout. */
-	ui->selection = 0;
+	ui->selection = CPYMO_MSGBOX_ITEM_OK;
 	ui->ignore_initial_confirm_input =
 		e->input.ok || e->prev_input.ok ||
 		e->input.mouse_button || e->prev_input.mouse_button;
