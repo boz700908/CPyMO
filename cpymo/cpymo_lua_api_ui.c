@@ -904,6 +904,16 @@ static int cpymo_lua_api_ui_import_patch(lua_State *l)
 }
 
 
+/* cpymo.ui.is_open() -> bool. True while an engine UI page is on screen.
+ * The engine keeps no page identity, so presence is all that can be reported. */
+static int cpymo_lua_api_ui_is_open(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    lua_pushboolean(l, cpymo_ui_enabled(cpymo_lua_state_get_engine(l)) ? 1 : 0);
+    return 1;
+}
+
+
 void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
 {
     lua_State *l = ctx->lua_state;
@@ -938,6 +948,7 @@ void cpymo_lua_api_ui_register(cpymo_lua_context *ctx)
         { "item_get", &cpymo_lua_api_ui_item_get },
         { "items", &cpymo_lua_api_ui_items },
         { "pages", &cpymo_lua_api_ui_pages },
+        { "is_open", &cpymo_lua_api_ui_is_open },
         { "export_patch", &cpymo_lua_api_ui_export_patch },
         { "import_patch", &cpymo_lua_api_ui_import_patch },
         { NULL, NULL }

@@ -820,3 +820,30 @@ void cpymo_select_img_configuare_end_select_text(
 	}
 }
 
+
+
+int cpymo_select_img_selection_count(const struct cpymo_select_img *sel)
+{
+    /* all_selections is set in configuare_begin and always holds the real
+     * slot count; current_selection is a write cursor during configuration
+     * and becomes the highlighted item after configuare_end. */
+    if (sel == NULL || sel->selections == NULL) return 0;
+    return (int)sel->all_selections;
+}
+
+bool cpymo_select_img_selection_info_at(
+	const struct cpymo_select_img *sel, int index,
+	struct cpymo_select_img_selection_info *out)
+{
+	if (out == NULL || sel == NULL || sel->selections == NULL) return false;
+	if (index < 0 || index >= cpymo_select_img_selection_count(sel)) return false;
+
+	const cpymo_select_img_selection *s = &sel->selections[index];
+	out->x = s->x;
+	out->y = s->y;
+	out->w = s->w;
+	out->h = s->h;
+	out->enabled = s->enabled;
+	out->hash = s->hash;
+	return true;
+}

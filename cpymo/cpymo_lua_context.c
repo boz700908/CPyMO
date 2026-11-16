@@ -182,6 +182,11 @@ static int cpymo_lua_api_cpymo_yield(lua_State *l);
 static int cpymo_lua_api_cpymo_wait(lua_State *l);
 static int cpymo_lua_api_cpymo_every(lua_State *l);
 static int cpymo_lua_api_cpymo_timer_cancel(lua_State *l);
+static int cpymo_lua_api_cpymo_timers(lua_State *l);
+static int cpymo_lua_api_cpymo_audio(lua_State *l);
+static int cpymo_lua_api_cpymo_bg(lua_State *l);
+static int cpymo_lua_api_cpymo_charas(lua_State *l);
+static int cpymo_lua_api_cpymo_gameconfig(lua_State *l);
 
 static error_t cpymo_lua_context_create_cpymo_package(
     cpymo_lua_context *ctx, cpymo_engine *e)
@@ -212,6 +217,11 @@ static error_t cpymo_lua_context_create_cpymo_package(
         { "timer", &cpymo_lua_api_cpymo_timer },
         { "every", &cpymo_lua_api_cpymo_every },
         { "timer_cancel", &cpymo_lua_api_cpymo_timer_cancel },
+        { "timers", &cpymo_lua_api_cpymo_timers },
+        { "audio", &cpymo_lua_api_cpymo_audio },
+        { "bg", &cpymo_lua_api_cpymo_bg },
+        { "charas", &cpymo_lua_api_cpymo_charas },
+        { "gameconfig", &cpymo_lua_api_cpymo_gameconfig },
         { "yield", &cpymo_lua_api_cpymo_yield },
         { "wait", &cpymo_lua_api_cpymo_wait },
         { NULL, NULL }
@@ -619,6 +629,233 @@ static int cpymo_lua_api_cpymo_timer_cancel(lua_State *l)
     }
 
     lua_pushboolean(l, 0);
+    return 1;
+}
+
+/* cpymo.audio() -> { enabled, bgm = {...}, se = {...}, vo = {...} }.
+ * Each channel reports volume, playing, looping and name (nil when unset).
+ * The engine kept all of this internally; it was simply unreachable from Lua.
+ * Everything goes through cpymo_audio.h accessors because cpymo_audio_system
+ * has a different shape in each of the three audio build configurations. */
+static int cpymo_lua_api_cpymo_audio(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    cpymo_audio_system *audio = &e->audio;
+    static const char *const names[CPYMO_AUDIO_MAX_CHANNELS] = {
+        "bgm", "se", "vo"
+    };
+
+    lua_newtable(l);
+    lua_pushboolean(l, cpymo_audio_enabled(e) ? 1 : 0);
+    lua_setfield(l, -2, "enabled");
+
+    for (size_t i = 0; i < CPYMO_AUDIO_MAX_CHANNELS; i++) {
+        const char *name = NULL;
+        if (i == (size_t)CPYMO_AUDIO_CHANNEL_BGM) {
+            name = cpymo_audio_get_bgm_name(e);
+        } else if (i == (size_t)CPYMO_AUDIO_CHANNEL_SE) {
+            name = cpymo_audio_get_se_name(e);
+        }
+
+        lua_newtable(l);
+        lua_pushnumber(l, cpymo_audio_get_channel_volume(i, audio));
+        lua_setfield(l, -2, "volume");
+        lua_pushboolean(l, cpymo_audio_channel_is_playing(i, audio) ? 1 : 0);
+        lua_setfield(l, -2, "playing");
+        lua_pushboolean(l, cpymo_audio_channel_is_looping(i, audio) ? 1 : 0);
+        lua_setfield(l, -2, "looping");
+        if (name) {
+            lua_pushstring(l, name);
+        } else {
+            lua_pushnil(l);
+        }
+        lua_setfield(l, -2, "name");
+        lua_setfield(l, -2, names[i]);
+    }
+
+    return 1;
+}
+
+/* cpymo.bg() -> { name, x, y, w, h, transforming, follow_chara_quake }.
+ * `name` is nil before the first @bg. */
+static int cpymo_lua_api_cpymo_bg(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    const cpymo_bg *bg = &e->bg;
+
+    lua_newtable(l);
+    if (bg->current_bg_name) {
+        lua_pushstring(l, bg->current_bg_name);
+    } else {
+        lua_pushnil(l);
+    }
+    lua_setfield(l, -2, "name");
+
+    lua_pushnumber(l, bg->current_bg_x);
+    lua_setfield(l, -2, "x");
+    lua_pushnumber(l, bg->current_bg_y);
+    lua_setfield(l, -2, "y");
+    lua_pushinteger(l, bg->current_bg_w);
+    lua_setfield(l, -2, "w");
+    lua_pushinteger(l, bg->current_bg_h);
+    lua_setfield(l, -2, "h");
+    lua_pushboolean(l, bg->transform_draw ? 1 : 0);
+    lua_setfield(l, -2, "transforming");
+    lua_pushboolean(l, bg->follow_chara_quake ? 1 : 0);
+    lua_setfield(l, -2, "follow_chara_quake");
+
+    return 1;
+}
+
+/* cpymo.charas() -> array of { name, id, layer, alive, x, y, alpha, scale,
+ * w, h, anime }. Positions and alpha are the current tween values, that is
+ * where the character is drawn right now, not the target of a running move. */
+static int cpymo_lua_api_cpymo_charas(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+
+    lua_newtable(l);
+    int n = 0;
+    for (const struct cpymo_chara *c = e->charas.chara; c; c = c->next) {
+        n++;
+        lua_newtable(l);
+        lua_pushstring(l, c->chara_name);
+        lua_setfield(l, -2, "name");
+        lua_pushinteger(l, c->chara_id);
+        lua_setfield(l, -2, "id");
+        lua_pushinteger(l, c->layer);
+        lua_setfield(l, -2, "layer");
+        lua_pushboolean(l, c->alive ? 1 : 0);
+        lua_setfield(l, -2, "alive");
+        lua_pushnumber(l, cpymo_tween_value(&c->pos_x));
+        lua_setfield(l, -2, "x");
+        lua_pushnumber(l, cpymo_tween_value(&c->pos_y));
+        lua_setfield(l, -2, "y");
+        lua_pushnumber(l, cpymo_tween_value(&c->alpha));
+        lua_setfield(l, -2, "alpha");
+        lua_pushnumber(l, cpymo_tween_value(&c->scale));
+        lua_setfield(l, -2, "scale");
+        lua_pushinteger(l, c->img_w);
+        lua_setfield(l, -2, "w");
+        lua_pushinteger(l, c->img_h);
+        lua_setfield(l, -2, "h");
+        lua_pushboolean(l, c->play_anime ? 1 : 0);
+        lua_setfield(l, -2, "anime");
+        lua_rawseti(l, -2, n);
+    }
+
+    return 1;
+}
+
+/* Push a fixed size char array as a Lua string, never reading past max_len.
+ * platform[12] and scripttype[4] are compared byte by byte by the engine, so
+ * they are not guaranteed to be NUL terminated. */
+static void cpymo_lua_api_push_fixed_string(
+    lua_State *l, const char *str, size_t max_len)
+{
+    size_t len = 0;
+    while (len < max_len && str[len]) {
+        len++;
+    }
+    lua_pushlstring(l, str, len);
+}
+
+/* cpymo.gameconfig() -> read only snapshot of the game configuration.
+ * Values are read on every call, so changes made through the config page are
+ * visible immediately. */
+static int cpymo_lua_api_cpymo_gameconfig(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    const cpymo_gameconfig *g = &e->gameconfig;
+
+    lua_newtable(l);
+    lua_pushstring(l, g->gametitle);
+    lua_setfield(l, -2, "title");
+    lua_pushstring(l, g->startscript);
+    lua_setfield(l, -2, "start_script");
+    lua_pushstring(l, g->cgprefix);
+    lua_setfield(l, -2, "cg_prefix");
+    cpymo_lua_api_push_fixed_string(l, g->platform, sizeof(g->platform));
+    lua_setfield(l, -2, "platform");
+    cpymo_lua_api_push_fixed_string(l, g->scripttype, sizeof(g->scripttype));
+    lua_setfield(l, -2, "script_type");
+    cpymo_lua_api_push_fixed_string(l, g->bgformat, sizeof(g->bgformat));
+    lua_setfield(l, -2, "bg_format");
+    lua_pushinteger(l, g->fontsize);
+    lua_setfield(l, -2, "font_size");
+    lua_pushnumber(l, cpymo_gameconfig_font_size(g));
+    lua_setfield(l, -2, "font_size_scaled");
+    lua_pushinteger(l, g->imagesize_w);
+    lua_setfield(l, -2, "width");
+    lua_pushinteger(l, g->imagesize_h);
+    lua_setfield(l, -2, "height");
+    lua_pushinteger(l, g->textspeed);
+    lua_setfield(l, -2, "text_speed");
+    lua_pushinteger(l, g->bgmvolume);
+    lua_setfield(l, -2, "bgm_volume");
+    lua_pushinteger(l, g->vovolume);
+    lua_setfield(l, -2, "vo_volume");
+    lua_pushinteger(l, g->namealign);
+    lua_setfield(l, -2, "name_align");
+    lua_pushboolean(l, g->hint ? 1 : 0);
+    lua_setfield(l, -2, "hint");
+    lua_pushboolean(l, g->grayselected ? 1 : 0);
+    lua_setfield(l, -2, "gray_selected");
+    lua_pushboolean(l, g->playvideo ? 1 : 0);
+    lua_setfield(l, -2, "play_video");
+
+    lua_newtable(l);
+    lua_pushinteger(l, g->textcolor.r);
+    lua_setfield(l, -2, "r");
+    lua_pushinteger(l, g->textcolor.g);
+    lua_setfield(l, -2, "g");
+    lua_pushinteger(l, g->textcolor.b);
+    lua_setfield(l, -2, "b");
+    lua_setfield(l, -2, "text_color");
+
+    lua_newtable(l);
+    lua_pushinteger(l, g->engineversion.major);
+    lua_setfield(l, -2, "major");
+    lua_pushinteger(l, g->engineversion.minor);
+    lua_setfield(l, -2, "minor");
+    lua_setfield(l, -2, "engine_version");
+
+    return 1;
+}
+
+
+/* cpymo.timers() -> array of { id, repeating, interval, remaining }.
+ * A repeating timer that is firing right now has already left the list,
+ * so it is not visible here either. */
+static int cpymo_lua_api_cpymo_timers(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    cpymo_lua_context *ctx = cpymo_lua_state_get_lua_context(l);
+
+    lua_newtable(l);
+    lua_Integer n = 0;
+    for (cpymo_lua_timer *t = ctx->timers; t; t = t->next) {
+        if (t->cancelled) continue;
+
+        double remaining = t->trigger_at - ctx->timer_clock;
+        if (remaining < 0.0) remaining = 0.0;
+
+        lua_newtable(l);
+        lua_pushinteger(l, (lua_Integer)t->id);
+        lua_setfield(l, -2, "id");
+        lua_pushboolean(l, t->interval > 0.0);
+        lua_setfield(l, -2, "repeating");
+        lua_pushnumber(l, (lua_Number)t->interval);
+        lua_setfield(l, -2, "interval");
+        lua_pushnumber(l, (lua_Number)remaining);
+        lua_setfield(l, -2, "remaining");
+        lua_rawseti(l, -2, ++n);
+    }
+
     return 1;
 }
 

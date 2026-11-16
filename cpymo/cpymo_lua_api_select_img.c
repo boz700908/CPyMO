@@ -213,6 +213,44 @@ static error_t cpymo_lua_api_select_img_ok_callback(
     return CPYMO_ERR_SUCC;
 }
 
+/* cpymo.select_img.options() -> array of the selections configured so far.
+ * index is the order the select() calls were made in (1 based), which is not
+ * the value the ok callback receives. */
+static int cpymo_lua_api_select_img_options(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    const struct cpymo_select_img *sel = &e->select_img;
+
+    lua_newtable(l);
+    lua_Integer n = 0;
+    int count = cpymo_select_img_selection_count(sel);
+    for (int i = 0; i < count; i++) {
+        struct cpymo_select_img_selection_info info;
+        if (!cpymo_select_img_selection_info_at(sel, i, &info)) continue;
+
+        lua_newtable(l);
+        lua_pushinteger(l, (lua_Integer)(i + 1));
+        lua_setfield(l, -2, "index");
+        lua_pushnumber(l, (lua_Number)info.x);
+        lua_setfield(l, -2, "x");
+        lua_pushnumber(l, (lua_Number)info.y);
+        lua_setfield(l, -2, "y");
+        lua_pushinteger(l, (lua_Integer)info.w);
+        lua_setfield(l, -2, "w");
+        lua_pushinteger(l, (lua_Integer)info.h);
+        lua_setfield(l, -2, "h");
+        lua_pushboolean(l, info.enabled);
+        lua_setfield(l, -2, "enabled");
+        lua_pushinteger(l, (lua_Integer)info.hash);
+        lua_setfield(l, -2, "hash");
+        lua_rawseti(l, -2, ++n);
+    }
+
+    return 1;
+}
+
 void cpymo_lua_api_select_img_register(cpymo_lua_context *ctx)
 {
     lua_State *l = ctx->lua_state;
@@ -225,6 +263,7 @@ void cpymo_lua_api_select_img_register(cpymo_lua_context *ctx)
         { "finish", &cpymo_lua_api_select_img_finish },
         { "active", &cpymo_lua_api_select_img_active },
         { "current", &cpymo_lua_api_select_img_current },
+        { "options", &cpymo_lua_api_select_img_options },
         { "cancel", &cpymo_lua_api_select_img_cancel },
         { NULL, NULL }
     };

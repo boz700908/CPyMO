@@ -26,6 +26,12 @@ struct cpymo_select_img;
 typedef error_t (*cpymo_select_img_ok_callback)(struct cpymo_engine *, int, uint64_t, bool save_enabled);
 
 struct cpymo_select_img_selection;
+struct cpymo_select_img_selection_info {
+	float x, y;
+	int w, h;
+	bool enabled;
+	uint64_t hash;
+};
 
 struct cpymo_select_img {
 	struct cpymo_select_img_selection *selections;
@@ -125,6 +131,13 @@ error_t cpymo_select_img_configuare_select_text(
 
 void cpymo_select_img_configuare_select_text_hint_pic(
 	struct cpymo_engine *engine, cpymo_str hint);
+
+/* Read-only access for the Lua bindings: what has been configured so far. */
+int cpymo_select_img_selection_count(const struct cpymo_select_img *sel);
+
+bool cpymo_select_img_selection_info_at(
+	const struct cpymo_select_img *sel, int index,
+	struct cpymo_select_img_selection_info *out);
 
 void cpymo_select_img_configuare_end_select_text(
 	cpymo_select_img *sel,

@@ -181,6 +181,77 @@ error_t cpymo_lua_context_pymo_override(
     return err;
 }
 
+/* cpymo.script.vars_list([scope]) -> { name = value }.
+ * scope is "global" (default) or "local"; both are plain name/value maps,
+ * so this only exposes what the interpreter already stores. */
+static int cpymo_lua_api_script_vars_list(lua_State *l)
+{
+    if (lua_gettop(l) > 1)
+        CPYMO_LUA_PANIC(l, "This function needs at most 1 argument(s).");
+
+    bool is_global = true;
+    if (lua_gettop(l) == 1 && !lua_isnil(l, 1)) {
+        const char *scope = lua_tostring(l, 1);
+        if (scope == NULL) CPYMO_LUA_THROW(l, CPYMO_ERR_INVALID_ARG);
+        if (strcmp(scope, "local") == 0) is_global = false;
+        else if (strcmp(scope, "global") != 0)
+            CPYMO_LUA_THROW(l, CPYMO_ERR_INVALID_ARG);
+    }
+
+    cpymo_vars *vars = &cpymo_lua_state_get_engine(l)->vars;
+    void *field = is_global ? vars->globals : vars->locals;
+    size_t count = cpymo_vars_count(&field);
+    if (is_global) vars->globals = field;
+    else vars->locals = field;
+
+    lua_newtable(l);
+    for (size_t i = 0; i < count; i++) {
+        cpymo_val v = 0;
+        const char *name = cpymo_vars_get_by_index(field, i, &v);
+        if (name == NULL) continue;
+        lua_pushinteger(l, (lua_Integer)v);
+        lua_setfield(l, -2, name);
+    }
+
+    return 1;
+}
+
+/* cpymo.script.position() -> { script, line, depth }, or nil when no
+ * interpreter is running. `script` is nil for pushed code, `line` is the line
+ * the parser has reached, `depth` counts calls (1 = outermost). */
+static int cpymo_lua_api_script_position(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+    cpymo_engine *e = cpymo_lua_state_get_engine(l);
+    const cpymo_interpreter *itr = e->interpreter;
+
+    if (itr == NULL) {
+        lua_pushnil(l);
+        return 1;
+    }
+
+    lua_newtable(l);
+    if (itr->script) {
+        lua_pushstring(l, itr->script->script_name);
+    } else {
+        lua_pushnil(l);
+    }
+    lua_setfield(l, -2, "script");
+
+    lua_pushinteger(l, (lua_Integer)itr->script_parser.cur_line);
+    lua_setfield(l, -2, "line");
+
+    int depth = 0;
+    for (const cpymo_interpreter *p = itr; p != NULL; p = p->caller) {
+        depth++;
+    }
+    lua_pushinteger(l, depth);
+    lua_setfield(l, -2, "depth");
+
+    return 1;
+}
+
+
 void cpymo_lua_api_script_register(cpymo_lua_context *ctx)
 {
     lua_State *l = ctx->lua_state;
@@ -191,6 +262,8 @@ void cpymo_lua_api_script_register(cpymo_lua_context *ctx)
     const luaL_Reg funcs[] = {
         { "push_code", &cpymo_lua_api_script_push_code },
         { "wait", &cpymo_lua_api_script_wait },
+        { "vars_list", &cpymo_lua_api_script_vars_list },
+        { "position", &cpymo_lua_api_script_position },
         { NULL, NULL }
     };
     luaL_setfuncs(l, funcs, 0);

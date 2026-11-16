@@ -87,6 +87,24 @@ static int cpymo_lua_api_flags_cg_unlocked(lua_State *l)
     return 1;    
 }
 
+/* cpymo.flags.list() -> array of the flag hashes currently set.
+ * Only hashes are stored, so a name cannot be recovered from one. */
+static int cpymo_lua_api_flags_list(lua_State *l)
+{
+    CPYMO_LUA_ARG_COUNT(l, 0);
+
+    cpymo_hash_flags *flags = &cpymo_lua_state_get_engine(l)->flags;
+    size_t count = cpymo_hash_flags_count(flags);
+
+    lua_newtable(l);
+    for (size_t i = 0; i < count; i++) {
+        lua_pushinteger(l, (lua_Integer)cpymo_hash_flags_get(flags, i));
+        lua_rawseti(l, -2, (lua_Integer)i + 1);
+    }
+
+    return 1;
+}
+
 void cpymo_lua_api_flags_register(cpymo_lua_context *ctx)
 {
     lua_State *l = ctx->lua_state;
@@ -99,6 +117,7 @@ void cpymo_lua_api_flags_register(cpymo_lua_context *ctx)
         { "unlock_cg", &cpymo_lua_api_flags_unlock_cg },
         { "lock_cg", &cpymo_lua_api_flags_lock_cg },
         { "cg_unlocked", &cpymo_lua_api_flags_cg_unlocked },
+        { "list", &cpymo_lua_api_flags_list },
         { NULL, NULL }
     };
 
