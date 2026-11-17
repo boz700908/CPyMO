@@ -44,7 +44,7 @@ MyGame/
 ├── save/                   存档（引擎运行时写入，不需要预置）
 ├── script/                 脚本
 ├── se/                     音效
-├── system/                 界面图片与字体
+├── system/                 界面图片与字体（不自动创建，字体也在这里找）
 ├── video/                  影片，只认 .mp4（DISABLE_MOVIE 构建不可用）
 └── voice/                  语音
 ```
