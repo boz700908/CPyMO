@@ -231,17 +231,19 @@ jobs:
         # Use the frontend the bootstrap installed. Current releases put the
         # package client at libexec/vdpm/pacman, while the clone's legacy
         # ./vdpm script still looks for bin/pacman.
-        $VITASDK/bin/vdpm install sdl2
-        $VITASDK/bin/vdpm install sdl2_mixer
-        $VITASDK/bin/vdpm install flac
-        $VITASDK/bin/vdpm install libmodplug
-        $VITASDK/bin/vdpm install mpg123
-        $VITASDK/bin/vdpm install libogg
-        $VITASDK/bin/vdpm install libvorbis
-        $VITASDK/bin/vdpm install libmikmod
-        $VITASDK/bin/vdpm install opus
-        $VITASDK/bin/vdpm install opusfile
-        $VITASDK/bin/vdpm install libxmp
+        #
+        # 2026-11-16 上游换成 series 2026.08 的新 vdpm/pacman 体系后，紧接着的
+        # `vdpm install sdl2` 会报 `target not found: sdl2`。先显式刷新一次仓库
+        # （幂等，只重写包数据库），再把 11 个库合并成一条事务安装；仍然失败时
+        # 打印 status / search / files，便于直接从日志定位原因。
+        $VITASDK/bin/vdpm refresh 2026.08 || echo "refresh failed; continuing"
+        pkgs="sdl2 sdl2_mixer flac libmodplug mpg123 libogg libvorbis libmikmod opus opusfile libxmp"
+        if ! $VITASDK/bin/vdpm install $pkgs; then
+          $VITASDK/bin/vdpm status || true
+          $VITASDK/bin/vdpm search sdl2 || true
+          $VITASDK/bin/vdpm files sdl2 || true
+          exit 1
+        fi
         # cd ../cpymo-backends/sdl2
         # chmod +x ./build-psv-ffmpeg.sh
         # ./build-psv-ffmpeg.sh
