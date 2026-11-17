@@ -1,0 +1,71 @@
+name: Package All Platforms
+
+# 把某一次 ci.yml 的 run 的全部平台产物，按「普通版 / 无障碍版」各打一个总包。
+# 总包内每个平台仍是一个独立压缩包，与原 artifact 内容一致。
+#
+# 之所以在 CI 里做而不是本机：从国内服务器直连 artifact 存储只有 ~40 KB/s，
+# 全部产物 385 MB 要一个多小时；CI 拉取同一仓库的 artifact 是内网速度。
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: '要打包的 ci.yml run id'
+        required: true
+        default: '44051537443'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    name: '打包：普通版 / 无障碍版'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download every artifact of the source run
+        uses: actions/download-artifact@v6.0.0
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: all
+
+      - name: Group into two bundles
+        run: |
+          set -euo pipefail
+          mkdir -p bundles
+          shopt -s nullglob
+          n=0
+          for d in all/*/; do
+            name=$(basename "$d")
+            case "$name" in
+              *"(Accessibility)")
+                out="bundles/CPyMO-accessibility-all-platforms.zip" ;;
+              *)
+                out="bundles/CPyMO-plain-all-platforms.zip" ;;
+            esac
+            # 追加进同一个总包；cd 到 all 里打，包内路径就是平台目录名。
+            ( cd all && zip -qr "../$out" "$name" )
+            n=$((n+1))
+          done
+          echo "platforms packaged: $n"
+          ls -l bundles
+
+      - name: Verify bundle contents
+        run: |
+          set -euo pipefail
+          for f in bundles/*.zip; do
+            echo "=== $f"
+            unzip -l "$f" | tail -n 3
+            echo "--- platforms:"
+            unzip -Z1 "$f" | cut -d/ -f1 | sort -u
+          done
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: CPyMO all platforms (bundles)
+          path: bundles/*.zip
+          # 里面已经是压缩包，不必再压一遍。
+          compression-level: 0
+          if-no-files-found: error
