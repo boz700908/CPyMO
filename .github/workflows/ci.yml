@@ -227,16 +227,19 @@ jobs:
         export VITASDK=~/vitasdk
         export PATH=$VITASDK/bin:$PATH
         export VDPM_NONINTERACTIVE=1
+        # supported 系列 2026.08 的 vita 包库（packages-2026.08-snapshot-20261116.70.1）
+        # 只有 54 个包，不含 SDL2 与音频库，install 会直接报 `target not found: sdl2`；
+        # nightly 系列（packages-snapshot-20261111.65.1）里这些包齐全，所以显式选它。
+        export VITASDK_CHANNEL=nightly
         ./bootstrap-vitasdk.sh
         # Use the frontend the bootstrap installed. Current releases put the
         # package client at libexec/vdpm/pacman, while the clone's legacy
         # ./vdpm script still looks for bin/pacman.
         #
-        # 2026-11-16 上游换成 series 2026.08 的新 vdpm/pacman 体系后，紧接着的
-        # `vdpm install sdl2` 会报 `target not found: sdl2`。先显式刷新一次仓库
-        # （幂等，只重写包数据库），再把 11 个库合并成一条事务安装；仍然失败时
-        # 打印 status / search / files，便于直接从日志定位原因。
-        $VITASDK/bin/vdpm refresh 2026.08 || echo "refresh failed; continuing"
+        # 新 vdpm/pacman 体系按 series 发布包库。先按所选系列刷新一次（幂等，
+        # 只重写包数据库），再把 11 个库合并成一条事务安装；仍然失败时打印
+        # status / search / files，便于直接从日志定位原因。
+        $VITASDK/bin/vdpm refresh "$VITASDK_CHANNEL" || echo "refresh failed; continuing"
         pkgs="sdl2 sdl2_mixer flac libmodplug mpg123 libogg libvorbis libmikmod opus opusfile libxmp"
         if ! $VITASDK/bin/vdpm install $pkgs; then
           $VITASDK/bin/vdpm status || true
