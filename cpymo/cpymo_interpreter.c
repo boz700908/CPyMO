@@ -1052,7 +1052,11 @@ static error_t cpymo_interpreter_dispatch(cpymo_str command, cpymo_interpreter *
 			content = cpymo_str_pure(content_num);
 		}
 
-		cpymo_engine_extract_text(engine, content);
+		{
+			char *a11y_plain = cpymo_textbox_strip_rich_text(content.begin, content.len);
+			cpymo_engine_extract_text(engine, a11y_plain ? cpymo_str_pure(a11y_plain) : content);
+			free(a11y_plain);
+		}
 		cpymo_engine_extract_text_submit(engine);
 
 		return cpymo_text_new(engine, x1, y1, x2, y2, col, fontsize, content, show_immediately);
