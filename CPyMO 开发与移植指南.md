@@ -729,6 +729,8 @@ cpymo-tool gen-album-cache MyGame-3ds
 
 `--pack` 会把 `bg`/`chara`/`se`/`voice` 打成 pak，`bgm` / `video` / `script` / `system` 仍是散文件。
 
+`strip` 不是必需的一步：`convert` 内部按同一份资源清单过滤，未被引用的文件同样不会进输出目录。单独跑 `strip` 的价值是先把裁剪结果落成一个目录，看清哪些资源留下了、哪些被丢掉了（脚本里用变量拼出来的资源名一定在这一步暴露），再决定去改脚本还是改文件名。
+
 ---
 
 ## 9. 移植已有的游戏
