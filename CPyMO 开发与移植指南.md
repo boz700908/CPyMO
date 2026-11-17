@@ -54,7 +54,7 @@ MyGame/
 `save/` 里实际会出现的三类文件（都在 `<游戏目录>/save/` 下，路径由后端的 `cpymo_backend_save.c` 拼 `<gamedir>/save/<文件名>`，目录本身由后端启动时 `mkdir`）：
 
 * `save-00.csav`、`save-01.csav` …… `save-30.csav` —— 对话界面「存档 / 读档」的 **31 个槽位**（`cpymo_save_ui.c` 里 `CPYMO_MAX_SAVES` 是 31，编号从 0 起，文件名格式 `save-%02d.csav`）。
-* `global.csav` —— `S` 开头的全局变量（见 5.3）。
+* `global.csav` —— 首字符大写 `S` 的全局变量（见 5.3）。
 * `config.csav` —— 玩家在设置界面改过的字号、音量、打字速度等，它会盖掉一部分 `gameconfig.txt`（见 2.4）。
 
 这三个都只由引擎写，发布时不用预置；删掉等于重置。注意 `save-%02d` 是两位编号，但槽位到 30，所以是 `save-00` 到 `save-30`，不是三位数。
@@ -190,9 +190,11 @@ voiceformat,mp3
 
 ### 3.2 颜色
 
-颜色一律写 `#RRGGBB`（六位十六进制），**不认颜色名**。写 `white`、`red` 得到的是品红，不是白色。
+颜色一律写 `#RRGGBB`（六位十六进制）。**引擎不认颜色名**：PyMO 文本脚本里写 `white`、`red` 得到的是品红，不是白色。
 
-**引擎**：`cpymo_str_as_color` 先看首字符是不是 `#`，不是就直接返回 `cpymo_color_error`（品红 241,75,233）；然后只检查 `#` 后面是否全是十六进制字符，从**末位往前**依次填 `b`、`g`、`r`。三位简写（`#FFF`）不报错，但按这个方向填出来是 `(15,255,255)` 而不是白色，**别用三位简写**。
+**ykm 侧有个例外**：`ykmc` 的 `colorCommands`（`PyMO.fs:150-155`）只对 `text`、`flash`、`fade_out`、`date` 四条命令做转换，把五个颜色名换成 `#FFFFFF`/`#000000`/`#FF0000`/`#00FF00`/`#0000FF`，把整数 `0xRRGGBB` 夹到 `0..0xFFFFFF` 再左补零成 `#RRGGBB`。表外命令（`select_text_do`、`select_var_do` 都算，尽管它们在 `libpymo.ykm` 里标了颜色类型）不转换：写颜色名会让编译器直接报 `Unsupported PyMO keyword white`，写整数会变成十进制数字、被引擎当成错误色。**所以在 ykm 里任何 color 参数都可以直接写字符串 `"#RRGGBB"`，最稳。**另外 ykm 的 `date` 宏默认 `color=white`，会转成 `#FFFFFF`；PyMO 的 `#date bg,x,y` 省掉第 4 格才落到错误色。
+
+**引擎**：`cpymo_str_as_color` 先看首字符是不是 `#`，不是就直接返回 `cpymo_color_error`（品红 241,75,233）；然后只检查 `#` 后面是否全是十六进制字符，从**末位往前每两位一组**依次填 `b`、`g`、`r`，位数不够就少填（`#1` = (0,0,1)、`#12` = (0,0,0x12)）。所以三位简写（`#FFF`）不报错，但填出来是 `(0,15,255)` 而不是白色，**别用三位简写**；位数也不严格要求是 6 位。参数整格留空同样落到错误色（`span.len < 1` 直接返回 `cpymo_color_error`），所以 `#date` 的 color 别省。
 
 ### 3.3 时间
 
@@ -346,6 +348,7 @@ make -j2
 
 * 运算符只有 `=`、`!=`、`<>`、`>`、`>=`、`<`、`<=`（**引擎**：`D("if")` 里逐个 `cpymo_str_equals_str` 比；写成别的样子会打 `[Error] Bad if expression "..." in script %s(%u).`）。
 * 两侧可以是常量，也可以是变量名。**右侧写了不存在的变量时整行被静默跳过**（`cpymo_vars_access` 拿到 NULL 就直接 `CONT_NEXTLINE`），不报错——「条件好像没生效」多半是这个。
+* **左侧未定义的变量按 0 算**（`cpymo_vars_eval` 对非常量走 `cpymo_vars_get`，取不到返回 0），所以 `#if F1=0` 在 `F1` 从没赋过值时**成立**。判断「玩家做过某事没有」之前，先确认变量被初始化过（惯例是在开场脚本里先给 0）。左右两侧口径不同，是这套条件最容易踩的地方。
 * 子命令只取逗号之后的第一个词，所以能内联的只有单条命令；要连着做好几件事就 `#if 条件,goto 标签`，把活儿放在标签下面。
 
 **随机数**
@@ -402,7 +405,7 @@ make -j2
 
 ### 5.3 全局变量：每次进游戏随机一张背景
 
-**`S` 开头的变量是全局变量**，存 `global.csav`，读档不影响它（**引擎**：全局变量进 `e->vars.globals`，与存档分开写）。这正好用来记「本局已经随机过没有」：
+**首字符是大写 `S` 的变量是全局变量**，存 `global.csav`，读档不影响它（**引擎**：`cpymo_vars_is_global` 只判 `name[0] == 'S'`，小写 `s` 算局部；全局进 `e->vars.globals` 写 `global.csav`，局部进 `e->vars.locals` 写进各个 `save-NN.csav`——两者分开落盘，读档时先 `cpymo_vars_clear_locals` 清空全部局部变量、再按存档逐个写回）。这正好用来记「本局已经随机过没有」：
 
 ```
 #label START
@@ -699,7 +702,7 @@ ascii-art 后端在 `cpymo-backends/ascii-art/`，`make LUA=1` 就能产出 `cpy
 * 除了 `s60v3` / `s60v5`，其他目标把 `platform` 写成 `pygame`。`platform` 在 CPyMO 里只有两个用途：塞班遮罩门控，以及 `cpymohd1/2/3` 这三个值用来选 feature level（见 2.2）。**`convert` 会把输出目录的 `platform` 覆盖成上表的值**，所以转换完要手工改回，否则 Level 1 的脚本跑不起来。
 * **`playvideo` 转换后照抄原值。** 规格表里那个 `play_video` 字段从没被读取过——`convert` 里唯一提到它的一行是 `if (!cfg.playvideo) cfg.playvideo = false;`，等于什么都没干。想让掌机不播影片，得自己把配置改成 `playvideo,0`。
 * **非塞班目标的立绘遮罩格式是空的。** 表里 `charamaskformat` 只有 `s60v3` / `s60v5` 有值，其余目标是 `NULL`，写回时被清成空串，于是输出的 `gameconfig.txt` 里会出现一行 `charamaskformat,.`（只有一个点）。这不是工具出错，非塞班平台本来也不读它。
-* PSP 的游戏数据包必须用 `convert psp` 转换过才能跑（README 的 PSP 章节明确要求）。
+* PSP 的游戏数据包必须用 `convert psp` 转换过才能跑。README 的 PSP 章节原话是「所有的游戏数据包必须使用 `pymo-convert` 转换为 psp 目标才可正常运行」——`pymo-convert` 是旧名，就是这里的 `convert`；同一份 README 前面又说 3DS 与 PSP「一般情况下可以直接运行 s60v5 版本」，两处口径不一致，按 PSP 章节那句办。
 * `convert` 会顺手把 `icon.png` 与 `system/default.ttf` 复制到输出目录（前者失败只警告）。
 
 **`convert` 会把 `gameconfig.txt` 整份重写。** 它按引擎规则解析原配置，再按固定字段表写一份新的（`cpymo_tool_gameconfig_write_to_file`，顺序就是写文件的顺序）：`gametitle`、`platform`、`engineversion`、`scripttype`、六个格式键、`font`、`fontsize`、`fontaa`、`hint`、`prefetching`、`grayselected`、`playvideo`、`textspeed`、`bgmvolume`、`vovolume`、`imagesize`、`startscript`、`nameboxorig`、`cgprefix`、`textcolor`、`msgtb`、`msglr`、`namealign`。写死的几项：`scripttype` 一律写 `pymo`（4 字节字段只留 3 个字符，存进去还是 `pym`，与手写等价）、格式键带前导点（`.jpg`）、`font` 写 `-1`、`fontaa` 与 `prefetching` 写 `1`、`namealign` 写 `middle` / `left` / `right`、`textcolor` 写成小写 `#rrggbb`。`font`、`fontaa`、`prefetching` 这三个键 CPyMO 引擎不认（见 2.3），写了只是留给上游 PyMO。**原文件里的注释行、`#` 开头的行、引擎不认识的键，转换后全部消失**——要留着就转换后再手工补回。
