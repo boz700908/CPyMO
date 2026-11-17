@@ -322,7 +322,13 @@ jobs:
       run: |
         export PSPDEV=/usr/local/pspdev
         export PATH=$PATH:$PSPDEV/bin
-        psp-pacman -S sdl2 sdl2-image freetype2 sdl2-ttf --noconfirm
+        # --needed：缓存命中时这几个包本来就在（旧写法会让 pacman 重装它们，日志里是
+        #   "up to date --reinstalling"），而重装要重新下载
+        #   sdl2-ttf-2.24.0-2-any.pkg.tar.gz，这个文件现在从 pspdev.github.io 取会报
+        #   "Maximum file size exceeded"，job 还没跑 make 就挂了。
+        # 后半句兜底：万一真要下载且失败，只要本地包装着就继续编译。
+        psp-pacman -S --needed --noconfirm sdl2 sdl2-image freetype2 sdl2-ttf \
+            || psp-pacman -Q sdl2 sdl2-image freetype2 sdl2-ttf >/dev/null
         cd ./cpymo-backends/sdl2
         make -f Makefile.PSP -j
 
